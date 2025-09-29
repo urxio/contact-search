@@ -28,28 +28,30 @@ import {
   RefreshCw,
   FileJson,
   FileSpreadsheet,
-  Import,
-  Filter,
+  Import
 } from "lucide-react"
-import * as XLSX from "xlsx"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import * as XLSX from "xlsx"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Filter } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -77,7 +79,7 @@ interface BaseContact {
 // Update the EnhancedContact interface to include territoryStatus
 interface EnhancedContact extends BaseContact {
   id: string
-  status: "Not checked" | "Potentially French" | "Not French"
+  status: "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected"
   notes: string
   isExpanded: boolean
   checkedOnTPS: boolean
@@ -87,6 +89,8 @@ interface EnhancedContact extends BaseContact {
   needPhoneUpdate: boolean
   lastInteraction?: Date // Add timestamp for last interaction
   territoryStatus: boolean // Add territory status field
+  // Flag set by automated name detection (heuristic)
+  frenchNameMatched?: boolean
 }
 
 // Add this debug function at the top of the file, right after the interfaces
@@ -154,13 +158,16 @@ export default function Home() {
 
   // Add this new state variable with the other state variables
   const [lastVerifiedId, setLastVerifiedId] = useState<string | null>(null)
+  const [isDetecting, setIsDetecting] = useState(false)
 
   // Add a keyboard shortcuts help dialog
   // Add this state variable with the other state variables
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French">("All")
+  // Debounced search to avoid re-filtering on every keystroke
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
+  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected">("All")
 
   // useRef hook for the file input
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -169,6 +176,12 @@ export default function Home() {
   const potentiallyFrenchContacts = useMemo(() => {
     return contacts.filter((contact) => contact.status === "Potentially French")
   }, [contacts])
+
+  // Update debounced search query after a short delay
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 250)
+    return () => clearTimeout(t)
+  }, [searchQuery])
 
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
@@ -182,9 +195,9 @@ export default function Home() {
         return false
       }
 
-      // Apply search query filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+      // Apply search query filter (debounced)
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase()
         return (
           contact.firstName.toLowerCase().includes(query) ||
           contact.lastName.toLowerCase().includes(query) ||
@@ -199,7 +212,7 @@ export default function Home() {
 
       return true
     })
-  }, [contacts, searchQuery, statusFilter, showUpdateNeeded])
+  }, [contacts, debouncedSearchQuery, statusFilter, showUpdateNeeded])
 
   // Update statistics calculations
   const notCheckedCount = useMemo(() => contacts.filter((c) => c.status === "Not checked").length, [contacts])
@@ -260,15 +273,35 @@ export default function Home() {
   }, [])
 
   // Save contacts to localStorage whenever they change
+  // Debounced save of contacts to localStorage to avoid frequent writes
   useEffect(() => {
-    if (contacts.length > 0) {
-      localStorage.setItem("contacts", JSON.stringify(contacts))
-    }
+    const handle = setTimeout(() => {
+      try {
+        if (contacts.length > 0) {
+          localStorage.setItem("contacts", JSON.stringify(contacts))
+        } else {
+          localStorage.removeItem("contacts")
+        }
+      } catch (e) {
+        console.error("Failed to save contacts to localStorage", e)
+      }
+    }, 500)
+
+    return () => clearTimeout(handle)
   }, [contacts])
 
   // Save global notes to localStorage whenever they change
+  // Debounce global notes saves to avoid frequent writes
   useEffect(() => {
-    localStorage.setItem("globalNotes", globalNotes)
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem("globalNotes", globalNotes)
+      } catch (e) {
+        console.error("Error saving globalNotes:", e)
+      }
+    }, 500)
+
+    return () => clearTimeout(t)
   }, [globalNotes])
 
   // Save view type to localStorage whenever it changes
@@ -369,6 +402,14 @@ export default function Home() {
 
         setContacts(processedContacts)
         setFileUploaded(true)
+        // Run detection automatically after import (non-blocking)
+        setTimeout(() => {
+          try {
+            ;(detectFrenchNames as any)?.(false, processedContacts)
+          } catch (e) {
+            console.warn("detectFrenchNames not available yet", e)
+          }
+        }, 50)
       } catch (error) {
         console.error("Error parsing Excel file:", error)
         setError(`Error parsing Excel file: ${error instanceof Error ? error.message : "Unknown error"}`)
@@ -675,6 +716,51 @@ export default function Home() {
     URL.revokeObjectURL(url)
   }, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
 
+  // Automated detection of French-looking names using utils/french-name-detection
+  const detectFrenchNames = useCallback(
+    async (onlySelected = false, contactsToCheck?: EnhancedContact[]) => {
+      const sourceContacts = contactsToCheck ?? contacts
+
+      if (!sourceContacts || sourceContacts.length === 0) {
+        alert("No contacts loaded")
+        return
+      }
+
+      setIsDetecting(true)
+      await loadDictionaryIfNeeded()
+
+      const targetIds = onlySelected && selectedContacts.length > 0 ? new Set(selectedContacts) : null
+
+      let changed = 0
+
+      // If contactsToCheck was provided (freshly imported), update directly from it
+      if (contactsToCheck) {
+        const updated = contactsToCheck.map((c) => {
+          if (targetIds && !targetIds.has(c.id)) return c
+          const surname = c.lastName || c.fullName || ""
+          const matched = isPotentiallyFrench(surname)
+          if (matched) changed++
+          return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
+        })
+        setContacts(updated)
+      } else {
+        setContacts((prev) =>
+          prev.map((c) => {
+            if (targetIds && !targetIds.has(c.id)) return c
+            const surname = c.lastName || c.fullName || ""
+            const matched = isPotentiallyFrench(surname)
+            if (matched) changed++
+            return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
+          }),
+        )
+      }
+
+      setIsDetecting(false)
+      alert(`Name detection completed. Marked ${changed} contacts as Detected.`)
+    },
+    [contacts, selectedContacts],
+  )
+
   // Function to import data
   const importData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -936,6 +1022,8 @@ export default function Home() {
         return <CheckCircle2 className="h-4 w-4 text-green-500" />
       case "Not checked":
         return <XCircle className="h-4 w-4 text-blue-500" />
+      case "Duplicate":
+        return <RefreshCw className="h-4 w-4 text-amber-500" />
       case "Not French":
         return <CircleSlash className="h-4 w-4 text-red-500" />
     }
@@ -1363,6 +1451,7 @@ export default function Home() {
                   </Button>
                   {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
 
+                  {/* detection runs automatically after import; manual detect buttons removed */}
                   <Button
                     variant="outline"
                     size="sm"
@@ -1588,6 +1677,8 @@ export default function Home() {
                       <SelectItem value="All">All</SelectItem>
                       <SelectItem value="Not checked">Not checked</SelectItem>
                       <SelectItem value="Potentially French">Potentially French</SelectItem>
+                      <SelectItem value="Detected">Detected</SelectItem>
+                      <SelectItem value="Duplicate">Duplicate</SelectItem>
                       <SelectItem value="Not French">Not French</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1621,9 +1712,13 @@ export default function Home() {
                         const rowColorClass =
                           contact.status === "Potentially French"
                             ? "bg-green-50 dark:bg-green-900/20"
-                            : contact.status === "Not French"
-                              ? "bg-red-50 dark:bg-red-900/20"
-                              : "" // Not checked stays white/default
+                            : contact.status === "Duplicate"
+                              ? "bg-amber-50 dark:bg-amber-900/20"
+                              : contact.status === "Detected"
+                                ? "bg-purple-50 dark:bg-purple-900/20"
+                                : contact.status === "Not French"
+                                ? "bg-red-50 dark:bg-red-900/20"
+                                : "" // Not checked stays white/default
 
                         return (
                           <React.Fragment key={contact.id}>
@@ -1723,7 +1818,9 @@ export default function Home() {
                                         ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
                                         : contact.status === "Not French"
                                           ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
-                                          : contact.status === "Not checked"
+                                          : contact.status === "Detected"
+                                            ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
+                                            : contact.status === "Not checked"
                                             ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
                                             : ""
                                     }`}
@@ -1733,6 +1830,8 @@ export default function Home() {
                                   <SelectContent>
                                     <SelectItem value="Not checked">Not checked</SelectItem>
                                     <SelectItem value="Potentially French">Potentially French</SelectItem>
+                                    <SelectItem value="Detected">Detected</SelectItem>
+                                    <SelectItem value="Duplicate">Duplicate</SelectItem>
                                     <SelectItem value="Not French">Not French</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1959,9 +2058,11 @@ export default function Home() {
                     const statusColor =
                       contact.status === "Potentially French"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : contact.status === "Not checked"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                        : contact.status === "Duplicate"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                          : contact.status === "Not checked"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                            : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
 
                     return (
                       <Card
@@ -2261,6 +2362,8 @@ export default function Home() {
                                     <SelectContent>
                                       <SelectItem value="Not checked">Not checked</SelectItem>
                                       <SelectItem value="Potentially French">Potentially French</SelectItem>
+                                      <SelectItem value="Detected">Detected</SelectItem>
+                                      <SelectItem value="Duplicate">Duplicate</SelectItem>
                                       <SelectItem value="Not French">Not French</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -2307,6 +2410,24 @@ export default function Home() {
               >
                 <CheckCircle2 className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
                 Potentially French
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Duplicate")}
+                className="bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
+              >
+                <RefreshCw className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
+                Duplicate
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Detected")}
+                className="bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:hover:bg-purple-900/40"
+              >
+                <Badge className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
+                Detected
               </Button>
               <Button
                 size="sm"

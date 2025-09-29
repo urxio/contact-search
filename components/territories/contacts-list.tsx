@@ -1,7 +1,25 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import type { Contact } from "@/actions/territory-actions"
+import { useState, useCallback, useMemo } from "react"
+// Local Contact shape used by this component. We declare it here to avoid
+// depending on an external type that may not match the runtime shape.
+// Keep this narrow: expand only if new compiler errors indicate missing fields.
+interface Contact {
+  id: string
+  first_name: string
+  last_name: string
+  full_name: string
+  address: string
+  city: string
+  zipcode: string
+  phone: string
+  notes: string
+  status: "Not checked" | "Potentially French" | "Duplicate" | "Not French" | "french"
+  | "Detected"
+  need_address_update?: boolean
+  need_phone_update?: boolean
+  is_expanded?: boolean
+}
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { LayoutGrid, LayoutList, Filter, ExternalLink, CheckCircle } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { FixedSizeList as List } from "react-window"
 import { updateContact, bulkUpdateContacts } from "@/actions/contact-actions"
 import { ExportFrenchContacts } from "./export-french-contacts"
 import { ExportJsonWithVerification } from "./export-json-with-verification"
@@ -37,40 +56,44 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
   )
   const [viewType, setViewType] = useState<ViewType>("list")
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French">("All")
+  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected">("All")
   const [showUpdateNeeded, setShowUpdateNeeded] = useState(false)
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
 
-  // Filter contacts based on search query and filters
-  const filteredContacts = contacts.filter((contact) => {
-    // Apply status filter
-    if (statusFilter !== "All" && contact.status !== statusFilter) {
-      return false
-    }
+  // Filter contacts based on search query and filters (memoized)
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((contact) => {
+      // Apply status filter
+      if (statusFilter !== "All" && contact.status !== statusFilter) {
+        return false
+      }
 
-    // Apply "needs update" filter if enabled
-    if (showUpdateNeeded && !contact.need_address_update && !contact.need_phone_update) {
-      return false
-    }
+      // Apply "needs update" filter if enabled
+      if (showUpdateNeeded && !contact.need_address_update && !contact.need_phone_update) {
+        return false
+      }
 
-    // Apply search query filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        contact.first_name.toLowerCase().includes(query) ||
-        contact.last_name.toLowerCase().includes(query) ||
-        contact.full_name.toLowerCase().includes(query) ||
-        contact.address.toLowerCase().includes(query) ||
-        contact.city.toLowerCase().includes(query) ||
-        contact.zipcode.toLowerCase().includes(query) ||
-        contact.phone.toLowerCase().includes(query) ||
-        contact.notes.toLowerCase().includes(query)
-      )
-    }
+      // Apply search query filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          contact.first_name.toLowerCase().includes(query) ||
+          contact.last_name.toLowerCase().includes(query) ||
+          contact.full_name.toLowerCase().includes(query) ||
+          contact.address.toLowerCase().includes(query) ||
+          contact.city.toLowerCase().includes(query) ||
+          contact.zipcode.toLowerCase().includes(query) ||
+          contact.phone.toLowerCase().includes(query) ||
+          contact.notes.toLowerCase().includes(query)
+        )
+      }
 
-    return true
-  })
+      return true
+    })
+  }, [contacts, statusFilter, showUpdateNeeded, searchQuery])
 
+  
+  
   // Handle "All Actions" button click
   const handleAllActionsClick = useCallback(
     async (contactId: string) => {
@@ -124,13 +147,13 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
 
   // Handle status change
   const handleStatusChange = useCallback(async (id: string, newStatus: Contact["status"]) => {
-    try {
-      await updateContact(id, { status: newStatus })
+    // Optimistic update: update UI immediately, then persist in background
+    setContacts((prevContacts) => prevContacts.map((c) => (c.id === id ? { ...c, status: newStatus } : c)))
 
-      setContacts((prevContacts) => prevContacts.map((c) => (c.id === id ? { ...c, status: newStatus } : c)))
-    } catch (error) {
+    updateContact(id, { status: newStatus }).catch((error: any) => {
       console.error("Error updating contact status:", error)
-    }
+      // Optionally revert UI on failure (simple strategy: no revert here, but could be implemented)
+    })
   }, [])
 
   // Toggle contact selection
@@ -160,30 +183,176 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
 
   // Update batch status
   const updateBatchStatus = useCallback(
-    async (newStatus: Contact["status"]) => {
+    (newStatus: Contact["status"]) => {
       if (selectedContacts.length === 0) {
         alert("Please select contacts to update")
         return
       }
 
-      try {
-        await bulkUpdateContacts(selectedContacts, { status: newStatus })
+      // Optimistic update: update UI immediately
+      setContacts((prevContacts) =>
+        prevContacts.map((contact) =>
+          selectedContacts.includes(contact.id) ? { ...contact, status: newStatus } : contact,
+        ),
+      )
 
-        setContacts((prevContacts) =>
-          prevContacts.map((contact) =>
-            selectedContacts.includes(contact.id) ? { ...contact, status: newStatus } : contact,
-          ),
-        )
-
-        // Show success message
-        alert(`Updated ${selectedContacts.length} contacts to "${newStatus}" status`)
-      } catch (error) {
-        console.error("Error updating batch status:", error)
-        alert("Error updating contacts. Please try again.")
-      }
+      // Fire-and-forget bulk update; report errors but don't block UI
+      bulkUpdateContacts(selectedContacts, { status: newStatus })
+        .then(() => {
+          // Optionally show success feedback (kept silent to avoid excessive alerts)
+        })
+        .catch((error: any) => {
+          console.error("Error updating batch status:", error)
+          alert("Error updating contacts. Some changes may not have been saved.")
+        })
     },
     [selectedContacts],
   )
+
+  // Memoize rendered list rows to avoid rebuilding large arrays on unrelated state changes
+  const listRows = useMemo(() => {
+    return filteredContacts.map((contact) => (
+      <TableRow
+        key={contact.id}
+        className="cursor-pointer"
+        onClick={() => toggleContactExpanded(contact.id)}
+      >
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selectedContacts.includes(contact.id)}
+            onCheckedChange={() => toggleContactSelection(contact.id)}
+          />
+        </TableCell>
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            {contact.full_name}
+            {contact.all_actions_clicked && <CheckCircle className="h-4 w-4 text-green-500" />}
+          </div>
+        </TableCell>
+        <TableCell>{contact.address}</TableCell>
+        <TableCell>{contact.city}</TableCell>
+        <TableCell>{contact.zipcode}</TableCell>
+        <TableCell>{contact.phone}</TableCell>
+        <TableCell>
+          <Select
+            value={contact.status}
+            onValueChange={(value) => handleStatusChange(contact.id, value as any)}
+          >
+            <SelectTrigger className="w-[140px] rounded-full">
+              <SelectValue placeholder={contact.status} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Not checked">Not checked</SelectItem>
+              <SelectItem value="Potentially French">Potentially French</SelectItem>
+              <SelectItem value="Duplicate">Duplicate</SelectItem>
+              <SelectItem value="Not French">Not French</SelectItem>
+            </SelectContent>
+          </Select>
+        </TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          {(contact.status === "Potentially French" || contact.status === "french" || contact.status === "Detected") && (
+            <Button
+              size="sm"
+              variant={contact.all_actions_clicked ? "default" : "outline"}
+              onClick={() => handleAllActionsClick(contact.id)}
+              disabled={contact.all_actions_clicked}
+              className="flex items-center gap-1"
+            >
+              {contact.all_actions_clicked ? (
+                <>
+                  <CheckCircle className="h-3 w-3" />
+                  Verified
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="h-3 w-3" />
+                  All Actions
+                </>
+              )}
+            </Button>
+          )}
+        </TableCell>
+      </TableRow>
+    ))
+  }, [filteredContacts, selectedContacts, toggleContactExpanded, toggleContactSelection, handleStatusChange, handleAllActionsClick])
+
+  // Memoize grid cards to reduce re-renders
+  const gridCards = useMemo(() => {
+    return filteredContacts.map((contact) => (
+      <Card
+        key={contact.id}
+        className="cursor-pointer hover:shadow-md transition-shadow"
+        onClick={() => toggleContactExpanded(contact.id)}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={selectedContacts.includes(contact.id)}
+                onCheckedChange={() => toggleContactSelection(contact.id)}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <CardTitle className="text-base flex items-center gap-2">
+                {contact.full_name}
+                {contact.all_actions_clicked && <CheckCircle className="h-4 w-4 text-green-500" />}
+              </CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm space-y-1">
+            <p>{contact.address}</p>
+            <p>
+              {contact.city}, {contact.zipcode}
+            </p>
+            <p>{contact.phone}</p>
+          </div>
+          <div className="mt-4 space-y-2">
+            <Select
+              value={contact.status}
+              onValueChange={(value) => handleStatusChange(contact.id, value as any)}
+            >
+              <SelectTrigger className="w-full rounded-full">
+                <SelectValue placeholder={contact.status} />
+              </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Not checked">Not checked</SelectItem>
+                  <SelectItem value="Potentially French">Potentially French</SelectItem>
+                  <SelectItem value="Detected">Detected</SelectItem>
+                  <SelectItem value="Duplicate">Duplicate</SelectItem>
+                  <SelectItem value="Not French">Not French</SelectItem>
+                </SelectContent>
+            </Select>
+
+            {(contact.status === "Potentially French" || contact.status === "french" || contact.status === "Detected") && (
+              <Button
+                size="sm"
+                variant={contact.all_actions_clicked ? "default" : "outline"}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAllActionsClick(contact.id)
+                }}
+                disabled={contact.all_actions_clicked}
+                className="w-full flex items-center gap-1"
+              >
+                {contact.all_actions_clicked ? (
+                  <>
+                    <CheckCircle className="h-3 w-3" />
+                    Verified
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-3 w-3" />
+                    All Actions
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    ))
+  }, [filteredContacts, selectedContacts, toggleContactExpanded, toggleContactSelection, handleStatusChange, handleAllActionsClick])
 
   return (
     <>
@@ -245,6 +414,8 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
                   <SelectItem value="All">All</SelectItem>
                   <SelectItem value="Not checked">Not checked</SelectItem>
                   <SelectItem value="Potentially French">Potentially French</SelectItem>
+                  <SelectItem value="Detected">Detected</SelectItem>
+                  <SelectItem value="Duplicate">Duplicate</SelectItem>
                   <SelectItem value="Not French">Not French</SelectItem>
                 </SelectContent>
               </Select>
@@ -253,170 +424,58 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
 
           {/* List View */}
           {viewType === "list" && (
-            <ScrollArea className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[30px]">
-                      <Checkbox
-                        checked={selectedContacts.length > 0 && selectedContacts.length === filteredContacts.length}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead className="w-[150px]">Name</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead>City</TableHead>
-                    <TableHead>Zipcode</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredContacts.map((contact) => (
-                    <TableRow
-                      key={contact.id}
-                      className="cursor-pointer"
-                      onClick={() => toggleContactExpanded(contact.id)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+            <div className="rounded-md border">
+              {/* Header */}
+              <div className="overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[30px]">
                         <Checkbox
-                          checked={selectedContacts.includes(contact.id)}
-                          onCheckedChange={() => toggleContactSelection(contact.id)}
+                          checked={selectedContacts.length > 0 && selectedContacts.length === filteredContacts.length}
+                          onCheckedChange={toggleSelectAll}
                         />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {contact.full_name}
-                          {contact.all_actions_clicked && <CheckCircle className="h-4 w-4 text-green-500" />}
-                        </div>
-                      </TableCell>
-                      <TableCell>{contact.address}</TableCell>
-                      <TableCell>{contact.city}</TableCell>
-                      <TableCell>{contact.zipcode}</TableCell>
-                      <TableCell>{contact.phone}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={contact.status}
-                          onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-                        >
-                          <SelectTrigger className="w-[140px] rounded-full">
-                            <SelectValue placeholder={contact.status} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Not checked">Not checked</SelectItem>
-                            <SelectItem value="Potentially French">Potentially French</SelectItem>
-                            <SelectItem value="Not French">Not French</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        {(contact.status === "Potentially French" || contact.status === "french") && (
-                          <Button
-                            size="sm"
-                            variant={contact.all_actions_clicked ? "default" : "outline"}
-                            onClick={() => handleAllActionsClick(contact.id)}
-                            disabled={contact.all_actions_clicked}
-                            className="flex items-center gap-1"
-                          >
-                            {contact.all_actions_clicked ? (
-                              <>
-                                <CheckCircle className="h-3 w-3" />
-                                Verified
-                              </>
-                            ) : (
-                              <>
-                                <ExternalLink className="h-3 w-3" />
-                                All Actions
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </TableCell>
+                      </TableHead>
+                      <TableHead className="w-[150px]">Name</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>City</TableHead>
+                      <TableHead>Zipcode</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead className="w-[120px]">Status</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                  </TableHeader>
+                </Table>
+              </div>
+
+              {/* Virtualized body for large lists */}
+              {filteredContacts.length > 50 ? (
+                <List
+                  height={400}
+                  itemCount={listRows.length}
+                  itemSize={62}
+                  width="100%"
+                >
+                  {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                    <div style={style} key={(filteredContacts[index] && filteredContacts[index].id) || index}>
+                      <Table>
+                        <TableBody>{listRows[index]}</TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </List>
+              ) : (
+                <ScrollArea className="rounded-b-md">
+                  <Table>
+                    <TableBody>{listRows}</TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </div>
           )}
 
           {/* Grid View */}
-          {viewType === "grid" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredContacts.map((contact) => (
-                <Card
-                  key={contact.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => toggleContactExpanded(contact.id)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={selectedContacts.includes(contact.id)}
-                          onCheckedChange={() => toggleContactSelection(contact.id)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <CardTitle className="text-base flex items-center gap-2">
-                          {contact.full_name}
-                          {contact.all_actions_clicked && <CheckCircle className="h-4 w-4 text-green-500" />}
-                        </CardTitle>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm space-y-1">
-                      <p>{contact.address}</p>
-                      <p>
-                        {contact.city}, {contact.zipcode}
-                      </p>
-                      <p>{contact.phone}</p>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      <Select
-                        value={contact.status}
-                        onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-                      >
-                        <SelectTrigger className="w-full rounded-full">
-                          <SelectValue placeholder={contact.status} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Not checked">Not checked</SelectItem>
-                          <SelectItem value="Potentially French">Potentially French</SelectItem>
-                          <SelectItem value="Not French">Not French</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      {(contact.status === "Potentially French" || contact.status === "french") && (
-                        <Button
-                          size="sm"
-                          variant={contact.all_actions_clicked ? "default" : "outline"}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleAllActionsClick(contact.id)
-                          }}
-                          disabled={contact.all_actions_clicked}
-                          className="w-full flex items-center gap-1"
-                        >
-                          {contact.all_actions_clicked ? (
-                            <>
-                              <CheckCircle className="h-3 w-3" />
-                              Verified
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="h-3 w-3" />
-                              All Actions
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+              {viewType === "grid" && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{gridCards}</div>}
         </CardContent>
       </Card>
 
@@ -436,6 +495,9 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
               </Button>
               <Button size="sm" variant="outline" onClick={() => updateBatchStatus("Potentially French")}>
                 Potentially French
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => updateBatchStatus("Duplicate")}>
+                Duplicate
               </Button>
               <Button size="sm" variant="outline" onClick={() => updateBatchStatus("Not French")}>
                 Not French
