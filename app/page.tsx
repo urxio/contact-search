@@ -1820,9 +1820,11 @@ export default function Home() {
                                           ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
                                           : contact.status === "Detected"
                                             ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
-                                            : contact.status === "Not checked"
-                                            ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
-                                            : ""
+                                            : contact.status === "Duplicate"
+                                              ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
+                                              : contact.status === "Not checked"
+                                              ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
+                                              : ""
                                     }`}
                                   >
                                     <SelectValue placeholder={contact.status} />
