@@ -707,7 +707,6 @@ clement
 clerc
 coast
 cochet
-cohen
 colas
 colin
 collard
@@ -725,9 +724,6 @@ cormier
 cornet
 cornu
 corre
-correia
-cortes
-costa
 coste
 costes
 cottin
@@ -1156,7 +1152,6 @@ ganga
 gangoue
 ganongo
 garba
-garcia
 garcin
 garga
 garnier
