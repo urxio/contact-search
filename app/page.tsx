@@ -222,6 +222,8 @@ export default function Home() {
   )
   const notFrenchCount = useMemo(() => contacts.filter((c) => c.status === "Not French").length, [contacts])
 
+  const detectedCount = useMemo(() => contacts.filter((c) => c.status === "Detected").length, [contacts])
+
   const potentiallyFrenchPercentage = useMemo(
     () => (contacts.length > 0 ? Math.round((potentiallyFrenchCount / contacts.length) * 100) : 0),
     [contacts, potentiallyFrenchCount],
@@ -1538,7 +1540,7 @@ export default function Home() {
                     style={{
                       width: `${
                         contacts.length > 0
-                          ? Math.round(((potentiallyFrenchCount + notFrenchCount) / contacts.length) * 100)
+                          ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
                           : 0
                       }%`,
                     }}
@@ -1546,7 +1548,7 @@ export default function Home() {
                 </div>
                 <span className="text-sm font-medium">
                   {contacts.length > 0
-                    ? Math.round(((potentiallyFrenchCount + notFrenchCount) / contacts.length) * 100)
+                    ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
                     : 0}
                   %
                 </span>
@@ -1554,7 +1556,7 @@ export default function Home() {
             </div>
 
             {/* Compact Stat Cards */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
                 <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900/30 mr-3">
                   <XCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -1582,6 +1584,16 @@ export default function Home() {
                 <div>
                   <div className="text-lg font-bold">{notFrenchCount}</div>
                   <div className="text-xs text-muted-foreground">Not French</div>
+                </div>
+              </div>
+
+              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
+                <div className="rounded-full p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
+                  <Globe className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{detectedCount}</div>
+                  <div className="text-xs text-muted-foreground">Detected</div>
                 </div>
               </div>
             </div>
