@@ -499,8 +499,19 @@ export default function Home() {
         return
       }
 
-      // Create the Forebears search URL
-      const forebearsUrl = `https://forebears.io/surnames/${encodeURIComponent(contact.lastName)}`
+  // Create the Forebears search URL
+  // forebears expects lowercase surname in the path; normalize and urlencode
+      const surnameForUrl = String(contact.lastName || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[ --]/g, "")
+        .replace(/[ -]/g, "")
+        .replace(/\p{Diacritic}/gu, "")
+        // fallback: remove combining diacritic marks
+        .replace(/[\u0300-\u036f]/g, "")
+
+      const forebearsUrl = `https://forebears.io/surnames/${encodeURIComponent(surnameForUrl)}`
 
       // Mark as checked on Forebears
       setContacts((prevContacts) =>
