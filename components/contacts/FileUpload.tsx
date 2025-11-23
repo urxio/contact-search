@@ -90,6 +90,55 @@ export function FileUpload({
                     throw new Error("No data found in the Excel file")
                 }
 
+                // Basic header/column validations
+                const headerRow: any[] = rawData[0] || []
+                const requiredCols: { name: string; index: number }[] = [
+                    { name: "First Name", index: FIXED_COLUMNS.FIRST_NAME },
+                    { name: "Last Name", index: FIXED_COLUMNS.LAST_NAME },
+                    { name: "Address", index: FIXED_COLUMNS.ADDRESS },
+                    { name: "City", index: FIXED_COLUMNS.CITY },
+                    { name: "Zipcode", index: FIXED_COLUMNS.ZIPCODE },
+                    { name: "Phone", index: FIXED_COLUMNS.PHONE },
+                ]
+
+                const headerErrors: string[] = []
+                for (const col of requiredCols) {
+                    const hdr = headerRow[col.index]
+                    if (hdr === undefined || hdr === null || String(hdr).trim() === "") {
+                        headerErrors.push(`Missing required header for column "${col.name}" at index ${col.index}`)
+                    }
+                }
+
+                if (headerErrors.length > 0) {
+                    const message = `Excel format error: missing headers:\n${headerErrors.join("\n")}`
+                    setError(message)
+                    onContactsLoaded([])
+                    setIsLoading(false)
+                    return
+                }
+
+                // Check for entirely empty required columns (no values in any data row)
+                const emptyColumnErrors: string[] = []
+                const dataRows = rawData.slice(1)
+                for (const col of requiredCols) {
+                    const allEmpty = dataRows.every((r) => {
+                        const v = r[col.index]
+                        return v === undefined || v === null || String(v).trim() === ""
+                    })
+                    if (allEmpty) {
+                        emptyColumnErrors.push(`Column "${col.name}" appears empty (no values found)
+                        `)
+                    }
+                }
+
+                if (emptyColumnErrors.length > 0) {
+                    const message = `Excel format error: empty columns detected:\n${emptyColumnErrors.join("\n")}`
+                    setError(message)
+                    onContactsLoaded([])
+                    setIsLoading(false)
+                    return
+                }
+
                 // Validate and process contacts
                 const validationErrors: string[] = []
                 const processedContacts = rawData.slice(1).map((row, rowIndex) => {
