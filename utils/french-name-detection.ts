@@ -31,25 +31,20 @@ export function isPotentiallyFrench(name: string): boolean {
     .split(/\s+/)
     .map((t) => t.replace(/[^a-z\-']/g, ""))
     .filter(Boolean)
+  // Only use dictionary lookups now. If the dictionary isn't loaded,
+  // do not apply heuristics — return false to avoid false positives.
+  if (!DICT) return false
 
-  // Quick dictionary check on whole name
-    if (DICT && DICT.has(cleanedWhole)) return true
+  // Quick dictionary check on whole normalized name
+  if (DICT.has(cleanedWhole)) return true
 
   // Check each token against dictionary
-  if (DICT) {
-    for (const t of tokens) {
-      if (DICT.has(t)) return true
-    }
-  }
-
-  // Heuristic fallback: check tokens for common French prefixes/suffixes
   for (const t of tokens) {
-    if (t.startsWith("le") || t.startsWith("la") || t.startsWith("du") || t.startsWith("de")) return true
-    if (t.endsWith("eau") || t.endsWith("eux") || t.endsWith("ier")) return true
+    if (DICT.has(t)) return true
   }
 
-  // Also apply heuristics to the full normalized name (covers "le xxx" patterns)
-  return normalized.startsWith("le ") || normalized.startsWith("la ") || normalized.startsWith("du ") || normalized.startsWith("de ")
+  // No dictionary match -> not considered French
+  return false
 }
 
 export function analyzeSurnames(surnames: string[]): { frenchCount: number; total: number } {
