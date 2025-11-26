@@ -465,20 +465,21 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <div className="flex-1">
-              <Input
-                id="search-contacts"
-                type="search"
-                placeholder="Search contacts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+            <div className="flex-1 flex items-center gap-2">
+                <Input
+                  id="search-contacts"
+                  type="search"
+                  placeholder="Search contacts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add</span>
+                </Button>
+              </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add contact</span>
-              </Button>
+              {/* Add button moved next to the search input */}
               <ExportFrenchContacts contacts={contacts} />
               <ExportJsonWithVerification contacts={contacts} />
               <Button
