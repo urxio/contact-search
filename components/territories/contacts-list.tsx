@@ -80,8 +80,11 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
       const tag = active?.tagName?.toLowerCase()
       const isTyping = tag === "input" || tag === "textarea" || active?.isContentEditable
 
-      if (e.ctrlKey && (e.key === "j" || e.key === "J")) {
-        if (isTyping) return
+      // allow the shortcut even when typing inside the main search box (id="search-contacts")
+      const allowWhenSearchFocused = active?.id === "search-contacts"
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        if (isTyping && !allowWhenSearchFocused) return
         e.preventDefault()
         setIsAddContactOpen(true)
       }

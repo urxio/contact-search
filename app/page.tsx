@@ -1207,6 +1207,27 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSelectAll, updateBatchStatus, selectedContacts, viewType])
 
+  // Global keyboard shortcut for creating a contact (Ctrl+N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ignore when typing in inputs or textareas
+      const active = document.activeElement as HTMLElement | null
+      const tag = active?.tagName?.toLowerCase()
+      const isTyping = tag === "input" || tag === "textarea" || active?.isContentEditable
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        // allow when typing in the search box (id="search-contacts") but not other inputs
+        const allowWhenSearchFocused = active?.id === "search-contacts"
+        if (isTyping && !allowWhenSearchFocused) return
+        e.preventDefault()
+        setIsAddContactOpen(true)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
   // Add a separate useEffect for the Excel export shortcut that runs after exportPotentiallyFrenchToExcel is defined
   useEffect(() => {
     const handleExportShortcut = (e: KeyboardEvent) => {
@@ -1453,6 +1474,10 @@ export default function Home() {
                           <div className="bg-muted p-2 rounded flex items-center">
                             <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
                             <span>Export to Excel</span>
+                          </div>
+                          <div className="bg-muted p-2 rounded flex items-center">
+                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+N</kbd>
+                            <span>Add new contact (open Add dialog)</span>
                           </div>
                           <div className="bg-muted p-2 rounded flex items-center">
                             <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+1</kbd>
