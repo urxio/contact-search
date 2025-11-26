@@ -988,7 +988,7 @@ export default function Home() {
   // Add a new function to export only Potentially French contacts
   // Add this after the exportToExcel function
 
-  const exportPotentiallyFrenchToExcel = useCallback((stateValue: string) => {
+  const exportPotentiallyFrenchToCSV = useCallback((stateValue: string) => {
     if (contacts.length === 0) {
       alert("No contacts to export")
       return
@@ -1002,25 +1002,35 @@ export default function Home() {
       return
     }
 
-    // Create worksheet data with State column instead of Status and Notes
-    const wsData = [
-      [
-        "Contact Name",
-        "House Number",
-        "Direction",
-        "Street Name",
-        "Apt Num",
-        "City",
-        "ZIP Code",
-        "Phone Number",
-        "State",
-      ],
+    // Helper function to escape CSV fields
+    const escapeCSV = (field: string) => {
+      if (field === null || field === undefined) return ""
+      const stringField = String(field)
+      // If field contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+        return `"${stringField.replace(/"/g, '""')}"`
+      }
+      return stringField
+    }
+
+    // Create CSV header
+    const headers = [
+      "Contact Name",
+      "House Number",
+      "Direction",
+      "Street Name",
+      "Apt Num",
+      "City",
+      "ZIP Code",
+      "Phone Number",
+      "State",
     ]
 
-    frenchContacts.forEach((contact) => {
+    // Create CSV rows
+    const rows = frenchContacts.map((contact) => {
       const { houseNumber, direction, streetName, aptNum } = parseAddress(contact.address)
 
-      wsData.push([
+      return [
         contact.fullName,
         houseNumber,
         direction,
@@ -1030,27 +1040,20 @@ export default function Home() {
         contact.zipcode,
         contact.phone,
         stateValue,
-      ])
+      ].map(escapeCSV).join(',')
     })
 
-    // Create workbook and worksheet
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    // Combine header and rows
+    const csvContent = [headers.map(escapeCSV).join(','), ...rows].join('\n')
 
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, "French Contacts")
-
-    // Generate Excel file in memory
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-
-    // Create a Blob from the buffer
-    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    // Create a Blob from the CSV content
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
 
     // Create download link
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.xlsx`
+    a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.csv`
 
     // Append to body, click and remove
     document.body.appendChild(a)
@@ -1061,7 +1064,7 @@ export default function Home() {
     URL.revokeObjectURL(url)
 
     // Show success message
-    alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to Excel`)
+    alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to CSV`)
     
     // Close dialog and reset state value
     setIsExportStateDialogOpen(false)
@@ -1234,10 +1237,10 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  // Add a separate useEffect for the Excel export shortcut that runs after exportPotentiallyFrenchToExcel is defined
+  // Add a separate useEffect for the CSV export shortcut that runs after exportPotentiallyFrenchToCSV is defined
   useEffect(() => {
     const handleExportShortcut = (e: KeyboardEvent) => {
-      // Ctrl+E to export to Excel
+      // Ctrl+E to export to CSV
       if (e.ctrlKey && e.key === "e") {
         e.preventDefault()
         setIsExportStateDialogOpen(true)
@@ -1272,10 +1275,10 @@ export default function Home() {
                     className="flex items-center gap-1 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
                   >
                     <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    <span className="hidden sm:inline">Export</span>
+                    <span className="hidden sm:inline">Export CSV</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Export Potentially French contacts to Excel file</TooltipContent>
+                <TooltipContent>Export Potentially French contacts to CSV file</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -1479,7 +1482,7 @@ export default function Home() {
                           </div>
                           <div className="bg-muted p-2 rounded flex items-center">
                             <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
-                            <span>Export to Excel</span>
+                            <span>Export to CSV</span>
                           </div>
                           <div className="bg-muted p-2 rounded flex items-center">
                             <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
@@ -1530,7 +1533,7 @@ export default function Home() {
                       </div>
                       <div className="bg-muted p-2 rounded flex items-center">
                         <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
-                        <span>Export to Excel</span>
+                        <span>Export to CSV</span>
                       </div>
                       <div className="bg-muted p-2 rounded flex items-center">
                         <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
@@ -1635,7 +1638,7 @@ export default function Home() {
         <Dialog open={isExportStateDialogOpen} onOpenChange={setIsExportStateDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Export to Excel</DialogTitle>
+              <DialogTitle>Export to CSV</DialogTitle>
               <DialogDescription>
                 Enter the state value to be added to all exported contacts. This will replace the Status and Notes columns.
               </DialogDescription>
@@ -1653,7 +1656,7 @@ export default function Home() {
                   onChange={(e) => setExportStateValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && exportStateValue.trim()) {
-                      exportPotentiallyFrenchToExcel(exportStateValue.trim())
+                      exportPotentiallyFrenchToCSV(exportStateValue.trim())
                     }
                   }}
                 />
@@ -1677,7 +1680,7 @@ export default function Home() {
                     alert("Please enter a state value")
                     return
                   }
-                  exportPotentiallyFrenchToExcel(trimmedValue)
+                  exportPotentiallyFrenchToCSV(trimmedValue)
                 }}
                 className="bg-green-600 hover:bg-green-700"
               >
