@@ -1476,7 +1476,7 @@ export default function Home() {
                             <span>Export to Excel</span>
                           </div>
                           <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+N</kbd>
+                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
                             <span>Add new contact (open Add dialog)</span>
                           </div>
                           <div className="bg-muted p-2 rounded flex items-center">
@@ -1525,6 +1525,10 @@ export default function Home() {
                       <div className="bg-muted p-2 rounded flex items-center">
                         <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
                         <span>Export to Excel</span>
+                      </div>
+                      <div className="bg-muted p-2 rounded flex items-center">
+                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
+                        <span>Add new contact (open Add dialog)</span>
                       </div>
                       <div className="bg-muted p-2 rounded flex items-center">
                         <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+1</kbd>
