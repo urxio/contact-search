@@ -179,6 +179,10 @@ export default function Home() {
     notes: "",
   })
 
+  // Export state dialog
+  const [isExportStateDialogOpen, setIsExportStateDialogOpen] = useState(false)
+  const [exportStateValue, setExportStateValue] = useState("")
+
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
@@ -984,7 +988,7 @@ export default function Home() {
   // Add a new function to export only Potentially French contacts
   // Add this after the exportToExcel function
 
-  const exportPotentiallyFrenchToExcel = useCallback(() => {
+  const exportPotentiallyFrenchToExcel = useCallback((stateValue: string) => {
     if (contacts.length === 0) {
       alert("No contacts to export")
       return
@@ -998,7 +1002,7 @@ export default function Home() {
       return
     }
 
-    // Create worksheet data
+    // Create worksheet data with State column instead of Status and Notes
     const wsData = [
       [
         "Contact Name",
@@ -1009,8 +1013,7 @@ export default function Home() {
         "City",
         "ZIP Code",
         "Phone Number",
-        "Status",
-        "Notes",
+        "State",
       ],
     ]
 
@@ -1026,8 +1029,7 @@ export default function Home() {
         contact.city,
         contact.zipcode,
         contact.phone,
-        contact.status,
-        contact.notes,
+        stateValue,
       ])
     })
 
@@ -1060,6 +1062,10 @@ export default function Home() {
 
     // Show success message
     alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to Excel`)
+    
+    // Close dialog and reset state value
+    setIsExportStateDialogOpen(false)
+    setExportStateValue("")
   }, [contacts, parseAddress])
 
   // Modify the startNewSession function to reset the file input element
@@ -1234,13 +1240,13 @@ export default function Home() {
       // Ctrl+E to export to Excel
       if (e.ctrlKey && e.key === "e") {
         e.preventDefault()
-        exportPotentiallyFrenchToExcel()
+        setIsExportStateDialogOpen(true)
       }
     }
 
     window.addEventListener("keydown", handleExportShortcut)
     return () => window.removeEventListener("keydown", handleExportShortcut)
-  }, [exportPotentiallyFrenchToExcel])
+  }, [])
 
   return (
     <TooltipProvider>
@@ -1262,7 +1268,7 @@ export default function Home() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={exportPotentiallyFrenchToExcel}
+                    onClick={() => setIsExportStateDialogOpen(true)}
                     className="flex items-center gap-1 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
                   >
                     <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -1621,6 +1627,62 @@ export default function Home() {
                 setIsAddContactOpen(false)
                 alert('Contact added')
               }}>Create</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export State Dialog */}
+        <Dialog open={isExportStateDialogOpen} onOpenChange={setIsExportStateDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Export to Excel</DialogTitle>
+              <DialogDescription>
+                Enter the state value to be added to all exported contacts. This will replace the Status and Notes columns.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label htmlFor="state-value" className="text-sm font-medium">
+                  State
+                </label>
+                <Input
+                  id="state-value"
+                  placeholder="e.g., CA, NY, TX..."
+                  value={exportStateValue}
+                  onChange={(e) => setExportStateValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && exportStateValue.trim()) {
+                      exportPotentiallyFrenchToExcel(exportStateValue.trim())
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsExportStateDialogOpen(false)
+                  setExportStateValue("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  const trimmedValue = exportStateValue.trim()
+                  if (!trimmedValue) {
+                    alert("Please enter a state value")
+                    return
+                  }
+                  exportPotentiallyFrenchToExcel(trimmedValue)
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Export
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
