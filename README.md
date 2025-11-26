@@ -21,4 +21,4 @@ Notes
 - There are no required environment variables detected in the codebase.
 - The project includes a `pnpm-lock.yaml` so you can use pnpm if desired.
  - You can add a new contact directly in the UI using the "Add contact" button in the Contacts view — added contacts are persisted to localStorage.
- - Keyboard shortcut: press Ctrl+J to open the Add Contact dialog when viewing the contacts list.
+ - Keyboard shortcut: press Ctrl+J (or Cmd+J on macOS) to open the Add Contact dialog when viewing the contacts list.

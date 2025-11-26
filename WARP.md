@@ -150,7 +150,7 @@ Expected column order (fixed positions):
 - `Ctrl+A`: Toggle select all contacts
 - `Ctrl+G`: Toggle between grid/list view
 - `Ctrl+E`: Export French contacts to Excel
-- `Ctrl+J`: Open Add Contact dialog (create new contact)
+- `Ctrl+J` / `Cmd+J`: Open Add Contact dialog (create new contact)
 - `Ctrl+1/2/3`: Bulk status updates for selected contacts
 
 ## Testing and Quality

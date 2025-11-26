@@ -1284,7 +1284,7 @@ export default function Home() {
                     <span className="hidden sm:inline">JSON</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Export data to JSON file (Ctrl+J)</TooltipContent>
+                <TooltipContent>Export data to JSON file</TooltipContent>
               </Tooltip>
 
               <Tooltip>
