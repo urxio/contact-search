@@ -91,6 +91,15 @@ export function ExportFrenchContacts({ contacts }: ExportFrenchContactsProps) {
         return
       }
 
+      // Prompt for State
+      const stateInput = window.prompt("Please enter the State for these contacts (e.g., VA):", "VA")
+      if (stateInput === null) {
+        // User cancelled
+        setIsExporting(false)
+        return
+      }
+      const state = stateInput.trim()
+
       // Create the data array with headers
       const exportData = []
 
@@ -119,7 +128,7 @@ export function ExportFrenchContacts({ contacts }: ExportFrenchContactsProps) {
           addressParts.aptNumber,
           contact.city,
           contact.zipcode,
-          "VA", // Always VA as requested
+          state, // Use user-provided state
           contact.phone,
         ])
       })
