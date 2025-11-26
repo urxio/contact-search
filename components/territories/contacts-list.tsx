@@ -73,6 +73,24 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
     notes: "",
   })
 
+  // Keyboard shortcut to open Add dialog (Ctrl+J) — ignore when typing in inputs
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null
+      const tag = active?.tagName?.toLowerCase()
+      const isTyping = tag === "input" || tag === "textarea" || active?.isContentEditable
+
+      if (e.ctrlKey && (e.key === "j" || e.key === "J")) {
+        if (isTyping) return
+        e.preventDefault()
+        setIsAddContactOpen(true)
+      }
+    }
+
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
   // Filter contacts based on search query and filters (memoized)
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
