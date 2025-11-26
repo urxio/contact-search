@@ -52,6 +52,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Filter } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { createContact as persistContact } from "@/actions/contact-actions"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -163,6 +164,19 @@ export default function Home() {
   // Add a keyboard shortcuts help dialog
   // Add this state variable with the other state variables
   const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
+
+  // Add-contact dialog state
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false)
+  const [newContactForm, setNewContactForm] = useState<Partial<BaseContact & { notes?: string }>>({
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    zipcode: "",
+    phone: "",
+    fullName: "",
+    notes: "",
+  })
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -603,6 +617,64 @@ export default function Home() {
       }),
     )
   }, [])
+
+  // Handler to create and add a new contact
+  const handleAddContactSubmit = useCallback(async () => {
+    // Basic validation
+    const firstName = (newContactForm.firstName || "").trim()
+    const lastName = (newContactForm.lastName || "").trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+
+    if (!fullName) {
+      alert("Please enter at least a first or last name")
+      return
+    }
+
+    const contact: EnhancedContact = {
+      firstName,
+      lastName,
+      fullName,
+      address: String(newContactForm.address || ""),
+      city: String(newContactForm.city || ""),
+      zipcode: String(newContactForm.zipcode || ""),
+      phone: String(newContactForm.phone || ""),
+      id: Math.random().toString(36).substring(2, 11),
+      status: "Not checked",
+      notes: String(newContactForm.notes || ""),
+      isExpanded: false,
+      checkedOnTPS: false,
+      checkedOnOTM: false,
+      checkedOnForebears: false,
+      needAddressUpdate: false,
+      needPhoneUpdate: false,
+      territoryStatus: false,
+    }
+
+    // Run detection for this new contact
+    try {
+      await loadDictionaryIfNeeded()
+      const surname = contact.lastName || contact.fullName || ""
+      const matched = isPotentiallyFrench(surname)
+      if (matched) contact.status = "Detected"
+    } catch (e) {
+      console.warn("name-detection not available", e)
+    }
+
+    // Add to UI first
+    setContacts((prev) => [contact, ...prev])
+
+    // Persist to localStorage via action (keeps behavior consistent)
+    try {
+      await persistContact(contact)
+    } catch (e) {
+      console.warn("Failed to persist contact to localStorage", e)
+    }
+
+    // Reset form and close dialog
+    setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", fullName: "", notes: "" })
+    setIsAddContactOpen(false)
+    alert("Contact added")
+  }, [newContactForm])
 
   // Update the deleteContact function
   const deleteContact = useCallback((id: string) => {

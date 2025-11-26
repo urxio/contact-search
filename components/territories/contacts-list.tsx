@@ -22,6 +22,7 @@ interface Contact {
 }
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,7 +30,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LayoutGrid, LayoutList, Filter, ExternalLink, CheckCircle } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FixedSizeList as List } from "react-window"
-import { updateContact, bulkUpdateContacts } from "@/actions/contact-actions"
+import { updateContact, bulkUpdateContacts, createContact } from "@/actions/contact-actions"
+import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
 import { ExportFrenchContacts } from "./export-french-contacts"
 import { ExportJsonWithVerification } from "./export-json-with-verification"
 
@@ -59,6 +61,17 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
   const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected">("All")
   const [showUpdateNeeded, setShowUpdateNeeded] = useState(false)
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false)
+  const [newContact, setNewContact] = useState<Partial<Contact>>({
+    first_name: "",
+    last_name: "",
+    full_name: "",
+    address: "",
+    city: "",
+    zipcode: "",
+    phone: "",
+    notes: "",
+  })
 
   // Filter contacts based on search query and filters (memoized)
   const filteredContacts = useMemo(() => {
@@ -363,6 +376,9 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
             <CardDescription>Manage and view your contacts.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-2">
+              Add contact
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -380,6 +396,74 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
+
+          <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
+            <DialogContent className="sm:max-w-[720px]">
+              <DialogHeader>
+                <DialogTitle>Add a new contact</DialogTitle>
+                <DialogDescription>Fill out the fields and save to add this contact.</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-2 py-4 grid-cols-1 sm:grid-cols-2">
+                <Input placeholder="First name" value={newContact.first_name || ""} onChange={(e) => setNewContact((s) => ({ ...s, first_name: e.target.value }))} />
+                <Input placeholder="Last name" value={newContact.last_name || ""} onChange={(e) => setNewContact((s) => ({ ...s, last_name: e.target.value }))} />
+                <Input placeholder="Address" value={newContact.address || ""} onChange={(e) => setNewContact((s) => ({ ...s, address: e.target.value }))} />
+                <Input placeholder="City" value={newContact.city || ""} onChange={(e) => setNewContact((s) => ({ ...s, city: e.target.value }))} />
+                <Input placeholder="Zipcode" value={newContact.zipcode || ""} onChange={(e) => setNewContact((s) => ({ ...s, zipcode: e.target.value }))} />
+                <Input placeholder="Phone" value={newContact.phone || ""} onChange={(e) => setNewContact((s) => ({ ...s, phone: e.target.value }))} />
+                <div className="sm:col-span-2">
+                  <Textarea placeholder="Notes" value={newContact.notes || ""} onChange={(e) => setNewContact((s) => ({ ...s, notes: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="outline" onClick={() => setIsAddContactOpen(false)}>Cancel</Button>
+                <Button onClick={async () => {
+                  // minimal validation
+                  const fn = (newContact.first_name || "").trim()
+                  const ln = (newContact.last_name || "").trim()
+                  if (!fn && !ln) {
+                    alert('Please provide at least a first or last name')
+                    return
+                  }
+
+                  const created: Contact = {
+                    id: Math.random().toString(36).substring(2, 11),
+                    first_name: fn,
+                    last_name: ln,
+                    full_name: `${fn} ${ln}`.trim(),
+                    address: newContact.address || "",
+                    city: newContact.city || "",
+                    zipcode: newContact.zipcode || "",
+                    phone: newContact.phone || "",
+                    notes: newContact.notes || "",
+                    status: "Not checked",
+                  }
+
+                  // run detection if available
+                  try {
+                    await loadDictionaryIfNeeded()
+                    if (isPotentiallyFrench(created.last_name || created.full_name)) {
+                      created.status = "Detected"
+                    }
+                  } catch (e) {
+                    console.warn('detection not available', e)
+                  }
+
+                  setContacts((prev) => [created, ...prev])
+                  try {
+                    await createContact(created)
+                  } catch (e) {
+                    console.warn('failed to persist new contact', e)
+                  }
+
+                  setNewContact({ first_name: "", last_name: "", full_name: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
+                  setIsAddContactOpen(false)
+                  alert('Contact added')
+                }}>Create</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">

@@ -25,3 +25,15 @@ export async function bulkUpdateContacts(ids: string[], patch: Record<string, an
     throw err
   }
 }
+
+// Create a new contact and persist to localStorage
+export async function createContact(contact: Record<string, any>): Promise<void> {
+  try {
+    const raw = localStorage.getItem("contacts")
+    const contacts = raw ? JSON.parse(raw) : []
+    contacts.unshift(contact)
+    localStorage.setItem("contacts", JSON.stringify(contacts))
+  } catch (err) {
+    throw err
+  }
+}
