@@ -28,7 +28,8 @@ import {
   RefreshCw,
   FileJson,
   FileSpreadsheet,
-  Import
+  Import,
+  Plus,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -1284,6 +1285,17 @@ export default function Home() {
                 </TooltipTrigger>
                 <TooltipContent>Import JSON data file</TooltipContent>
               </Tooltip>
+
+                {/* Add Contact Button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-1">
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Add contact</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Add a new contact</TooltipContent>
+                </Tooltip>
             </div>
 
             <Dialog open={isDocOpen} onOpenChange={setIsDocOpen}>
@@ -1509,6 +1521,80 @@ export default function Home() {
             <ThemeSwitcher />
           </div>
         </div>
+
+        {/* Add Contact Dialog (main page) */}
+        <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
+          <DialogContent className="sm:max-w-[720px]">
+            <DialogHeader>
+              <DialogTitle>Add a new contact</DialogTitle>
+              <DialogDescription>Fill out at minimum a first or last name, then save.</DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-2 py-4 grid-cols-1 sm:grid-cols-2">
+              <Input placeholder="First name" value={newContactForm.firstName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, firstName: e.target.value }))} />
+              <Input placeholder="Last name" value={newContactForm.lastName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, lastName: e.target.value }))} />
+              <Input placeholder="Address" value={newContactForm.address || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, address: e.target.value }))} />
+              <Input placeholder="City" value={newContactForm.city || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, city: e.target.value }))} />
+              <Input placeholder="Zipcode" value={newContactForm.zipcode || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, zipcode: e.target.value }))} />
+              <Input placeholder="Phone" value={newContactForm.phone || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, phone: e.target.value }))} />
+              <div className="sm:col-span-2">
+                <Textarea placeholder="Notes (optional)" value={newContactForm.notes || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, notes: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" onClick={() => setIsAddContactOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                const fn = (newContactForm.firstName || "").trim()
+                const ln = (newContactForm.lastName || "").trim()
+                if (!fn && !ln) {
+                  alert('Please provide at least a first or last name')
+                  return
+                }
+
+                const created: EnhancedContact = {
+                  firstName: fn,
+                  lastName: ln,
+                  fullName: `${fn} ${ln}`.trim(),
+                  address: newContactForm.address || "",
+                  city: newContactForm.city || "",
+                  zipcode: newContactForm.zipcode || "",
+                  phone: newContactForm.phone || "",
+                  id: Math.random().toString(36).substring(2, 11),
+                  status: "Not checked",
+                  notes: newContactForm.notes || "",
+                  isExpanded: false,
+                  checkedOnTPS: false,
+                  checkedOnOTM: false,
+                  checkedOnForebears: false,
+                  needAddressUpdate: false,
+                  needPhoneUpdate: false,
+                  territoryStatus: false,
+                }
+
+                try {
+                  await loadDictionaryIfNeeded()
+                  if (isPotentiallyFrench(created.lastName || created.fullName)) {
+                    created.status = "Detected"
+                  }
+                } catch (e) {
+                  console.warn('detection not available', e)
+                }
+
+                setContacts((prev) => [created, ...prev])
+                try {
+                  await persistContact(created)
+                } catch (e) {
+                  console.warn('failed to persist new contact', e)
+                }
+
+                setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
+                setIsAddContactOpen(false)
+                alert('Contact added')
+              }}>Create</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Card className="mb-4">
           <CardHeader>
