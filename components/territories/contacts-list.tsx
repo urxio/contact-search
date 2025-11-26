@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
-import { LayoutGrid, LayoutList, Filter, ExternalLink, CheckCircle } from "lucide-react"
+import { LayoutGrid, LayoutList, Filter, ExternalLink, CheckCircle, Plus } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { FixedSizeList as List } from "react-window"
 import { updateContact, bulkUpdateContacts, createContact } from "@/actions/contact-actions"
@@ -375,10 +375,8 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
             <CardTitle>Contacts</CardTitle>
             <CardDescription>Manage and view your contacts.</CardDescription>
           </div>
+          {/* Add contact button moved next to the search bar */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-2">
-              Add contact
-            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -477,6 +475,10 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
               />
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add contact</span>
+              </Button>
               <ExportFrenchContacts contacts={contacts} />
               <ExportJsonWithVerification contacts={contacts} />
               <Button
