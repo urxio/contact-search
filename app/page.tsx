@@ -482,453 +482,538 @@ export default function Home() {
     [updateLastInteraction],
   )
 
-  // Update the copyAndSearchOTM function to copy contact address and use the new URL
+  // Update the copyAndSearchOTM function to copy contact name and use the new URL
   const copyAndSearchOTM = useCallback(
     async (contact: EnhancedContact) => {
-      // Copy the contact address to the clipboard
+      // Copy the contact name to the clipboard
       try {
-        await navigator.clipboard.writeText(contact.address)
+        await navigator.clipboard.writeText(contact.fullName)
         setCopiedId(contact.id)
       } catch (err) {
-        console.error("Failed to copy contact address: ", err)
-        alert("Failed to copy contact address to clipboard")
+        console.error("Failed to copy contact name: ", err)
+        alert("Failed to copy contact name to clipboard")
         return
       }
-      return
-    }
 
       // Create the OTM search URL
       const otmSearchUrl = "https://mobile.onlineterritorymanager.com/AddrSearch.php"
 
-  // Mark as checked but don't change status
-  setContacts((prevContacts) => prevContacts.map((c) => (c.id === contact.id ? { ...c, checkedOnOTM: true } : c)))
+      // Mark as checked but don't change status
+      setContacts((prevContacts) => prevContacts.map((c) => (c.id === contact.id ? { ...c, checkedOnOTM: true } : c)))
 
-  // Set as last verified
-  updateLastInteraction(contact.id)
+      // Set as last verified
+      updateLastInteraction(contact.id)
 
-  // Open in a new tab
-  window.open(otmSearchUrl, "_blank")
-},
-[updateLastInteraction],
+      // Open in a new tab
+      window.open(otmSearchUrl, "_blank")
+    },
+    [updateLastInteraction],
   )
 
-// Add a new function to search on Forebears.io
-const searchOnForebears = useCallback(
-  (contact: EnhancedContact) => {
-    if (!contact.lastName) {
-      alert("Last name is required for Forebears search")
-      return
-    }
+  // Add a new function to search on Forebears.io
+  const searchOnForebears = useCallback(
+    (contact: EnhancedContact) => {
+      if (!contact.lastName) {
+        alert("Last name is required for Forebears search")
+        return
+      }
 
-    // Create the Forebears search URL
-    // forebears expects lowercase surname in the path; normalize and urlencode
-    const surnameForUrl = String(contact.lastName || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[ --]/g, "")
-      .replace(/[ -]/g, "")
-      .replace(/\p{Diacritic}/gu, "")
-      // fallback: remove combining diacritic marks
-      .replace(/[\u0300-\u036f]/g, "")
+      // Create the Forebears search URL
+      // forebears expects lowercase surname in the path; normalize and urlencode
+      const surnameForUrl = String(contact.lastName || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[ --]/g, "")
+        .replace(/[ -]/g, "")
+        .replace(/\p{Diacritic}/gu, "")
+        // fallback: remove combining diacritic marks
+        .replace(/[\u0300-\u036f]/g, "")
 
-    const forebearsUrl = `https://forebears.io/surnames/${encodeURIComponent(surnameForUrl)}`
+      const forebearsUrl = `https://forebears.io/surnames/${encodeURIComponent(surnameForUrl)}`
 
-    // Mark as checked on Forebears
+      // Mark as checked on Forebears
+      setContacts((prevContacts) =>
+        prevContacts.map((c) => (c.id === contact.id ? { ...c, checkedOnForebears: true } : c)),
+      )
+
+      // Set as last verified
+      updateLastInteraction(contact.id)
+
+      // Open in a new tab
+      window.open(forebearsUrl, "_blank")
+    },
+    [updateLastInteraction],
+  )
+
+  // Update the handleStatusChange function
+  const handleStatusChange = useCallback(
+    (id: string, newStatus: EnhancedContact["status"]) => {
+      setContacts((prevContacts) =>
+        prevContacts.map((contact) => (contact.id === id ? { ...contact, status: newStatus } : contact)),
+      )
+
+      // Set the last verified ID when a contact is marked as Potentially French
+      if (newStatus === "Potentially French") {
+        updateLastInteraction(id)
+      }
+    },
+    [updateLastInteraction],
+  )
+
+  // Update the handleNotesChange function
+  const handleNotesChange = useCallback((id: string, newNotes: string) => {
     setContacts((prevContacts) =>
-      prevContacts.map((c) => (c.id === contact.id ? { ...c, checkedOnForebears: true } : c)),
+      prevContacts.map((contact) => (contact.id === id ? { ...contact, notes: newNotes } : contact)),
     )
+  }, [])
 
-    // Set as last verified
-    updateLastInteraction(contact.id)
-
-    // Open in a new tab
-    window.open(forebearsUrl, "_blank")
-  },
-  [updateLastInteraction],
-)
-
-// Update the handleStatusChange function
-const handleStatusChange = useCallback(
-  (id: string, newStatus: EnhancedContact["status"]) => {
-    setContacts((prevContacts) =>
-      prevContacts.map((contact) => (contact.id === id ? { ...contact, status: newStatus } : contact)),
-    )
-
-    // Set the last verified ID when a contact is marked as Potentially French
-    if (newStatus === "Potentially French") {
-      updateLastInteraction(id)
-    }
-  },
-  [updateLastInteraction],
-)
-
-// Update the handleNotesChange function
-const handleNotesChange = useCallback((id: string, newNotes: string) => {
-  setContacts((prevContacts) =>
-    prevContacts.map((contact) => (contact.id === id ? { ...contact, notes: newNotes } : contact)),
-  )
-}, [])
-
-// Update the handleAddressUpdateChange function
-const handleAddressUpdateChange = useCallback((id: string, needAddressUpdate: boolean) => {
-  setContacts((prevContacts) =>
-    prevContacts.map((contact) =>
-      contact.id === id ? { ...contact, needAddressUpdate: needAddressUpdate } : contact,
-    ),
-  )
-}, [])
-
-// Update the handlePhoneUpdateChange function
-const handlePhoneUpdateChange = useCallback((id: string, needPhoneUpdate: boolean) => {
-  setContacts((prevContacts) =>
-    prevContacts.map((contact) => (contact.id === id ? { ...contact, needPhoneUpdate: needPhoneUpdate } : contact)),
-  )
-}, [])
-
-// Function to update contact field
-const updateContactField = useCallback((id: string, field: keyof BaseContact, value: string) => {
-  setContacts((prevContacts) =>
-    prevContacts.map((contact) => {
-      if (contact.id !== id) return contact
-
-      const updatedContact = { ...contact, [field]: value }
-
-      // Auto-check "address needs update" when address field is edited
-      if (field === "address" || field === "city") {
-        updatedContact.needAddressUpdate = true
-        // Auto-set status to "Potentially French" when address is edited
-        updatedContact.status = "Potentially French"
-      }
-
-      // Auto-check "phone needs update" when phone field is edited
-      if (field === "phone") {
-        updatedContact.needPhoneUpdate = true
-        // Auto-set status to "Potentially French" when phone is edited
-        updatedContact.status = "Potentially French"
-      }
-
-      // Set territory status when zipcode is changed
-      if (field === "zipcode") {
-        updatedContact.territoryStatus = true
-      }
-
-      // If we're updating first or last name, recalculate the full name
-      if (field === "firstName" || field === "lastName") {
-        updatedContact.fullName = `${field === "firstName" ? value : contact.firstName} ${field === "lastName" ? value : contact.lastName
-          }`.trim()
-      }
-
-      return updatedContact
-    }),
-  )
-}, [])
-
-// Handler to create and add a new contact
-const handleAddContactSubmit = useCallback(async () => {
-  // Basic validation
-  const firstName = (newContactForm.firstName || "").trim()
-  const lastName = (newContactForm.lastName || "").trim()
-  const fullName = `${firstName} ${lastName}`.trim()
-
-  if (!fullName) {
-    alert("Please enter at least a first or last name")
-    return
-  }
-
-  const contact: EnhancedContact = {
-    firstName,
-    lastName,
-    fullName,
-    address: String(newContactForm.address || ""),
-    city: String(newContactForm.city || ""),
-    zipcode: String(newContactForm.zipcode || ""),
-    phone: String(newContactForm.phone || ""),
-    id: Math.random().toString(36).substring(2, 11),
-    status: "Not checked",
-    notes: String(newContactForm.notes || ""),
-    isExpanded: false,
-    checkedOnTPS: false,
-    checkedOnOTM: false,
-    checkedOnForebears: false,
-    needAddressUpdate: false,
-    needPhoneUpdate: false,
-    territoryStatus: false,
-  }
-
-  // Run detection for this new contact
-  try {
-    await loadDictionaryIfNeeded()
-    const surname = contact.lastName || contact.fullName || ""
-    const matched = isPotentiallyFrench(surname)
-    if (matched) contact.status = "Detected"
-  } catch (e) {
-    console.warn("name-detection not available", e)
-  }
-
-  // Add to UI first
-  setContacts((prev) => [contact, ...prev])
-
-  // Persist to localStorage via action (keeps behavior consistent)
-  try {
-    await persistContact(contact)
-  } catch (e) {
-    console.warn("Failed to persist contact to localStorage", e)
-  }
-
-  // Reset form and close dialog
-  setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", fullName: "", notes: "" })
-  setIsAddContactOpen(false)
-  alert("Contact added")
-}, [newContactForm])
-
-// Update the deleteContact function
-const deleteContact = useCallback((id: string) => {
-  setContacts((prevContacts) => prevContacts.filter((contact) => contact.id !== id))
-}, [])
-
-// Function to handle batch status updates
-const updateBatchStatus = useCallback(
-  (newStatus: EnhancedContact["status"]) => {
-    if (selectedContacts.length === 0) {
-      alert("Please select contacts to update")
-      return
-    }
-
+  // Update the handleAddressUpdateChange function
+  const handleAddressUpdateChange = useCallback((id: string, needAddressUpdate: boolean) => {
     setContacts((prevContacts) =>
       prevContacts.map((contact) =>
-        selectedContacts.includes(contact.id) ? { ...contact, status: newStatus } : contact,
+        contact.id === id ? { ...contact, needAddressUpdate: needAddressUpdate } : contact,
       ),
     )
+  }, [])
 
-    // Show success message
-    alert(`Updated ${selectedContacts.length} contacts to "${newStatus}" status`)
-  },
-  [selectedContacts],
-)
+  // Update the handlePhoneUpdateChange function
+  const handlePhoneUpdateChange = useCallback((id: string, needPhoneUpdate: boolean) => {
+    setContacts((prevContacts) =>
+      prevContacts.map((contact) => (contact.id === id ? { ...contact, needPhoneUpdate: needPhoneUpdate } : contact)),
+    )
+  }, [])
 
-// Function to toggle contact selection
-const toggleContactSelection = useCallback((id: string) => {
-  setSelectedContacts((prev) => {
-    if (prev.includes(id)) {
-      return prev.filter((contactId) => contactId !== id)
-    } else {
-      return [...prev, id]
-    }
-  })
-}, [])
+  // Function to update contact field
+  const updateContactField = useCallback((id: string, field: keyof BaseContact, value: string) => {
+    setContacts((prevContacts) =>
+      prevContacts.map((contact) => {
+        if (contact.id !== id) return contact
 
-// Function to select/deselect all contacts
-const toggleSelectAll = useCallback(() => {
-  if (selectedContacts.length === filteredContacts.length) {
-    setSelectedContacts([])
-  } else {
-    setSelectedContacts(filteredContacts.map((c) => c.id))
-  }
-}, [filteredContacts, selectedContacts])
+        const updatedContact = { ...contact, [field]: value }
 
-// Function to filter contacts that need updates
-const filterContactsNeedingUpdates = useCallback(() => {
-  setShowUpdateNeeded((prev) => !prev)
-}, [])
+        // Auto-check "address needs update" when address field is edited
+        if (field === "address" || field === "city") {
+          updatedContact.needAddressUpdate = true
+          // Auto-set status to "Potentially French" when address is edited
+          updatedContact.status = "Potentially French"
+        }
 
-// Add a quick navigation feature to jump to the last verified contact
-// Add this function after the filterContactsNeedingUpdates function
-const scrollToLastVerified = useCallback(() => {
-  if (lastVerifiedId) {
-    const element = document.getElementById(`contact-row-${lastVerifiedId}`)
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" })
+        // Auto-check "phone needs update" when phone field is edited
+        if (field === "phone") {
+          updatedContact.needPhoneUpdate = true
+          // Auto-set status to "Potentially French" when phone is edited
+          updatedContact.status = "Potentially French"
+        }
 
-      // Highlight the row temporarily
-      element.classList.add("bg-green-200", "dark:bg-green-800")
-      setTimeout(() => {
-        element.classList.remove("bg-green-200", "dark:bg-green-800")
-      }, 2000)
-    }
-  }
-}, [lastVerifiedId])
+        // Set territory status when zipcode is changed
+        if (field === "zipcode") {
+          updatedContact.territoryStatus = true
+        }
 
-// Add this useEffect to load the last verified ID from localStorage
-useEffect(() => {
-  const savedLastVerifiedId = localStorage.getItem("lastVerifiedId")
-  if (savedLastVerifiedId) {
-    setLastVerifiedId(savedLastVerifiedId)
-  }
-}, [])
+        // If we're updating first or last name, recalculate the full name
+        if (field === "firstName" || field === "lastName") {
+          updatedContact.fullName = `${field === "firstName" ? value : contact.firstName} ${field === "lastName" ? value : contact.lastName
+            }`.trim()
+        }
 
-// Add keyboard shortcuts for batch operations
-// Add this to the useEffect for keyboard shortcuts
-const deleteSelectedContacts = useCallback(() => {
-  if (selectedContacts.length === 0) {
-    alert("Please select contacts to delete")
-    return
-  }
+        return updatedContact
+      }),
+    )
+  }, [])
 
-  if (confirm(`Are you sure you want to delete ${selectedContacts.length} contacts?`)) {
-    setContacts((prevContacts) => prevContacts.filter((contact) => !selectedContacts.includes(contact.id)))
-    setSelectedContacts([])
-  }
-}, [selectedContacts])
+  // Handler to create and add a new contact
+  const handleAddContactSubmit = useCallback(async () => {
+    // Basic validation
+    const firstName = (newContactForm.firstName || "").trim()
+    const lastName = (newContactForm.lastName || "").trim()
+    const fullName = `${firstName} ${lastName}`.trim()
 
-// Function to mark selected contacts as done (Potentially French)
-const markSelectedAsDone = useCallback(() => {
-  if (selectedContacts.length === 0) {
-    alert("Please select contacts to mark as done")
-    return
-  }
-
-  updateBatchStatus("Potentially French")
-  setSelectedContacts([])
-}, [selectedContacts, updateBatchStatus])
-
-// Function to export data
-const exportData = useCallback(() => {
-  const dataToExport = {
-    contacts,
-    globalNotes,
-    territoryZipcode,
-    territoryPageRange,
-    lastVerifiedId,
-    exportDate: new Date().toISOString(),
-    version: "1.5",
-  }
-
-  const jsonString = JSON.stringify(dataToExport, null, 2)
-  const blob = new Blob([jsonString], { type: "application/json" })
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `otm-helper-export-${new Date().toLocaleDateString().replace(/\//g, "-")}.json`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
-
-// Automated detection of French-looking names using utils/french-name-detection
-const detectFrenchNames = useCallback(
-  async (onlySelected = false, contactsToCheck?: EnhancedContact[]) => {
-    const sourceContacts = contactsToCheck ?? contacts
-
-    if (!sourceContacts || sourceContacts.length === 0) {
-      alert("No contacts loaded")
+    if (!fullName) {
+      alert("Please enter at least a first or last name")
       return
     }
 
-    setIsDetecting(true)
-    await loadDictionaryIfNeeded()
+    const contact: EnhancedContact = {
+      firstName,
+      lastName,
+      fullName,
+      address: String(newContactForm.address || ""),
+      city: String(newContactForm.city || ""),
+      zipcode: String(newContactForm.zipcode || ""),
+      phone: String(newContactForm.phone || ""),
+      id: Math.random().toString(36).substring(2, 11),
+      status: "Not checked",
+      notes: String(newContactForm.notes || ""),
+      isExpanded: false,
+      checkedOnTPS: false,
+      checkedOnOTM: false,
+      checkedOnForebears: false,
+      needAddressUpdate: false,
+      needPhoneUpdate: false,
+      territoryStatus: false,
+    }
 
-    const targetIds = onlySelected && selectedContacts.length > 0 ? new Set(selectedContacts) : null
+    // Run detection for this new contact
+    try {
+      await loadDictionaryIfNeeded()
+      const surname = contact.lastName || contact.fullName || ""
+      const matched = isPotentiallyFrench(surname)
+      if (matched) contact.status = "Detected"
+    } catch (e) {
+      console.warn("name-detection not available", e)
+    }
 
-    let changed = 0
+    // Add to UI first
+    setContacts((prev) => [contact, ...prev])
 
-    // If contactsToCheck was provided (freshly imported), update directly from it
-    if (contactsToCheck) {
-      const updated = contactsToCheck.map((c) => {
-        if (targetIds && !targetIds.has(c.id)) return c
-        const surname = c.lastName || c.fullName || ""
-        const matched = isPotentiallyFrench(surname)
-        if (matched) changed++
-        return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
-      })
-      setContacts(updated)
+    // Persist to localStorage via action (keeps behavior consistent)
+    try {
+      await persistContact(contact)
+    } catch (e) {
+      console.warn("Failed to persist contact to localStorage", e)
+    }
+
+    // Reset form and close dialog
+    setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", fullName: "", notes: "" })
+    setIsAddContactOpen(false)
+    alert("Contact added")
+  }, [newContactForm])
+
+  // Update the deleteContact function
+  const deleteContact = useCallback((id: string) => {
+    setContacts((prevContacts) => prevContacts.filter((contact) => contact.id !== id))
+  }, [])
+
+  // Function to handle batch status updates
+  const updateBatchStatus = useCallback(
+    (newStatus: EnhancedContact["status"]) => {
+      if (selectedContacts.length === 0) {
+        alert("Please select contacts to update")
+        return
+      }
+
+      setContacts((prevContacts) =>
+        prevContacts.map((contact) =>
+          selectedContacts.includes(contact.id) ? { ...contact, status: newStatus } : contact,
+        ),
+      )
+
+      // Show success message
+      alert(`Updated ${selectedContacts.length} contacts to "${newStatus}" status`)
+    },
+    [selectedContacts],
+  )
+
+  // Function to toggle contact selection
+  const toggleContactSelection = useCallback((id: string) => {
+    setSelectedContacts((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((contactId) => contactId !== id)
+      } else {
+        return [...prev, id]
+      }
+    })
+  }, [])
+
+  // Function to select/deselect all contacts
+  const toggleSelectAll = useCallback(() => {
+    if (selectedContacts.length === filteredContacts.length) {
+      setSelectedContacts([])
     } else {
-      setContacts((prev) =>
-        prev.map((c) => {
+      setSelectedContacts(filteredContacts.map((c) => c.id))
+    }
+  }, [filteredContacts, selectedContacts])
+
+  // Function to filter contacts that need updates
+  const filterContactsNeedingUpdates = useCallback(() => {
+    setShowUpdateNeeded((prev) => !prev)
+  }, [])
+
+  // Add a quick navigation feature to jump to the last verified contact
+  // Add this function after the filterContactsNeedingUpdates function
+  const scrollToLastVerified = useCallback(() => {
+    if (lastVerifiedId) {
+      const element = document.getElementById(`contact-row-${lastVerifiedId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" })
+
+        // Highlight the row temporarily
+        element.classList.add("bg-green-200", "dark:bg-green-800")
+        setTimeout(() => {
+          element.classList.remove("bg-green-200", "dark:bg-green-800")
+        }, 2000)
+      }
+    }
+  }, [lastVerifiedId])
+
+  // Add this useEffect to load the last verified ID from localStorage
+  useEffect(() => {
+    const savedLastVerifiedId = localStorage.getItem("lastVerifiedId")
+    if (savedLastVerifiedId) {
+      setLastVerifiedId(savedLastVerifiedId)
+    }
+  }, [])
+
+  // Add keyboard shortcuts for batch operations
+  // Add this to the useEffect for keyboard shortcuts
+  const deleteSelectedContacts = useCallback(() => {
+    if (selectedContacts.length === 0) {
+      alert("Please select contacts to delete")
+      return
+    }
+
+    if (confirm(`Are you sure you want to delete ${selectedContacts.length} contacts?`)) {
+      setContacts((prevContacts) => prevContacts.filter((contact) => !selectedContacts.includes(contact.id)))
+      setSelectedContacts([])
+    }
+  }, [selectedContacts])
+
+  // Function to mark selected contacts as done (Potentially French)
+  const markSelectedAsDone = useCallback(() => {
+    if (selectedContacts.length === 0) {
+      alert("Please select contacts to mark as done")
+      return
+    }
+
+    updateBatchStatus("Potentially French")
+    setSelectedContacts([])
+  }, [selectedContacts, updateBatchStatus])
+
+  // Function to export data
+  const exportData = useCallback(() => {
+    const dataToExport = {
+      contacts,
+      globalNotes,
+      territoryZipcode,
+      territoryPageRange,
+      lastVerifiedId,
+      exportDate: new Date().toISOString(),
+      version: "1.5",
+    }
+
+    const jsonString = JSON.stringify(dataToExport, null, 2)
+    const blob = new Blob([jsonString], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `otm-helper-export-${new Date().toLocaleDateString().replace(/\//g, "-")}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
+
+  // Automated detection of French-looking names using utils/french-name-detection
+  const detectFrenchNames = useCallback(
+    async (onlySelected = false, contactsToCheck?: EnhancedContact[]) => {
+      const sourceContacts = contactsToCheck ?? contacts
+
+      if (!sourceContacts || sourceContacts.length === 0) {
+        alert("No contacts loaded")
+        return
+      }
+
+      setIsDetecting(true)
+      await loadDictionaryIfNeeded()
+
+      const targetIds = onlySelected && selectedContacts.length > 0 ? new Set(selectedContacts) : null
+
+      let changed = 0
+
+      // If contactsToCheck was provided (freshly imported), update directly from it
+      if (contactsToCheck) {
+        const updated = contactsToCheck.map((c) => {
           if (targetIds && !targetIds.has(c.id)) return c
           const surname = c.lastName || c.fullName || ""
           const matched = isPotentiallyFrench(surname)
           if (matched) changed++
           return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
-        }),
-      )
-    }
-
-    setIsDetecting(false)
-    alert(`Name detection completed. Marked ${changed} contacts as Detected.`)
-  },
-  [contacts, selectedContacts],
-)
-
-// Function to import data
-const importData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const importedData = JSON.parse(e.target?.result as string)
-
-      if (!importedData.contacts || !Array.isArray(importedData.contacts)) {
-        throw new Error("Invalid data format")
+        })
+        setContacts(updated)
+      } else {
+        setContacts((prev) =>
+          prev.map((c) => {
+            if (targetIds && !targetIds.has(c.id)) return c
+            const surname = c.lastName || c.fullName || ""
+            const matched = isPotentiallyFrench(surname)
+            if (matched) changed++
+            return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
+          }),
+        )
       }
 
-      setContacts(importedData.contacts)
-      if (importedData.globalNotes) setGlobalNotes(importedData.globalNotes)
-      if (importedData.territoryZipcode) setTerritoryZipcode(importedData.territoryZipcode)
-      if (importedData.territoryPageRange) setTerritoryPageRange(importedData.territoryPageRange)
-      if (importedData.lastVerifiedId) setLastVerifiedId(importedData.lastVerifiedId)
+      setIsDetecting(false)
+      alert(`Name detection completed. Marked ${changed} contacts as Detected.`)
+    },
+    [contacts, selectedContacts],
+  )
 
-      alert("Data imported successfully!")
-    } catch (error) {
-      console.error("Error importing data:", error)
-      alert("Error importing data. Please check the file format.")
+  // Function to import data
+  const importData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target?.result as string)
+
+        if (!importedData.contacts || !Array.isArray(importedData.contacts)) {
+          throw new Error("Invalid data format")
+        }
+
+        setContacts(importedData.contacts)
+        if (importedData.globalNotes) setGlobalNotes(importedData.globalNotes)
+        if (importedData.territoryZipcode) setTerritoryZipcode(importedData.territoryZipcode)
+        if (importedData.territoryPageRange) setTerritoryPageRange(importedData.territoryPageRange)
+        if (importedData.lastVerifiedId) setLastVerifiedId(importedData.lastVerifiedId)
+
+        alert("Data imported successfully!")
+      } catch (error) {
+        console.error("Error importing data:", error)
+        alert("Error importing data. Please check the file format.")
+      }
     }
-  }
-  reader.readAsText(file)
-}, [])
+    reader.readAsText(file)
+  }, [])
 
-// Function to share data via email
-const shareData = useCallback(() => {
-  const dataToExport = {
-    contacts,
-    globalNotes,
-    territoryZipcode,
-    territoryPageRange,
-    lastVerifiedId,
-    exportDate: new Date().toISOString(),
-    version: "1.5",
-  }
+  // Function to share data via email
+  const shareData = useCallback(() => {
+    const dataToExport = {
+      contacts,
+      globalNotes,
+      territoryZipcode,
+      territoryPageRange,
+      lastVerifiedId,
+      exportDate: new Date().toISOString(),
+      version: "1.5",
+    }
 
-  const jsonString = JSON.stringify(dataToExport)
-  const subject = encodeURIComponent("OTM Helper Data")
-  const body = encodeURIComponent(
-    "Please find attached the OTM Helper data.\n\n" +
-<<<<<<< HEAD
-    "To use this data:\n" +
-    "1. Save the JSON content below to a file with .json extension\n" +
-    "2. Import it using the Import button in the OTM Helper app\n\n" +
-    "--- JSON DATA BELOW ---\n\n" +
-    jsonString,
-=======
+    const jsonString = JSON.stringify(dataToExport)
+    const subject = encodeURIComponent("OTM Helper Data")
+    const body = encodeURIComponent(
+      "Please find attached the OTM Helper data.\n\n" +
       "To use this data:\n" +
       "1. Save the JSON content below to a file with .json extension\n" +
       "2. Import it using the Import button in the OTM Helper app\n\n" +
       "--- JSON DATA BELOW ---\n\n" +
       jsonString,
->>>>>>> 3b88820 (Update copy name button to copy address)
-  )
+    )
 
-  window.location.href = `mailto:?subject=${subject}&body=${body}`
-}, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
+    window.location.href = `mailto:?subject=${subject}&body=${body}`
+  }, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
 
-// Add this function after the shareData function
-const exportToExcel = useCallback(() => {
-  if (contacts.length === 0) {
-    alert("No contacts to export")
-    return
-  }
+  // Add this function after the shareData function
+  const exportToExcel = useCallback(() => {
+    if (contacts.length === 0) {
+      alert("No contacts to export")
+      return
+    }
 
-  // Determine which contacts to export (all or selected)
-  const contactsToExport =
-    selectedContacts.length > 0 ? contacts.filter((contact) => selectedContacts.includes(contact.id)) : contacts
+    // Determine which contacts to export (all or selected)
+    const contactsToExport =
+      selectedContacts.length > 0 ? contacts.filter((contact) => selectedContacts.includes(contact.id)) : contacts
 
-  // Create worksheet data
-  const wsData = [
-    [
+    // Create worksheet data
+    const wsData = [
+      [
+        "Contact Name",
+        "House Number",
+        "Direction",
+        "Street Name",
+        "Apt Num",
+        "City",
+        "ZIP Code",
+        "Phone Number",
+        "Status",
+        "Notes",
+      ],
+    ]
+
+    contactsToExport.forEach((contact) => {
+      const { houseNumber, direction, streetName, aptNum } = parseAddress(contact.address)
+
+      wsData.push([
+        contact.fullName,
+        houseNumber,
+        direction,
+        streetName,
+        aptNum,
+        contact.city,
+        contact.zipcode,
+        contact.phone,
+        contact.status,
+        contact.notes,
+      ])
+    })
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, "Contacts")
+
+    // Generate Excel file in memory
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+
+    // Create a Blob from the buffer
+    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+
+    // Create downloa  { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+
+    // Create download link
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `otm-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.xlsx`
+
+    // Append to body, click and remove
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    // Clean up
+    URL.revokeObjectURL(url)
+
+    // Show success message
+    const exportCount = contactsToExport.length
+    const selectionText = selectedContacts.length > 0 ? "selected" : "all"
+    alert(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
+  }, [contacts, selectedContacts, parseAddress])
+
+  // Add a new function to export only Potentially French contacts
+  // Add this after the exportToExcel function
+
+  const exportPotentiallyFrenchToCSV = useCallback((stateValue: string) => {
+    if (contacts.length === 0) {
+      alert("No contacts to export")
+      return
+    }
+
+    // Filter only Potentially French contacts
+    const frenchContacts = contacts.filter((contact) => contact.status === "Potentially French")
+
+    if (frenchContacts.length === 0) {
+      alert("No Potentially French contacts found to export")
+      return
+    }
+
+    // Helper function to escape CSV fields
+    const escapeCSV = (field: string) => {
+      if (field === null || field === undefined) return ""
+      const stringField = String(field)
+      // If field contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+        return `"${stringField.replace(/"/g, '""')}"`
+      }
+      return stringField
+    }
+
+    // Create CSV header
+    const headers = [
       "Contact Name",
       "House Number",
       "Direction",
@@ -937,410 +1022,299 @@ const exportToExcel = useCallback(() => {
       "City",
       "ZIP Code",
       "Phone Number",
-      "Status",
-      "Notes",
-    ],
-  ]
+      "State",
+    ]
 
-  contactsToExport.forEach((contact) => {
-    const { houseNumber, direction, streetName, aptNum } = parseAddress(contact.address)
+    // Create CSV rows
+    const rows = frenchContacts.map((contact) => {
+      const { houseNumber, direction, streetName, aptNum } = parseAddress(contact.address)
 
-    wsData.push([
-      contact.fullName,
-      houseNumber,
-      direction,
-      streetName,
-      aptNum,
-      contact.city,
-      contact.zipcode,
-      contact.phone,
-      contact.status,
-      contact.notes,
-    ])
-  })
+      return [
+        contact.fullName,
+        houseNumber,
+        direction,
+        streetName,
+        aptNum,
+        contact.city,
+        contact.zipcode,
+        contact.phone,
+        stateValue,
+      ].map(escapeCSV).join(',')
+    })
 
-  // Create workbook and worksheet
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet(wsData)
+    // Combine header and rows
+    const csvContent = [headers.map(escapeCSV).join(','), ...rows].join('\n')
 
-  // Add worksheet to workbook
-  XLSX.utils.book_append_sheet(wb, ws, "Contacts")
+    // Create a Blob from the CSV content
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
 
-  // Generate Excel file in memory
-  const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+    // Create download link
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.csv`
 
-  // Create a Blob from the buffer
-  const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    // Append to body, click and remove
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
 
-  // Create downloa  { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    // Clean up
+    URL.revokeObjectURL(url)
 
-  // Create download link
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `otm-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.xlsx`
+    // Show success message
+    alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to CSV`)
 
-  // Append to body, click and remove
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+    // Close dialog and reset state value
+    setIsExportStateDialogOpen(false)
+    setExportStateValue("")
+  }, [contacts, parseAddress])
 
-  // Clean up
-  URL.revokeObjectURL(url)
+  // Modify the startNewSession function to reset the file input element
+  const startNewSession = useCallback(() => {
+    if (contacts.length > 0) {
+      if (confirm("Are you sure you want to start a new session? This will clear all current data.")) {
+        // Clear all data
+        setContacts([])
+        setGlobalNotes("")
+        setTerritoryZipcode("")
+        setTerritoryPageRange("")
+        setLastVerifiedId(null)
+        setSelectedContacts([])
+        setSearchQuery("")
+        setStatusFilter("All")
+        setShowUpdateNeeded(false)
+        setError(null) // Clear any previous errors
 
-  // Show success message
-  const exportCount = contactsToExport.length
-  const selectionText = selectedContacts.length > 0 ? "selected" : "all"
-  alert(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
-}, [contacts, selectedContacts, parseAddress])
+        // Reset the file input element
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""
+        }
 
-// Add a new function to export only Potentially French contacts
-// Add this after the exportToExcel function
+        // Clear localStorage
+        localStorage.removeItem("contacts")
+        localStorage.removeItem("globalNotes")
+        localStorage.removeItem("territoryZipcode")
+        localStorage.removeItem("territoryPageRange")
+        localStorage.removeItem("lastVerifiedId")
 
-const exportPotentiallyFrenchToCSV = useCallback((stateValue: string) => {
-  if (contacts.length === 0) {
-    alert("No contacts to export")
-    return
-  }
+        // Set fileUploaded to false
+        setFileUploaded(false)
 
-  // Filter only Potentially French contacts
-  const frenchContacts = contacts.filter((contact) => contact.status === "Potentially French")
-
-  if (frenchContacts.length === 0) {
-    alert("No Potentially French contacts found to export")
-    return
-  }
-
-  // Helper function to escape CSV fields
-  const escapeCSV = (field: string) => {
-    if (field === null || field === undefined) return ""
-    const stringField = String(field)
-    // If field contains comma, quote, or newline, wrap in quotes and escape quotes
-    if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-      return `"${stringField.replace(/"/g, '""')}"`
+        // Show confirmation
+        alert("New session started. All data has been cleared.")
+      }
+    } else {
+      alert("No active session to clear.")
     }
-    return stringField
-  }
+  }, [contacts])
 
-  // Create CSV header
-  const headers = [
-    "Contact Name",
-    "House Number",
-    "Direction",
-    "Street Name",
-    "Apt Num",
-    "City",
-    "ZIP Code",
-    "Phone Number",
-    "State",
-  ]
+  // Function to get status icon
+  const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
+    switch (status) {
+      case "Potentially French":
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />
+      case "Not checked":
+        return <XCircle className="h-4 w-4 text-blue-500" />
+      case "Duplicate":
+        return <RefreshCw className="h-4 w-4 text-amber-500" />
+      case "Not French":
+        return <CircleSlash className="h-4 w-4 text-red-500" />
+    }
+  }, [])
 
-  // Create CSV rows
-  const rows = frenchContacts.map((contact) => {
-    const { houseNumber, direction, streetName, aptNum } = parseAddress(contact.address)
+  // Add a new function to handle territory status changes
+  const handleTerritoryStatusChange = useCallback((id: string, territoryStatus: boolean) => {
+    setContacts((prevContacts) =>
+      prevContacts.map((contact) => (contact.id === id ? { ...contact, territoryStatus: territoryStatus } : contact)),
+    )
+  }, [])
 
-    return [
-      contact.fullName,
-      houseNumber,
-      direction,
-      streetName,
-      aptNum,
-      contact.city,
-      contact.zipcode,
-      contact.phone,
-      stateValue,
-    ].map(escapeCSV).join(',')
-  })
+  // Function to find the most recently interacted contact
+  const findMostRecentContact = useCallback(() => {
+    if (contacts.length === 0) return null
 
-  // Combine header and rows
-  const csvContent = [headers.map(escapeCSV).join(','), ...rows].join('\n')
+    let mostRecentContact = contacts[0]
+    let mostRecentTime = mostRecentContact.lastInteraction ? new Date(mostRecentContact.lastInteraction) : new Date(0)
 
-  // Create a Blob from the CSV content
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    contacts.forEach((contact) => {
+      if (contact.lastInteraction) {
+        const interactionTime = new Date(contact.lastInteraction)
+        if (interactionTime > mostRecentTime) {
+          mostRecentContact = contact
+          mostRecentTime = interactionTime
+        }
+      }
+    })
 
-  // Create download link
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.csv`
+    return mostRecentContact.id
+  }, [contacts])
 
-  // Append to body, click and remove
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  // Function to jump to the most recently interacted contact
+  const scrollToRecentContact = useCallback(() => {
+    const recentContactId = findMostRecentContact()
+    if (recentContactId) {
+      const element = document.getElementById(`contact-row-${recentContactId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" })
 
-  // Clean up
-  URL.revokeObjectURL(url)
+        // Highlight the row temporarily
+        element.classList.add("bg-green-200", "dark:bg-green-800")
+        setTimeout(() => {
+          element.classList.remove("bg-green-200", "dark:bg-green-800")
+        }, 2000)
+      }
+    } else {
+      alert("No recent contact interaction found")
+    }
+  }, [findMostRecentContact])
 
-  // Show success message
-  alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to CSV`)
-<<<<<<< HEAD
-
-=======
-
->>>>>>> 3b88820 (Update copy name button to copy address)
-  // Close dialog and reset state value
-  setIsExportStateDialogOpen(false)
-  setExportStateValue("")
-}, [contacts, parseAddress])
-
-// Modify the startNewSession function to reset the file input element
-const startNewSession = useCallback(() => {
-  if (contacts.length > 0) {
-    if (confirm("Are you sure you want to start a new session? This will clear all current data.")) {
-      // Clear all data
-      setContacts([])
-      setGlobalNotes("")
-      setTerritoryZipcode("")
-      setTerritoryPageRange("")
-      setLastVerifiedId(null)
-      setSelectedContacts([])
-      setSearchQuery("")
-      setStatusFilter("All")
-      setShowUpdateNeeded(false)
-      setError(null) // Clear any previous errors
-
-      // Reset the file input element
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+  // Add keyboard shortcuts for batch operations
+  // Add this to the useEffect for keyboard shortcuts
+  useEffect(() => {
+    // Add keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F for search focus
+      if (e.ctrlKey && e.key === "f") {
+        e.preventDefault()
+        document.getElementById("search-contacts")?.focus()
       }
 
-      // Clear localStorage
-      localStorage.removeItem("contacts")
-      localStorage.removeItem("globalNotes")
-      localStorage.removeItem("territoryZipcode")
-      localStorage.removeItem("territoryPageRange")
-      localStorage.removeItem("lastVerifiedId")
+      // Ctrl+1 for "Not checked" status (for selected contacts)
+      if (e.ctrlKey && e.key === "1" && selectedContacts.length > 0) {
+        e.preventDefault()
+        updateBatchStatus("Not checked")
+      }
 
-      // Set fileUploaded to false
-      setFileUploaded(false)
+      // Ctrl+2 for "Potentially French" status (for selected contacts)
+      if (e.ctrlKey && e.key === "2" && selectedContacts.length > 0) {
+        e.preventDefault()
+        updateBatchStatus("Potentially French")
+      }
 
-      // Show confirmation
-      alert("New session started. All data has been cleared.")
-    }
-  } else {
-    alert("No active session to clear.")
-  }
-}, [contacts])
+      // Ctrl+3 for "Not French" status (for selected contacts)
+      if (e.ctrlKey && e.key === "3" && selectedContacts.length > 0) {
+        e.preventDefault()
+        updateBatchStatus("Not French")
+      }
 
-// Function to get status icon
-const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
-  switch (status) {
-    case "Potentially French":
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />
-    case "Not checked":
-      return <XCircle className="h-4 w-4 text-blue-500" />
-    case "Duplicate":
-      return <RefreshCw className="h-4 w-4 text-amber-500" />
-    case "Not French":
-      return <CircleSlash className="h-4 w-4 text-red-500" />
-  }
-}, [])
+      // Ctrl+A to select/deselect all contacts
+      if (e.ctrlKey && e.key === "a") {
+        e.preventDefault()
+        toggleSelectAll()
+      }
 
-// Add a new function to handle territory status changes
-const handleTerritoryStatusChange = useCallback((id: string, territoryStatus: boolean) => {
-  setContacts((prevContacts) =>
-    prevContacts.map((contact) => (contact.id === id ? { ...contact, territoryStatus: territoryStatus } : contact)),
-  )
-}, [])
-
-// Function to find the most recently interacted contact
-const findMostRecentContact = useCallback(() => {
-  if (contacts.length === 0) return null
-
-  let mostRecentContact = contacts[0]
-  let mostRecentTime = mostRecentContact.lastInteraction ? new Date(mostRecentContact.lastInteraction) : new Date(0)
-
-  contacts.forEach((contact) => {
-    if (contact.lastInteraction) {
-      const interactionTime = new Date(contact.lastInteraction)
-      if (interactionTime > mostRecentTime) {
-        mostRecentContact = contact
-        mostRecentTime = interactionTime
+      // Ctrl+G to toggle between grid and list view
+      if (e.ctrlKey && e.key === "g") {
+        e.preventDefault()
+        setViewType((prev) => (prev === "list" ? "grid" : "list"))
       }
     }
-  })
 
-  return mostRecentContact.id
-}, [contacts])
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [toggleSelectAll, updateBatchStatus, selectedContacts, viewType])
 
-// Function to jump to the most recently interacted contact
-const scrollToRecentContact = useCallback(() => {
-  const recentContactId = findMostRecentContact()
-  if (recentContactId) {
-    const element = document.getElementById(`contact-row-${recentContactId}`)
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" })
+  // Global keyboard shortcut for creating a contact (Ctrl+N)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ignore when typing in inputs or textareas
+      const active = document.activeElement as HTMLElement | null
+      const tag = active?.tagName?.toLowerCase()
+      const isTyping = tag === "input" || tag === "textarea" || active?.isContentEditable
 
-      // Highlight the row temporarily
-      element.classList.add("bg-green-200", "dark:bg-green-800")
-      setTimeout(() => {
-        element.classList.remove("bg-green-200", "dark:bg-green-800")
-      }, 2000)
-    }
-  } else {
-    alert("No recent contact interaction found")
-  }
-}, [findMostRecentContact])
-
-// Add keyboard shortcuts for batch operations
-// Add this to the useEffect for keyboard shortcuts
-useEffect(() => {
-  // Add keyboard shortcuts
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // Ctrl+F for search focus
-    if (e.ctrlKey && e.key === "f") {
-      e.preventDefault()
-      document.getElementById("search-contacts")?.focus()
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        // allow when typing in the search box (id="search-contacts") but not other inputs
+        const allowWhenSearchFocused = active?.id === "search-contacts"
+        if (isTyping && !allowWhenSearchFocused) return
+        e.preventDefault()
+        setIsAddContactOpen(true)
+      }
     }
 
-    // Ctrl+1 for "Not checked" status (for selected contacts)
-    if (e.ctrlKey && e.key === "1" && selectedContacts.length > 0) {
-      e.preventDefault()
-      updateBatchStatus("Not checked")
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
+
+  // Add a separate useEffect for the CSV export shortcut that runs after exportPotentiallyFrenchToCSV is defined
+  useEffect(() => {
+    const handleExportShortcut = (e: KeyboardEvent) => {
+      // Ctrl+E to export to CSV
+      if (e.ctrlKey && e.key === "e") {
+        e.preventDefault()
+        setIsExportStateDialogOpen(true)
+      }
     }
 
-    // Ctrl+2 for "Potentially French" status (for selected contacts)
-    if (e.ctrlKey && e.key === "2" && selectedContacts.length > 0) {
-      e.preventDefault()
-      updateBatchStatus("Potentially French")
-    }
+    window.addEventListener("keydown", handleExportShortcut)
+    return () => window.removeEventListener("keydown", handleExportShortcut)
+  }, [])
 
-    // Ctrl+3 for "Not French" status (for selected contacts)
-    if (e.ctrlKey && e.key === "3" && selectedContacts.length > 0) {
-      e.preventDefault()
-      updateBatchStatus("Not French")
-    }
+  return (
+    <TooltipProvider>
+      <main className="container mx-auto py-8 px-4 pb-24">
+        <div className="flex justify-between items-center mb-6 pb-4 border-b">
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              OTMRT Helper
+            </h1>
+            <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded-md">
+              v1.7
+            </span>
+          </div>
 
-    // Ctrl+A to select/deselect all contacts
-    if (e.ctrlKey && e.key === "a") {
-      e.preventDefault()
-      toggleSelectAll()
-    }
-
-    // Ctrl+G to toggle between grid and list view
-    if (e.ctrlKey && e.key === "g") {
-      e.preventDefault()
-      setViewType((prev) => (prev === "list" ? "grid" : "list"))
-    }
-  }
-
-  window.addEventListener("keydown", handleKeyDown)
-  return () => window.removeEventListener("keydown", handleKeyDown)
-}, [toggleSelectAll, updateBatchStatus, selectedContacts, viewType])
-
-// Global keyboard shortcut for creating a contact (Ctrl+N)
-useEffect(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // ignore when typing in inputs or textareas
-    const active = document.activeElement as HTMLElement | null
-    const tag = active?.tagName?.toLowerCase()
-    const isTyping = tag === "input" || tag === "textarea" || active?.isContentEditable
-
-    if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
-      // allow when typing in the search box (id="search-contacts") but not other inputs
-      const allowWhenSearchFocused = active?.id === "search-contacts"
-      if (isTyping && !allowWhenSearchFocused) return
-      e.preventDefault()
-      setIsAddContactOpen(true)
-    }
-  }
-
-  window.addEventListener("keydown", handleKeyDown)
-  return () => window.removeEventListener("keydown", handleKeyDown)
-}, [])
-
-// Add a separate useEffect for the CSV export shortcut that runs after exportPotentiallyFrenchToCSV is defined
-useEffect(() => {
-  const handleExportShortcut = (e: KeyboardEvent) => {
-    // Ctrl+E to export to CSV
-    if (e.ctrlKey && e.key === "e") {
-      e.preventDefault()
-      setIsExportStateDialogOpen(true)
-    }
-  }
-
-  window.addEventListener("keydown", handleExportShortcut)
-  return () => window.removeEventListener("keydown", handleExportShortcut)
-}, [])
-
-return (
-  <TooltipProvider>
-    <main className="container mx-auto py-8 px-4 pb-24">
-      <div className="flex justify-between items-center mb-6 pb-4 border-b">
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            OTMRT Helper
-          </h1>
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded-md">
-            v1.7
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 mr-4">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsExportStateDialogOpen(true)}
-                  className="flex items-center gap-1 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
-                >
-                  <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <span className="hidden sm:inline">Export CSV</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export Potentially French contacts to CSV file</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportData}
-                  className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
-                >
-                  <FileJson className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="hidden sm:inline">JSON</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export data to JSON file</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
-                    asChild
-                    className="flex items-center gap-1 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
+                    onClick={() => setIsExportStateDialogOpen(true)}
+                    className="flex items-center gap-1 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
                   >
-                    <label htmlFor="import-data" className="flex items-center cursor-pointer">
-                      <Import className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <span className="hidden sm:inline">Import</span>
-                    </label>
+                    <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="hidden sm:inline">Export CSV</span>
                   </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Import JSON data file</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Export Potentially French contacts to CSV file</TooltipContent>
+              </Tooltip>
 
-<<<<<<< HEAD
-{/* Add Contact Button */ }
-<Tooltip>
-  <TooltipTrigger asChild>
-    <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-1">
-      <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">Add contact</span>
-    </Button>
-  </TooltipTrigger>
-  <TooltipContent>Add a new contact</TooltipContent>
-</Tooltip>
-=======
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportData}
+                    className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
+                  >
+                    <FileJson className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="hidden sm:inline">JSON</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export data to JSON file</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="flex items-center gap-1 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
+                    >
+                      <label htmlFor="import-data" className="flex items-center cursor-pointer">
+                        <Import className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <span className="hidden sm:inline">Import</span>
+                      </label>
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Import JSON data file</TooltipContent>
+              </Tooltip>
+
               {/* Add Contact Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1351,8 +1325,7 @@ return (
                 </TooltipTrigger>
                 <TooltipContent>Add a new contact</TooltipContent>
               </Tooltip>
->>>>>>> 3b88820 (Update copy name button to copy address)
-            </div >
+            </div>
 
             <Dialog open={isDocOpen} onOpenChange={setIsDocOpen}>
               <DialogTrigger asChild>
@@ -1583,120 +1556,115 @@ return (
               </DialogContent>
             </Dialog>
             <ThemeSwitcher />
-          </div >
-        </div >
-
-  {/* Add Contact Dialog (main page) */ }
-  < Dialog open = { isAddContactOpen } onOpenChange = { setIsAddContactOpen } >
-    <DialogContent className="sm:max-w-[720px]">
-      <DialogHeader>
-        <DialogTitle>Add a new contact</DialogTitle>
-        <DialogDescription>Fill out at minimum a first or last name, then save.</DialogDescription>
-      </DialogHeader>
-
-      <div className="grid gap-2 py-4 grid-cols-1 sm:grid-cols-2">
-        <Input placeholder="First name" value={newContactForm.firstName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, firstName: e.target.value }))} />
-        <Input placeholder="Last name" value={newContactForm.lastName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, lastName: e.target.value }))} />
-        <Input placeholder="Address" value={newContactForm.address || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, address: e.target.value }))} />
-        <Input placeholder="City" value={newContactForm.city || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, city: e.target.value }))} />
-        <Input placeholder="Zipcode" value={newContactForm.zipcode || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, zipcode: e.target.value }))} />
-        <Input placeholder="Phone" value={newContactForm.phone || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, phone: e.target.value }))} />
-        <div className="sm:col-span-2">
-          <Textarea placeholder="Notes (optional)" value={newContactForm.notes || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, notes: e.target.value }))} />
+          </div>
         </div>
-      </div>
 
-      <div className="flex justify-end gap-2 mt-2">
-        <Button variant="outline" onClick={() => setIsAddContactOpen(false)}>Cancel</Button>
-        <Button onClick={async () => {
-          const fn = (newContactForm.firstName || "").trim()
-          const ln = (newContactForm.lastName || "").trim()
-          if (!fn && !ln) {
-            alert('Please provide at least a first or last name')
-            return
-          }
+        {/* Add Contact Dialog (main page) */}
+        <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
+          <DialogContent className="sm:max-w-[720px]">
+            <DialogHeader>
+              <DialogTitle>Add a new contact</DialogTitle>
+              <DialogDescription>Fill out at minimum a first or last name, then save.</DialogDescription>
+            </DialogHeader>
 
-          const created: EnhancedContact = {
-            firstName: fn,
-            lastName: ln,
-            fullName: `${fn} ${ln}`.trim(),
-            address: newContactForm.address || "",
-            city: newContactForm.city || "",
-            zipcode: newContactForm.zipcode || "",
-            phone: newContactForm.phone || "",
-            id: Math.random().toString(36).substring(2, 11),
-            status: "Not checked",
-            notes: newContactForm.notes || "",
-            isExpanded: false,
-            checkedOnTPS: false,
-            checkedOnOTM: false,
-            checkedOnForebears: false,
-            needAddressUpdate: false,
-            needPhoneUpdate: false,
-            territoryStatus: false,
-          }
+            <div className="grid gap-2 py-4 grid-cols-1 sm:grid-cols-2">
+              <Input placeholder="First name" value={newContactForm.firstName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, firstName: e.target.value }))} />
+              <Input placeholder="Last name" value={newContactForm.lastName || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, lastName: e.target.value }))} />
+              <Input placeholder="Address" value={newContactForm.address || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, address: e.target.value }))} />
+              <Input placeholder="City" value={newContactForm.city || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, city: e.target.value }))} />
+              <Input placeholder="Zipcode" value={newContactForm.zipcode || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, zipcode: e.target.value }))} />
+              <Input placeholder="Phone" value={newContactForm.phone || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, phone: e.target.value }))} />
+              <div className="sm:col-span-2">
+                <Textarea placeholder="Notes (optional)" value={newContactForm.notes || ""} onChange={(e) => setNewContactForm((s) => ({ ...s, notes: e.target.value }))} />
+              </div>
+            </div>
 
-          try {
-            await loadDictionaryIfNeeded()
-            if (isPotentiallyFrench(created.lastName || created.fullName)) {
-              created.status = "Detected"
-            }
-          } catch (e) {
-            console.warn('detection not available', e)
-          }
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" onClick={() => setIsAddContactOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                const fn = (newContactForm.firstName || "").trim()
+                const ln = (newContactForm.lastName || "").trim()
+                if (!fn && !ln) {
+                  alert('Please provide at least a first or last name')
+                  return
+                }
 
-          setContacts((prev) => [created, ...prev])
-          try {
-            await persistContact(created)
-          } catch (e) {
-            console.warn('failed to persist new contact', e)
-          }
+                const created: EnhancedContact = {
+                  firstName: fn,
+                  lastName: ln,
+                  fullName: `${fn} ${ln}`.trim(),
+                  address: newContactForm.address || "",
+                  city: newContactForm.city || "",
+                  zipcode: newContactForm.zipcode || "",
+                  phone: newContactForm.phone || "",
+                  id: Math.random().toString(36).substring(2, 11),
+                  status: "Not checked",
+                  notes: newContactForm.notes || "",
+                  isExpanded: false,
+                  checkedOnTPS: false,
+                  checkedOnOTM: false,
+                  checkedOnForebears: false,
+                  needAddressUpdate: false,
+                  needPhoneUpdate: false,
+                  territoryStatus: false,
+                }
 
-          setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
-          setIsAddContactOpen(false)
-          alert('Contact added')
-        }}>Create</Button>
-      </div>
-    </DialogContent>
-        </Dialog >
+                try {
+                  await loadDictionaryIfNeeded()
+                  if (isPotentiallyFrench(created.lastName || created.fullName)) {
+                    created.status = "Detected"
+                  }
+                } catch (e) {
+                  console.warn('detection not available', e)
+                }
 
-  {/* Export State Dialog */ }
-  < Dialog open = { isExportStateDialogOpen } onOpenChange = { setIsExportStateDialogOpen } >
-    <DialogContent className="sm:max-w-[425px]">
-      <DialogHeader>
-        <DialogTitle>Export to CSV</DialogTitle>
-        <DialogDescription>
-          Enter the state value to be added to all exported contacts. This will replace the Status and Notes columns.
-        </DialogDescription>
-      </DialogHeader>
+                setContacts((prev) => [created, ...prev])
+                try {
+                  await persistContact(created)
+                } catch (e) {
+                  console.warn('failed to persist new contact', e)
+                }
 
-      <div className="grid gap-4 py-4">
-        <div className="grid gap-2">
-          <label htmlFor="state-value" className="text-sm font-medium">
-            State
-          </label>
-          <Input
-            id="state-value"
-            placeholder="e.g., CA, NY, TX..."
-            value={exportStateValue}
-            onChange={(e) => setExportStateValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && exportStateValue.trim()) {
-                exportPotentiallyFrenchToCSV(exportStateValue.trim())
-              }
-            }}
-          />
-        </div>
-      </div>
+                setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
+                setIsAddContactOpen(false)
+                alert('Contact added')
+              }}>Create</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
-      <div className="flex justify-end gap-2">
-<<<<<<< HEAD
-              <Button 
-                variant="outline" 
-=======
+        {/* Export State Dialog */}
+        <Dialog open={isExportStateDialogOpen} onOpenChange={setIsExportStateDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Export to CSV</DialogTitle>
+              <DialogDescription>
+                Enter the state value to be added to all exported contacts. This will replace the Status and Notes columns.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label htmlFor="state-value" className="text-sm font-medium">
+                  State
+                </label>
+                <Input
+                  id="state-value"
+                  placeholder="e.g., CA, NY, TX..."
+                  value={exportStateValue}
+                  onChange={(e) => setExportStateValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && exportStateValue.trim()) {
+                      exportPotentiallyFrenchToCSV(exportStateValue.trim())
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
->>>>>>> 3b88820 (Update copy name button to copy address)
                 onClick={() => {
                   setIsExportStateDialogOpen(false)
                   setExportStateValue("")
@@ -1704,11 +1672,7 @@ return (
               >
                 Cancel
               </Button>
-<<<<<<< HEAD
-              <Button 
-=======
               <Button
->>>>>>> 3b88820 (Update copy name button to copy address)
                 onClick={() => {
                   const trimmedValue = exportStateValue.trim()
                   if (!trimmedValue) {
@@ -1721,422 +1685,377 @@ return (
               >
                 Export
               </Button>
-            </div >
-          </DialogContent >
-        </Dialog >
+            </div>
+          </DialogContent>
+        </Dialog>
 
-  <Card className="mb-4">
-    <CardHeader>
-      <CardTitle>Upload Excel File</CardTitle>
-      <CardDescription>Upload an Excel file to process contacts.</CardDescription>
-    </CardHeader>
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Upload Excel File</CardTitle>
+            <CardDescription>Upload an Excel file to process contacts.</CardDescription>
+          </CardHeader>
 
-    <CardContent>
-      <div className="flex flex-col space-y-4">
-        <div className="flex items-center space-x-4">
-          <Input
-            type="file"
-            id="excel-upload"
-            accept=".xlsx, .xls"
-            onChange={handleFileUpload}
-            className="hidden"
-            ref={fileInputRef}
-          />
-          <div className="flex items-center gap-2">
-            <Button asChild disabled={isLoading} className="bg-purple-600 hover:bg-purple-700">
-              <label htmlFor="excel-upload" className="flex items-center space-x-2 cursor-pointer">
-                <Upload className="h-4 w-4" />
-                <span>{isLoading ? "Loading..." : "Import Excel File"}</span>
-              </label>
-            </Button>
-            {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
+          <CardContent>
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-4">
+                <Input
+                  type="file"
+                  id="excel-upload"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  ref={fileInputRef}
+                />
+                <div className="flex items-center gap-2">
+                  <Button asChild disabled={isLoading} className="bg-purple-600 hover:bg-purple-700">
+                    <label htmlFor="excel-upload" className="flex items-center space-x-2 cursor-pointer">
+                      <Upload className="h-4 w-4" />
+                      <span>{isLoading ? "Loading..." : "Import Excel File"}</span>
+                    </label>
+                  </Button>
+                  {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
 
-            {/* detection runs automatically after import; manual detect buttons removed */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startNewSession}
-              className="flex items-center gap-1 bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
-            >
-              <RefreshCw className="h-4 w-4 text-red-600 dark:text-red-400" />
-              <span>New Session</span>
-            </Button>
-          </div>
-          {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
-        </div>
-        <div className="text-sm text-muted-foreground">
-          <p>Required columns: First Name, Last Name, Address, City, Zipcode, Phone</p>
-        </div>
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircleIcon className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+                  {/* detection runs automatically after import; manual detect buttons removed */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={startNewSession}
+                    className="flex items-center gap-1 bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
+                  >
+                    <RefreshCw className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    <span>New Session</span>
+                  </Button>
+                </div>
+                {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p>Required columns: First Name, Last Name, Address, City, Zipcode, Phone</p>
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircleIcon className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {contacts.length > 0 && (
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>General Notes</CardTitle>
+              <CardDescription>Add information about this territory.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="territory-zipcode" className="block text-sm font-medium mb-1">
+                    Territory Zipcode
+                  </label>
+                  <Input
+                    id="territory-zipcode"
+                    placeholder="Enter zipcode..."
+                    value={territoryZipcode}
+                    onChange={(e) => setTerritoryZipcode(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="territory-page-range" className="block text-sm font-medium mb-1">
+                    Page Range
+                  </label>
+                  <Input
+                    id="territory-page-range"
+                    placeholder="e.g., 1-10"
+                    value={territoryPageRange}
+                    onChange={(e) => setTerritoryPageRange(e.target.value)}
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label htmlFor="territory-notes" className="block text-sm font-medium mb-1">
+                    Notes
+                  </label>
+                  <Textarea
+                    id="territory-notes"
+                    placeholder="Add notes here..."
+                    value={globalNotes}
+                    onChange={(e) => setGlobalNotes(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
-      </div>
-    </CardContent>
-  </Card>
 
-{
-  contacts.length > 0 && (
-    <Card className="mb-4">
-      <CardHeader>
-        <CardTitle>General Notes</CardTitle>
-        <CardDescription>Add information about this territory.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="territory-zipcode" className="block text-sm font-medium mb-1">
-              Territory Zipcode
-            </label>
-            <Input
-              id="territory-zipcode"
-              placeholder="Enter zipcode..."
-              value={territoryZipcode}
-              onChange={(e) => setTerritoryZipcode(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="territory-page-range" className="block text-sm font-medium mb-1">
-              Page Range
-            </label>
-            <Input
-              id="territory-page-range"
-              placeholder="e.g., 1-10"
-              value={territoryPageRange}
-              onChange={(e) => setTerritoryPageRange(e.target.value)}
-            />
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="territory-notes" className="block text-sm font-medium mb-1">
-              Notes
-            </label>
-            <Textarea
-              id="territory-notes"
-              placeholder="Add notes here..."
-              value={globalNotes}
-              onChange={(e) => setGlobalNotes(e.target.value)}
-              className="min-h-[80px]"
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-{/* Compact Statistics Section */ }
-{
-  contacts.length > 0 && (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Statistics</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Checked:</span>
-          <div className="w-48 h-2 bg-gray-100 rounded-full dark:bg-gray-800 overflow-hidden">
-            <div
-              className="h-2 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full"
-              style={{
-<<<<<<< HEAD
-                width: `${contacts.length > 0
-                    ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
-                    : 0
-                  }%`,
-=======
+        {/* Compact Statistics Section */}
+        {contacts.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Statistics</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Checked:</span>
+                <div className="w-48 h-2 bg-gray-100 rounded-full dark:bg-gray-800 overflow-hidden">
+                  <div
+                    className="h-2 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full"
+                    style={{
                       width: `${contacts.length > 0
                         ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
                         : 0
                         }%`,
->>>>>>> 3b88820 (Update copy name button to copy address)
-              }}
-            ></div>
-          </div>
-          <span className="text-sm font-medium">
-            {contacts.length > 0
-              ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
-              : 0}
-            %
-          </span>
-        </div>
-      </div>
+                    }}
+                  ></div>
+                </div>
+                <span className="text-sm font-medium">
+                  {contacts.length > 0
+                    ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
+                    : 0}
+                  %
+                </span>
+              </div>
+            </div>
 
-      {/* Compact Stat Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-          <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900/30 mr-3">
-            <XCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <div className="text-lg font-bold">{notCheckedCount}</div>
-            <div className="text-xs text-muted-foreground">Not Checked</div>
-          </div>
-        </div>
+            {/* Compact Stat Cards */}
+            <div className="grid grid-cols-4 gap-3">
+              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
+                <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900/30 mr-3">
+                  <XCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{notCheckedCount}</div>
+                  <div className="text-xs text-muted-foreground">Not Checked</div>
+                </div>
+              </div>
 
-        <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-          <div className="rounded-full p-2 bg-green-100 dark:bg-green-900/30 mr-3">
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-          </div>
-          <div>
-            <div className="text-lg font-bold">{potentiallyFrenchCount}</div>
-            <div className="text-xs text-muted-foreground">Potentially French</div>
-          </div>
-        </div>
+              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
+                <div className="rounded-full p-2 bg-green-100 dark:bg-green-900/30 mr-3">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{potentiallyFrenchCount}</div>
+                  <div className="text-xs text-muted-foreground">Potentially French</div>
+                </div>
+              </div>
 
-        <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-          <div className="rounded-full p-2 bg-red-100 dark:bg-red-900/30 mr-3">
-            <CircleSlash className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </div>
-          <div>
-            <div className="text-lg font-bold">{notFrenchCount}</div>
-            <div className="text-xs text-muted-foreground">Not French</div>
-          </div>
-        </div>
+              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
+                <div className="rounded-full p-2 bg-red-100 dark:bg-red-900/30 mr-3">
+                  <CircleSlash className="h-4 w-4 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{notFrenchCount}</div>
+                  <div className="text-xs text-muted-foreground">Not French</div>
+                </div>
+              </div>
 
-        <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-          <div className="rounded-full p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
-            <Globe className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
+                <div className="rounded-full p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
+                  <Globe className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-bold">{detectedCount}</div>
+                  <div className="text-xs text-muted-foreground">Detected</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-lg font-bold">{detectedCount}</div>
-            <div className="text-xs text-muted-foreground">Detected</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+        )}
 
-{
-  contacts.length > 0 && (
-    <Card className="mb-4">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Contacts</CardTitle>
-          <CardDescription>Manage and view your contacts.</CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setViewType("list")}
-                className={viewType === "list" ? "bg-muted" : ""}
-              >
-                <LayoutList className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>List View (Ctrl+G)</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setViewType("grid")}
-                className={viewType === "grid" ? "bg-muted" : ""}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Grid View (Ctrl+G)</TooltipContent>
-          </Tooltip>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <Input
-              id="search-contacts"
-              type="search"
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={scrollToRecentContact}
-                  className="flex items-center gap-1"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span className="hidden sm:inline">Recent</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Jump to most recently interacted contact</TooltipContent>
-            </Tooltip>
+        {contacts.length > 0 && (
+          <Card className="mb-4">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Contacts</CardTitle>
+                <CardDescription>Manage and view your contacts.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setViewType("list")}
+                      className={viewType === "list" ? "bg-muted" : ""}
+                    >
+                      <LayoutList className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>List View (Ctrl+G)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setViewType("grid")}
+                      className={viewType === "grid" ? "bg-muted" : ""}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Grid View (Ctrl+G)</TooltipContent>
+                </Tooltip>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div className="flex-1">
+                  <Input
+                    id="search-contacts"
+                    type="search"
+                    placeholder="Search contacts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={scrollToRecentContact}
+                        className="flex items-center gap-1"
+                      >
+                        <Clock className="h-4 w-4" />
+                        <span className="hidden sm:inline">Recent</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Jump to most recently interacted contact</TooltipContent>
+                  </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={filterContactsNeedingUpdates}
-<<<<<<< HEAD
-                  className={`flex items-center gap-1 ${showUpdateNeeded
-                      ? "bg-amber-100 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
-                      : ""
-                    }`}
-=======
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={filterContactsNeedingUpdates}
                         className={`flex items-center gap-1 ${showUpdateNeeded
                           ? "bg-amber-100 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
                           : ""
                           }`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-                >
-                  <Filter className="h-4 w-4" />
-                  <span className="hidden sm:inline">{showUpdateNeeded ? "Show All" : "Needs Update"}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Filter contacts that need updates</TooltipContent>
-            </Tooltip>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="Not checked">Not checked</SelectItem>
-                <SelectItem value="Potentially French">Potentially French</SelectItem>
-                <SelectItem value="Detected">Detected</SelectItem>
-                <SelectItem value="Duplicate">Duplicate</SelectItem>
-                <SelectItem value="Not French">Not French</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+                      >
+                        <Filter className="h-4 w-4" />
+                        <span className="hidden sm:inline">{showUpdateNeeded ? "Show All" : "Needs Update"}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Filter contacts that need updates</TooltipContent>
+                  </Tooltip>
+                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All</SelectItem>
+                      <SelectItem value="Not checked">Not checked</SelectItem>
+                      <SelectItem value="Potentially French">Potentially French</SelectItem>
+                      <SelectItem value="Detected">Detected</SelectItem>
+                      <SelectItem value="Duplicate">Duplicate</SelectItem>
+                      <SelectItem value="Not French">Not French</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-        {/* List View */}
-        {viewType === "list" && (
-          <ScrollArea className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[30px]">
-                    <Checkbox
-                      checked={selectedContacts.length > 0 && selectedContacts.length === filteredContacts.length}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead className="w-[150px]">Name</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Zipcode</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredContacts.map((contact) => {
-                  // Determine row styling based on status
-                  const rowColorClass =
-                    contact.status === "Potentially French"
-                      ? "bg-green-50 dark:bg-green-900/20"
-                      : contact.status === "Duplicate"
-                        ? "bg-amber-50 dark:bg-amber-900/20"
-                        : contact.status === "Detected"
-                          ? "bg-purple-50 dark:bg-purple-900/20"
-                          : contact.status === "Not French"
-<<<<<<< HEAD
-                            ? "bg-red-50 dark:bg-red-900/20"
-                            : "" // Not checked stays white/default
-=======
+              {/* List View */}
+              {viewType === "list" && (
+                <ScrollArea className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[30px]">
+                          <Checkbox
+                            checked={selectedContacts.length > 0 && selectedContacts.length === filteredContacts.length}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[150px]">Name</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>City</TableHead>
+                        <TableHead>Zipcode</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead className="w-[120px]">Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredContacts.map((contact) => {
+                        // Determine row styling based on status
+                        const rowColorClass =
+                          contact.status === "Potentially French"
+                            ? "bg-green-50 dark:bg-green-900/20"
+                            : contact.status === "Duplicate"
+                              ? "bg-amber-50 dark:bg-amber-900/20"
+                              : contact.status === "Detected"
+                                ? "bg-purple-50 dark:bg-purple-900/20"
+                                : contact.status === "Not French"
                                   ? "bg-red-50 dark:bg-red-900/20"
                                   : "" // Not checked stays white/default
->>>>>>> 3b88820 (Update copy name button to copy address)
 
-                  return (
-                    <React.Fragment key={contact.id}>
-                      {/* Add an ID to the TableRow for scrolling */}
-                      <TableRow
-                        id={`contact-row-${contact.id}`}
-<<<<<<< HEAD
-                        className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${contact.id === lastVerifiedId
-                            ? "border-l-4 border-l-green-500 dark:border-l-green-400"
-                            : ""
-                          }`}
-=======
+                        return (
+                          <React.Fragment key={contact.id}>
+                            {/* Add an ID to the TableRow for scrolling */}
+                            <TableRow
+                              id={`contact-row-${contact.id}`}
                               className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${contact.id === lastVerifiedId
                                 ? "border-l-4 border-l-green-500 dark:border-l-green-400"
                                 : ""
                                 }`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-                        onClick={() => toggleContactExpanded(contact.id)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedContacts.includes(contact.id)}
-                            onCheckedChange={() => toggleContactSelection(contact.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {contact.fullName}
-                            {contact.id === lastVerifiedId && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <Clock className="h-4 w-4 text-green-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>Last verified contact</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {contact.notes && contact.notes.trim() !== "" && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <StickyNote className="h-4 w-4 text-blue-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>Has notes</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {contact.needAddressUpdate && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <AlertCircleIcon className="h-4 w-4 text-amber-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>Address needs update</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {contact.needPhoneUpdate && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <Phone className="h-4 w-4 text-amber-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>Phone needs update</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {contact.territoryStatus && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <MapPin className="h-4 w-4 text-purple-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>Different territory</TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                          {/* Add verification status bar with 3 distinct sections */}
-                          <div className="mt-1 flex h-1.5 w-full rounded-full overflow-hidden">
-                            <div
-<<<<<<< HEAD
-                              className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                } flex-1`}
-                            ></div>
-                            <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                            <div
-                              className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                } flex-1`}
-                            ></div>
-                            <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                            <div
-                              className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                } flex-1`}
-=======
+                              onClick={() => toggleContactExpanded(contact.id)}
+                            >
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={selectedContacts.includes(contact.id)}
+                                  onCheckedChange={() => toggleContactSelection(contact.id)}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {contact.fullName}
+                                  {contact.id === lastVerifiedId && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Clock className="h-4 w-4 text-green-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Last verified contact</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {contact.notes && contact.notes.trim() !== "" && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <StickyNote className="h-4 w-4 text-blue-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Has notes</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {contact.needAddressUpdate && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <AlertCircleIcon className="h-4 w-4 text-amber-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Address needs update</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {contact.needPhoneUpdate && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Phone className="h-4 w-4 text-amber-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Phone needs update</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {contact.territoryStatus && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <MapPin className="h-4 w-4 text-purple-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>Different territory</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                                {/* Add verification status bar with 3 distinct sections */}
+                                <div className="mt-1 flex h-1.5 w-full rounded-full overflow-hidden">
+                                  <div
                                     className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
                                       } flex-1`}
                                   ></div>
@@ -2149,34 +2068,19 @@ return (
                                   <div
                                     className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
                                       } flex-1`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-                            ></div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{contact.address}</TableCell>
-                        <TableCell>{contact.city}</TableCell>
-                        <TableCell>{contact.zipcode}</TableCell>
-                        <TableCell>{contact.phone}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={contact.status}
-                            onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-                          >
-                            <SelectTrigger
-<<<<<<< HEAD
-                              className={`w-[140px] rounded-full ${contact.status === "Potentially French"
-                                  ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
-                                  : contact.status === "Not French"
-                                    ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
-                                    : contact.status === "Detected"
-                                      ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
-                                      : contact.status === "Duplicate"
-                                        ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
-                                        : contact.status === "Not checked"
-                                          ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
-                                          : ""
-                                }`}
-=======
+                                  ></div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{contact.address}</TableCell>
+                              <TableCell>{contact.city}</TableCell>
+                              <TableCell>{contact.zipcode}</TableCell>
+                              <TableCell>{contact.phone}</TableCell>
+                              <TableCell>
+                                <Select
+                                  value={contact.status}
+                                  onValueChange={(value) => handleStatusChange(contact.id, value as any)}
+                                >
+                                  <SelectTrigger
                                     className={`w-[140px] rounded-full ${contact.status === "Potentially French"
                                       ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
                                       : contact.status === "Not French"
@@ -2189,43 +2093,368 @@ return (
                                               ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
                                               : ""
                                       }`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-                            >
-                              <SelectValue placeholder={contact.status} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Not checked">Not checked</SelectItem>
-                              <SelectItem value="Potentially French">Potentially French</SelectItem>
-                              <SelectItem value="Detected">Detected</SelectItem>
-                              <SelectItem value="Duplicate">Duplicate</SelectItem>
-                              <SelectItem value="Not French">Not French</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
+                                  >
+                                    <SelectValue placeholder={contact.status} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Not checked">Not checked</SelectItem>
+                                    <SelectItem value="Potentially French">Potentially French</SelectItem>
+                                    <SelectItem value="Detected">Detected</SelectItem>
+                                    <SelectItem value="Duplicate">Duplicate</SelectItem>
+                                    <SelectItem value="Not French">Not French</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end space-x-2">
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          toggleContactExpanded(contact.id)
+                                        }}
+                                        className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      >
+                                        {contact.isExpanded ? (
+                                          <ChevronDown className="h-4 w-4" />
+                                        ) : (
+                                          <ChevronRight className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Button
+                                        variant={contact.checkedOnForebears ? "secondary" : "outline"}
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          searchOnForebears(contact)
+                                        }}
+                                        className={
+                                          contact.checkedOnForebears
+                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
+                                        }
+                                      >
+                                        <Globe className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Search on Forebears.io</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Button
+                                        variant={contact.checkedOnTPS ? "secondary" : "outline"}
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          searchOnTruePeopleSearch(contact)
+                                        }}
+                                        className={
+                                          contact.checkedOnTPS
+                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
+                                        }
+                                      >
+                                        <Search className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Search on TruePeopleSearch</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Button
+                                        variant={contact.checkedOnOTM ? "secondary" : "outline"}
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          copyAndSearchOTM(contact)
+                                        }}
+                                        className={
+                                          contact.checkedOnOTM
+                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
+                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
+                                        }
+                                      >
+                                        {copiedId === contact.id ? (
+                                          <Check className="h-4 w-4 text-green-500" />
+                                        ) : (
+                                          <Copy className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Copy Name & Open OTM</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {contact.isExpanded && (
+                              <TableRow className={`${rowColorClass} border-t-0`}>
+                                <TableCell colSpan={8} className="p-0">
+                                  <div className="p-4 bg-background/50 rounded-b-lg shadow-inner">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <h3 className="text-sm font-medium mb-2">Contact Details</h3>
+                                        <div className="space-y-3 text-sm">
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">First Name:</span>
+                                            <Input
+                                              value={contact.firstName}
+                                              onChange={(e) =>
+                                                updateContactField(contact.id, "firstName", e.target.value)
+                                              }
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">Last Name:</span>
+                                            <Input
+                                              value={contact.lastName}
+                                              onChange={(e) =>
+                                                updateContactField(contact.id, "lastName", e.target.value)
+                                              }
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">Address:</span>
+                                            <Input
+                                              value={contact.address}
+                                              onChange={(e) =>
+                                                updateContactField(contact.id, "address", e.target.value)
+                                              }
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">City:</span>
+                                            <Input
+                                              value={contact.city}
+                                              onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">Zipcode:</span>
+                                            <Input
+                                              value={contact.zipcode}
+                                              onChange={(e) =>
+                                                updateContactField(contact.id, "zipcode", e.target.value)
+                                              }
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-3 items-center gap-2">
+                                            <span className="font-medium">Phone:</span>
+                                            <Input
+                                              value={contact.phone}
+                                              onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
+                                              className="col-span-2 h-8"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
+                                        <Textarea
+                                          placeholder="Add notes about this contact..."
+                                          value={contact.notes}
+                                          onChange={(e) => handleNotesChange(contact.id, e.target.value)}
+                                          className="mb-2 min-h-[80px]"
+                                        />
+                                        <div className="flex items-center space-x-4">
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                              id={`address-update-${contact.id}`}
+                                              checked={contact.needAddressUpdate}
+                                              onCheckedChange={(checked) =>
+                                                handleAddressUpdateChange(contact.id, !!checked)
+                                              }
+                                            />
+                                            <label htmlFor={`address-update-${contact.id}`} className="text-sm">
+                                              Address updated
+                                            </label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                              id={`phone-update-${contact.id}`}
+                                              checked={contact.needPhoneUpdate}
+                                              onCheckedChange={(checked) =>
+                                                handlePhoneUpdateChange(contact.id, !!checked)
+                                              }
+                                            />
+                                            <label htmlFor={`phone-update-${contact.id}`} className="text-sm">
+                                              Phone updated
+                                            </label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                              id={`territory-status-${contact.id}`}
+                                              checked={contact.territoryStatus}
+                                              onCheckedChange={(checked) =>
+                                                handleTerritoryStatusChange(contact.id, !!checked)
+                                              }
+                                            />
+                                            <label htmlFor={`territory-status-${contact.id}`} className="text-sm">
+                                              Different territory
+                                            </label>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+
+              {/* Grid View */}
+              {viewType === "grid" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredContacts.map((contact) => {
+                    const statusColor =
+                      contact.status === "Potentially French"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                        : contact.status === "Duplicate"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                          : contact.status === "Not checked"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                            : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+
+                    return (
+                      <Card
+                        key={contact.id}
+                        id={`contact-row-${contact.id}`}
+                        className={`overflow-hidden cursor-pointer ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""
+                          }`}
+                        onClick={() => toggleContactExpanded(contact.id)}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={selectedContacts.includes(contact.id)}
+                                  onCheckedChange={() => toggleContactSelection(contact.id)}
+                                />
+                                <CardTitle className="text-base">{contact.fullName}</CardTitle>
+                              </div>
+                              <CardDescription className="mt-1">{contact.address}</CardDescription>
+                            </div>
+                            <Badge className={statusColor}>
+                              <div className="flex items-center gap-1">
+                                {getStatusIcon(contact.status)}
+                                <span>{contact.status}</span>
+                              </div>
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pb-2 pt-0">
+                          <div className="text-sm space-y-1">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>
+                                {contact.city}, {contact.zipcode}
+                              </span>
+                            </div>
+                            {contact.phone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span>{contact.phone}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Add verification status bar with 3 distinct sections */}
+                          <div className="mt-2 mb-1">
+                            <div className="flex h-1.5 w-full rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
+                                  } flex-1`}
+                              ></div>
+                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
+                              <div
+                                className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
+                                  } flex-1`}
+                              ></div>
+                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
+                              <div
+                                className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
+                                  } flex-1`}
+                              ></div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1 mt-2">
+                            {contact.id === lastVerifiedId && (
+                              <Badge
+                                variant="outline"
+                                className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200"
+                              >
+                                <Clock className="h-3 w-3 mr-1" /> Last verified
+                              </Badge>
+                            )}
+                            {contact.notes && contact.notes.trim() !== "" && (
+                              <Badge
+                                variant="outline"
+                                className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200"
+                              >
+                                <StickyNote className="h-3 w-3 mr-1" /> Has notes
+                              </Badge>
+                            )}
+                            {contact.needAddressUpdate && (
+                              <Badge
+                                variant="outline"
+                                className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
+                              >
+                                <AlertCircleIcon className="h-3 w-3 mr-1" /> Address update
+                              </Badge>
+                            )}
+                            {contact.needPhoneUpdate && (
+                              <Badge
+                                variant="outline"
+                                className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
+                              >
+                                <Phone className="h-3 w-3 mr-1" /> Phone update
+                              </Badge>
+                            )}
+                            {contact.territoryStatus && (
+                              <Badge
+                                variant="outline"
+                                className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200"
+                              >
+                                <MapPin className="h-3 w-3 mr-1" /> Different territory
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-between pt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleContactExpanded(contact.id)
+                            }}
+                            className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
+                            {contact.isExpanded ? "Less" : "More"}
+                          </Button>
+                          <div className="flex gap-1">
                             <Tooltip>
-                              <TooltipTrigger>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    toggleContactExpanded(contact.id)
-                                  }}
-                                  className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                                >
-                                  {contact.isExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger>
+                              <TooltipTrigger asChild>
                                 <Button
                                   variant={contact.checkedOnForebears ? "secondary" : "outline"}
                                   size="icon"
@@ -2245,7 +2474,7 @@ return (
                               <TooltipContent>Search on Forebears.io</TooltipContent>
                             </Tooltip>
                             <Tooltip>
-                              <TooltipTrigger>
+                              <TooltipTrigger asChild>
                                 <Button
                                   variant={contact.checkedOnTPS ? "secondary" : "outline"}
                                   size="icon"
@@ -2265,7 +2494,7 @@ return (
                               <TooltipContent>Search on TruePeopleSearch</TooltipContent>
                             </Tooltip>
                             <Tooltip>
-                              <TooltipTrigger>
+                              <TooltipTrigger asChild>
                                 <Button
                                   variant={contact.checkedOnOTM ? "secondary" : "outline"}
                                   size="icon"
@@ -2286,568 +2515,207 @@ return (
                                   )}
                                 </Button>
                               </TooltipTrigger>
-<<<<<<< HEAD
-  <TooltipContent>Copy Name & Open OTM</TooltipContent>
-=======
-                                    <TooltipContent>Copy Address & Open OTM</TooltipContent>
->>>>>>> 3b88820 (Update copy name button to copy address)
-                                  </Tooltip >
-                                </div >
-                              </TableCell >
-                            </TableRow >
-  {
-    contact.isExpanded && (
-      <TableRow className={`${rowColorClass} border-t-0`}>
-        <TableCell colSpan={8} className="p-0">
-          <div className="p-4 bg-background/50 rounded-b-lg shadow-inner">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Contact Details</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">First Name:</span>
-                    <Input
-                      value={contact.firstName}
-                      onChange={(e) =>
-                        updateContactField(contact.id, "firstName", e.target.value)
-                      }
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">Last Name:</span>
-                    <Input
-                      value={contact.lastName}
-                      onChange={(e) =>
-                        updateContactField(contact.id, "lastName", e.target.value)
-                      }
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">Address:</span>
-                    <Input
-                      value={contact.address}
-                      onChange={(e) =>
-                        updateContactField(contact.id, "address", e.target.value)
-                      }
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">City:</span>
-                    <Input
-                      value={contact.city}
-                      onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">Zipcode:</span>
-                    <Input
-                      value={contact.zipcode}
-                      onChange={(e) =>
-                        updateContactField(contact.id, "zipcode", e.target.value)
-                      }
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-2">
-                    <span className="font-medium">Phone:</span>
-                    <Input
-                      value={contact.phone}
-                      onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
-                <Textarea
-                  placeholder="Add notes about this contact..."
-                  value={contact.notes}
-                  onChange={(e) => handleNotesChange(contact.id, e.target.value)}
-                  className="mb-2 min-h-[80px]"
-                />
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`address-update-${contact.id}`}
-                      checked={contact.needAddressUpdate}
-                      onCheckedChange={(checked) =>
-                        handleAddressUpdateChange(contact.id, !!checked)
-                      }
-                    />
-                    <label htmlFor={`address-update-${contact.id}`} className="text-sm">
-                      Address updated
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`phone-update-${contact.id}`}
-                      checked={contact.needPhoneUpdate}
-                      onCheckedChange={(checked) =>
-                        handlePhoneUpdateChange(contact.id, !!checked)
-                      }
-                    />
-                    <label htmlFor={`phone-update-${contact.id}`} className="text-sm">
-                      Phone updated
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`territory-status-${contact.id}`}
-                      checked={contact.territoryStatus}
-                      onCheckedChange={(checked) =>
-                        handleTerritoryStatusChange(contact.id, !!checked)
-                      }
-                    />
-                    <label htmlFor={`territory-status-${contact.id}`} className="text-sm">
-                      Different territory
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </TableCell>
-      </TableRow>
-    )
-  }
-                          </React.Fragment >
-                        )
-})}
-                    </TableBody >
-                  </Table >
-                </ScrollArea >
-              )}
+                              <TooltipContent>Copy Name & Open OTM</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </CardFooter>
 
-{/* Grid View */ }
-{
-  viewType === "grid" && (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {filteredContacts.map((contact) => {
-        const statusColor =
-          contact.status === "Potentially French"
-            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-            : contact.status === "Duplicate"
-              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-              : contact.status === "Not checked"
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-
-        return (
-          <Card
-            key={contact.id}
-            id={`contact-row-${contact.id}`}
-<<<<<<< HEAD
-            className={`overflow-hidden cursor-pointer ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""
-              }`}
-=======
-                        className={`overflow-hidden cursor-pointer ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""
-                          }`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-            onClick={() => toggleContactExpanded(contact.id)}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedContacts.includes(contact.id)}
-                      onCheckedChange={() => toggleContactSelection(contact.id)}
-                    />
-                    <CardTitle className="text-base">{contact.fullName}</CardTitle>
-                  </div>
-                  <CardDescription className="mt-1">{contact.address}</CardDescription>
-                </div>
-                <Badge className={statusColor}>
-                  <div className="flex items-center gap-1">
-                    {getStatusIcon(contact.status)}
-                    <span>{contact.status}</span>
-                  </div>
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pb-2 pt-0">
-              <div className="text-sm space-y-1">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>
-                    {contact.city}, {contact.zipcode}
-                  </span>
-                </div>
-                {contact.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{contact.phone}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Add verification status bar with 3 distinct sections */}
-              <div className="mt-2 mb-1">
-                <div className="flex h-1.5 w-full rounded-full overflow-hidden">
-                  <div
-<<<<<<< HEAD
-                    className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                      } flex-1`}
-                  ></div>
-                  <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                  <div
-                    className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                      } flex-1`}
-                  ></div>
-                  <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                  <div
-                    className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                      } flex-1`}
-=======
-                                className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
-                              ></div>
-                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                              <div
-                                className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
-                              ></div>
-                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                              <div
-                                className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
->>>>>>> 3b88820 (Update copy name button to copy address)
-                  ></div>
-                </div>
-              </div>
-
-              <div className="flex gap-1 mt-2">
-                {contact.id === lastVerifiedId && (
-                  <Badge
-                    variant="outline"
-                    className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200"
-                  >
-                    <Clock className="h-3 w-3 mr-1" /> Last verified
-                  </Badge>
-                )}
-                {contact.notes && contact.notes.trim() !== "" && (
-                  <Badge
-                    variant="outline"
-                    className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200"
-                  >
-                    <StickyNote className="h-3 w-3 mr-1" /> Has notes
-                  </Badge>
-                )}
-                {contact.needAddressUpdate && (
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
-                  >
-                    <AlertCircleIcon className="h-3 w-3 mr-1" /> Address update
-                  </Badge>
-                )}
-                {contact.needPhoneUpdate && (
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
-                  >
-                    <Phone className="h-3 w-3 mr-1" /> Phone update
-                  </Badge>
-                )}
-                {contact.territoryStatus && (
-                  <Badge
-                    variant="outline"
-                    className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200"
-                  >
-                    <MapPin className="h-3 w-3 mr-1" /> Different territory
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggleContactExpanded(contact.id)
-                }}
-                className="hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                {contact.isExpanded ? "Less" : "More"}
-              </Button>
-              <div className="flex gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={contact.checkedOnForebears ? "secondary" : "outline"}
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        searchOnForebears(contact)
-                      }}
-                      className={
-                        contact.checkedOnForebears
-                          ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                      }
-                    >
-                      <Globe className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Search on Forebears.io</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={contact.checkedOnTPS ? "secondary" : "outline"}
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        searchOnTruePeopleSearch(contact)
-                      }}
-                      className={
-                        contact.checkedOnTPS
-                          ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                      }
-                    >
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Search on TruePeopleSearch</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={contact.checkedOnOTM ? "secondary" : "outline"}
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        copyAndSearchOTM(contact)
-                      }}
-                      className={
-                        contact.checkedOnOTM
-                          ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                      }
-                    >
-                      {copiedId === contact.id ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-<<<<<<< HEAD
-  <TooltipContent>Copy Name & Open OTM</TooltipContent>
-=======
-                              <TooltipContent>Copy Address & Open OTM</TooltipContent>
->>>>>>> 3b88820 (Update copy name button to copy address)
-                            </Tooltip >
-                          </div >
-                        </CardFooter >
-
-  {
-    contact.isExpanded && (
-      <div className="p-4 bg-muted/30 border-t">
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <h3 className="text-sm font-medium mb-2">Contact Details</h3>
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">First Name:</span>
-                <Input
-                  value={contact.firstName}
-                  onChange={(e) => updateContactField(contact.id, "firstName", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">Last Name:</span>
-                <Input
-                  value={contact.lastName}
-                  onChange={(e) => updateContactField(contact.id, "lastName", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">Address:</span>
-                <Input
-                  value={contact.address}
-                  onChange={(e) => updateContactField(contact.id, "address", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">City:</span>
-                <Input
-                  value={contact.city}
-                  onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">Zipcode:</span>
-                <Input
-                  value={contact.zipcode}
-                  onChange={(e) => updateContactField(contact.id, "zipcode", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                <span className="font-medium">Phone:</span>
-                <Input
-                  value={contact.phone}
-                  onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
-                  className="col-span-2 h-8"
-                />
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
-            <Textarea
-              placeholder="Add notes about this contact..."
-              value={contact.notes}
-              onChange={(e) => handleNotesChange(contact.id, e.target.value)}
-              className="mb-2 min-h-[80px]"
-            />
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={`address-update-grid-${contact.id}`}
-                  checked={contact.needAddressUpdate}
-                  onCheckedChange={(checked) => handleAddressUpdateChange(contact.id, !!checked)}
-                />
-                <label htmlFor={`address-update-grid-${contact.id}`} className="text-sm">
-                  Address updated
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={`phone-update-grid-${contact.id}`}
-                  checked={contact.needPhoneUpdate}
-                  onCheckedChange={(checked) => handlePhoneUpdateChange(contact.id, !!checked)}
-                />
-                <label htmlFor={`phone-update-grid-${contact.id}`} className="text-sm">
-                  Phone updated
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={`territory-status-grid-${contact.id}`}
-                  checked={contact.territoryStatus}
-                  onCheckedChange={(checked) => handleTerritoryStatusChange(contact.id, !!checked)}
-                />
-                <label htmlFor={`territory-status-grid-${contact.id}`} className="text-sm">
-                  Different territory
-                </label>
-              </div>
-            </div>
-            <div className="mt-2">
-              <Select
-                value={contact.status}
-                onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-              >
-                <SelectTrigger className="w-full rounded-full">
-                  <SelectValue placeholder={contact.status} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Not checked">Not checked</SelectItem>
-                  <SelectItem value="Potentially French">Potentially French</SelectItem>
-                  <SelectItem value="Detected">Detected</SelectItem>
-                  <SelectItem value="Duplicate">Duplicate</SelectItem>
-                  <SelectItem value="Not French">Not French</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-                      </Card >
+                        {contact.isExpanded && (
+                          <div className="p-4 bg-muted/30 border-t">
+                            <div className="grid grid-cols-1 gap-4">
+                              <div>
+                                <h3 className="text-sm font-medium mb-2">Contact Details</h3>
+                                <div className="space-y-3 text-sm">
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">First Name:</span>
+                                    <Input
+                                      value={contact.firstName}
+                                      onChange={(e) => updateContactField(contact.id, "firstName", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">Last Name:</span>
+                                    <Input
+                                      value={contact.lastName}
+                                      onChange={(e) => updateContactField(contact.id, "lastName", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">Address:</span>
+                                    <Input
+                                      value={contact.address}
+                                      onChange={(e) => updateContactField(contact.id, "address", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">City:</span>
+                                    <Input
+                                      value={contact.city}
+                                      onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">Zipcode:</span>
+                                    <Input
+                                      value={contact.zipcode}
+                                      onChange={(e) => updateContactField(contact.id, "zipcode", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-3 items-center gap-2">
+                                    <span className="font-medium">Phone:</span>
+                                    <Input
+                                      value={contact.phone}
+                                      onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
+                                      className="col-span-2 h-8"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
+                                <Textarea
+                                  placeholder="Add notes about this contact..."
+                                  value={contact.notes}
+                                  onChange={(e) => handleNotesChange(contact.id, e.target.value)}
+                                  className="mb-2 min-h-[80px]"
+                                />
+                                <div className="flex items-center space-x-4">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`address-update-grid-${contact.id}`}
+                                      checked={contact.needAddressUpdate}
+                                      onCheckedChange={(checked) => handleAddressUpdateChange(contact.id, !!checked)}
+                                    />
+                                    <label htmlFor={`address-update-grid-${contact.id}`} className="text-sm">
+                                      Address updated
+                                    </label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`phone-update-grid-${contact.id}`}
+                                      checked={contact.needPhoneUpdate}
+                                      onCheckedChange={(checked) => handlePhoneUpdateChange(contact.id, !!checked)}
+                                    />
+                                    <label htmlFor={`phone-update-grid-${contact.id}`} className="text-sm">
+                                      Phone updated
+                                    </label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`territory-status-grid-${contact.id}`}
+                                      checked={contact.territoryStatus}
+                                      onCheckedChange={(checked) => handleTerritoryStatusChange(contact.id, !!checked)}
+                                    />
+                                    <label htmlFor={`territory-status-grid-${contact.id}`} className="text-sm">
+                                      Different territory
+                                    </label>
+                                  </div>
+                                </div>
+                                <div className="mt-2">
+                                  <Select
+                                    value={contact.status}
+                                    onValueChange={(value) => handleStatusChange(contact.id, value as any)}
+                                  >
+                                    <SelectTrigger className="w-full rounded-full">
+                                      <SelectValue placeholder={contact.status} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Not checked">Not checked</SelectItem>
+                                      <SelectItem value="Potentially French">Potentially French</SelectItem>
+                                      <SelectItem value="Detected">Detected</SelectItem>
+                                      <SelectItem value="Duplicate">Duplicate</SelectItem>
+                                      <SelectItem value="Not French">Not French</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </Card>
                     )
-})}
-                </div >
+                  })}
+                </div>
               )}
-            </CardContent >
-          </Card >
+            </CardContent>
+          </Card>
         )}
-      </main >
+      </main>
 
-  {/* Floating Batch Action Box */ }
-{
-  selectedContacts.length > 0 && (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50 transition-all duration-300 ease-in-out">
-      <div className="container mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{selectedContacts.length} contacts selected</span>
-          <Button size="sm" variant="outline" onClick={() => setSelectedContacts([])}>
-            Clear Selection
-          </Button>
+      {/* Floating Batch Action Box */}
+      {selectedContacts.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50 transition-all duration-300 ease-in-out">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{selectedContacts.length} contacts selected</span>
+              <Button size="sm" variant="outline" onClick={() => setSelectedContacts([])}>
+                Clear Selection
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Not checked")}
+                className="bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
+              >
+                <XCircle className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+                Not Checked
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Potentially French")}
+                className="bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                Potentially French
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Duplicate")}
+                className="bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
+              >
+                <RefreshCw className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
+                Duplicate
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Detected")}
+                className="bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:hover:bg-purple-900/40"
+              >
+                <Badge className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
+                Detected
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => updateBatchStatus("Not French")}
+                className="bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
+              >
+                <CircleSlash className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
+                Not French
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => setSelectedContacts([])}
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Done
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateBatchStatus("Not checked")}
-            className="bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
-          >
-            <XCircle className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
-            Not Checked
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateBatchStatus("Potentially French")}
-            className="bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-            Potentially French
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateBatchStatus("Duplicate")}
-            className="bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
-          >
-            <RefreshCw className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
-            Duplicate
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateBatchStatus("Detected")}
-            className="bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:hover:bg-purple-900/40"
-          >
-            <Badge className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
-            Detected
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateBatchStatus("Not French")}
-            className="bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
-          >
-            <CircleSlash className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
-            Not French
-          </Button>
-          <Button
-            size="sm"
-            variant="default"
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => setSelectedContacts([])}
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Done
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-    </TooltipProvider >
+      )}
+    </TooltipProvider>
   )
 }
