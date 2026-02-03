@@ -24,13 +24,12 @@ abdoulkarim
 abdoullahi
 abdouraman
 abdouramane
-abdu
 abega
 abena
 abeng
 abessolo
 abia
-abid
+
 abira
 abo
 aboh
@@ -53,7 +52,7 @@ adama
 adamou
 adamu
 adda
-adil
+
 adja
 adje
 adjoumani
@@ -118,7 +117,6 @@ alouna
 amadou
 amah
 amal
-aman
 amana
 amani
 amba
@@ -602,7 +600,6 @@ brahim
 bras
 braud
 brault
-braun
 bresson
 breton
 briand
@@ -640,7 +637,6 @@ carre
 carrier
 cartier
 carton
-carvalho
 casanova
 castel
 catherine
@@ -669,6 +665,7 @@ charlet
 charpentier
 charrier
 charron
+charvin
 chartier
 chateau
 chatelain
@@ -2020,13 +2017,13 @@ mayala
 mayangui
 mayela
 mayembo
-mayer
+
 mayima
 mayindou
 mayinga
 mayinguidi
 mayinguila
-mayo
+
 mayoukou
 mayoulou
 mayouma
@@ -2237,7 +2234,7 @@ mokongo
 mokouabi
 mokube
 molambo
-molina
+
 molo
 molonda
 mombo
@@ -2261,7 +2258,7 @@ morchid
 moreau
 moreira
 morel
-moreno
+
 moret
 morice
 morin
@@ -2383,12 +2380,12 @@ mpoungui
 mpouo
 mpoutou
 mua
-muller
+
 muluh
 munier
-munoz
+
 murat
-musa
+
 mustapha
 mvembe
 mveng
@@ -2428,7 +2425,7 @@ naji
 najib
 nakavoua
 nama
-names
+
 namondo
 nana
 nanfack
@@ -2439,7 +2436,7 @@ nanje
 nassiri
 nassourou
 naudin
-navarro
+
 nchang
 nchare
 nche
@@ -2619,7 +2616,6 @@ nguimbi
 nguimfack
 nguini
 ngum
-nguyen
 ngwa
 ngwang
 ngwe
@@ -2679,7 +2675,7 @@ nkwenti
 nna
 nnanga
 nnomo
-noah
+
 noel
 nombo
 nomo
@@ -2689,7 +2685,7 @@ noubissi
 noubissie
 noufe
 nouhou
-nour
+
 nouri
 nsana
 nsangou
@@ -2719,7 +2715,7 @@ ntsimba
 ntsoko
 ntsoumou
 ntyam
-nunes
+
 nya
 nyah
 nyam
@@ -2764,7 +2760,7 @@ obongo
 odette
 oger
 ojong
-oka
+
 okala
 okamba
 okana
@@ -2788,7 +2784,7 @@ olandzobo
 olinga
 olingou
 olive
-oliveira
+
 olivier
 ollivier
 omari
@@ -2851,7 +2847,7 @@ owona
 owono
 oyono
 packa
-page
+
 pages
 paillard
 pain
@@ -2885,8 +2881,8 @@ pemba
 pembe
 pemboura
 penda
-penn
-pereira
+
+
 pernot
 peron
 perret
@@ -3332,7 +3328,6 @@ wabo
 wane
 waffo
 wafo
-wagner
 wahbi
 walla
 walter
@@ -3340,7 +3335,6 @@ wamba
 wandala
 wandji
 wando
-wang
 warda
 wassa
 wayang
@@ -3426,3 +3420,24 @@ zoua
 zouhair
 zourmba
 zra
+abene
+abessa
+michaux
+milotte
+moussaidi
+ntumba
+pasquine
+patenaude
+abboud
+abdelouahabi
+abderrahmane
+abouhiha
+achour
+amroune
+acotchou
+ahniche
+ahodehou
+aitballa
+amarir
+amara
+amour
