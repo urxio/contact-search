@@ -2,6 +2,7 @@ import type React from "react"
 import "@/app/globals.css"
 import { Inter } from "next/font/google"
 import { EnhancedThemeProvider } from "@/components/enhanced-theme-provider"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
           storageKey="contact-search-theme"
         >
           {children}
+          <Toaster position="bottom-center" richColors />
         </EnhancedThemeProvider>
       </body>
     </html>

@@ -54,6 +54,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { createContact as persistContact } from "@/actions/contact-actions"
+import { toast } from "sonner"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -644,7 +645,14 @@ export default function Home() {
             "22333","22334","22336","22401","22402","22403","22404","22405","22406","22407",
             "22412","22430","22463","22471","22554","22555","22556","22712",
           ])
-          updatedContact.territoryStatus = !TERRITORY_ZIPCODES.has(value.trim())
+          const isOutside = !TERRITORY_ZIPCODES.has(value.trim())
+          updatedContact.territoryStatus = isOutside
+          if (isOutside && value.trim()) {
+            toast.warning("Outside territory", {
+              description: `Zipcode ${value.trim()} is not within your territory.`,
+              duration: 4000,
+            })
+          }
         }
 
         // If we're updating first or last name, recalculate the full name
@@ -1201,9 +1209,19 @@ export default function Home() {
 
   // Add a new function to handle territory status changes
   const handleTerritoryStatusChange = useCallback((id: string, territoryStatus: boolean) => {
-    setContacts((prevContacts) =>
-      prevContacts.map((contact) => (contact.id === id ? { ...contact, territoryStatus: territoryStatus } : contact)),
-    )
+    setContacts((prevContacts) => {
+      const updated = prevContacts.map((contact) =>
+        contact.id === id ? { ...contact, territoryStatus } : contact
+      )
+      if (territoryStatus) {
+        const contact = prevContacts.find((c) => c.id === id)
+        toast.warning("Outside territory", {
+          description: `${contact?.fullName || "This contact"}'s address is not within your territory.`,
+          duration: 4000,
+        })
+      }
+      return updated
+    })
   }, [])
 
   // Function to find the most recently interacted contact
