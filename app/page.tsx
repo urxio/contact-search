@@ -1409,16 +1409,6 @@ export default function Home() {
                 <TooltipContent>Import JSON data file</TooltipContent>
               </Tooltip>
 
-              {/* Add Contact Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={() => setIsAddContactOpen(true)} className="flex items-center gap-1">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Add contact</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Add a new contact</TooltipContent>
-              </Tooltip>
             </div>
 
             <Dialog open={isDocOpen} onOpenChange={setIsDocOpen}>
@@ -2023,17 +2013,14 @@ export default function Home() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={filterContactsNeedingUpdates}
-                        className={`flex items-center gap-1 ${showUpdateNeeded
-                          ? "bg-amber-100 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
-                          : ""
-                          }`}
+                        onClick={() => setIsAddContactOpen(true)}
+                        className="flex items-center gap-1"
                       >
-                        <Filter className="h-4 w-4" />
-                        <span className="hidden sm:inline">{showUpdateNeeded ? "Show All" : "Needs Update"}</span>
+                        <Plus className="h-4 w-4" />
+                        <span className="hidden sm:inline">Add Contact</span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Filter contacts that need updates</TooltipContent>
+                    <TooltipContent>Add a new contact (Ctrl+J)</TooltipContent>
                   </Tooltip>
                   <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
                     <SelectTrigger className="w-[180px]">
