@@ -473,7 +473,7 @@ export default function Home() {
   const searchOnTruePeopleSearch = useCallback(
     (contact: EnhancedContact) => {
       if (!contact.fullName || !contact.zipcode) {
-        alert("Contact name and zipcode are required for search")
+        toast.error("Contact name and zipcode are required for search")
         return
       }
 
@@ -503,7 +503,7 @@ export default function Home() {
         setCopiedId(contact.id)
       } catch (err) {
         console.error("Failed to copy contact name: ", err)
-        alert("Failed to copy contact name to clipboard")
+        toast.error("Failed to copy contact name to clipboard")
         return
       }
 
@@ -526,7 +526,7 @@ export default function Home() {
   const searchOnForebears = useCallback(
     (contact: EnhancedContact) => {
       if (!contact.lastName) {
-        alert("Last name is required for Forebears search")
+        toast.error("Last name is required for Forebears search")
         return
       }
 
@@ -674,7 +674,7 @@ export default function Home() {
     const fullName = `${firstName} ${lastName}`.trim()
 
     if (!fullName) {
-      alert("Please enter at least a first or last name")
+      toast.error("Please enter at least a first or last name")
       return
     }
 
@@ -721,7 +721,7 @@ export default function Home() {
     // Reset form and close dialog
     setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", fullName: "", notes: "" })
     setIsAddContactOpen(false)
-    alert("Contact added")
+    toast.success("Contact added")
   }, [newContactForm])
 
   // Update the deleteContact function
@@ -733,7 +733,7 @@ export default function Home() {
   const updateBatchStatus = useCallback(
     (newStatus: EnhancedContact["status"]) => {
       if (selectedContacts.length === 0) {
-        alert("Please select contacts to update")
+        toast.error("Please select contacts to update")
         return
       }
 
@@ -744,7 +744,7 @@ export default function Home() {
       )
 
       // Show success message
-      alert(`Updated ${selectedContacts.length} contacts to "${newStatus}" status`)
+      toast.success(`Updated ${selectedContacts.length} contacts to "${newStatus}" status`)
     },
     [selectedContacts],
   )
@@ -803,7 +803,7 @@ export default function Home() {
   // Add this to the useEffect for keyboard shortcuts
   const deleteSelectedContacts = useCallback(() => {
     if (selectedContacts.length === 0) {
-      alert("Please select contacts to delete")
+      toast.error("Please select contacts to delete")
       return
     }
 
@@ -816,7 +816,7 @@ export default function Home() {
   // Function to mark selected contacts as done (Potentially French)
   const markSelectedAsDone = useCallback(() => {
     if (selectedContacts.length === 0) {
-      alert("Please select contacts to mark as done")
+      toast.error("Please select contacts to mark as done")
       return
     }
 
@@ -855,7 +855,7 @@ export default function Home() {
       const sourceContacts = contactsToCheck ?? contacts
 
       if (!sourceContacts || sourceContacts.length === 0) {
-        alert("No contacts loaded")
+        toast.error("No contacts loaded")
         return
       }
 
@@ -889,7 +889,7 @@ export default function Home() {
       }
 
       setIsDetecting(false)
-      alert(`Name detection completed. Marked ${changed} contacts as Detected.`)
+      toast.success(`Name detection completed. Marked ${changed} contacts as Detected.`)
     },
     [contacts, selectedContacts],
   )
@@ -926,7 +926,7 @@ export default function Home() {
     setContacts(updated)
 
     if (!sourceContacts) {
-      alert(`Duplicate address detection completed. Marked ${duplicateCount} contact${duplicateCount !== 1 ? "s" : ""} as Duplicate.`)
+      toast.success(`Duplicate detection complete. Marked ${duplicateCount} contact${duplicateCount !== 1 ? "s" : ""} as Duplicate.`)
     }
 
     return duplicateCount
@@ -952,10 +952,10 @@ export default function Home() {
         if (importedData.territoryPageRange) setTerritoryPageRange(importedData.territoryPageRange)
         if (importedData.lastVerifiedId) setLastVerifiedId(importedData.lastVerifiedId)
 
-        alert("Data imported successfully!")
+        toast.success("Data imported successfully!")
       } catch (error) {
         console.error("Error importing data:", error)
-        alert("Error importing data. Please check the file format.")
+        toast.error("Error importing data. Please check the file format.")
       }
     }
     reader.readAsText(file)
@@ -990,7 +990,7 @@ export default function Home() {
   // Add this function after the shareData function
   const exportToExcel = useCallback(async () => {
     if (contacts.length === 0) {
-      alert("No contacts to export")
+      toast.error("No contacts to export")
       return
     }
 
@@ -1065,7 +1065,7 @@ export default function Home() {
     // Show success message
     const exportCount = contactsToExport.length
     const selectionText = selectedContacts.length > 0 ? "selected" : "all"
-    alert(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
+    toast.success(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
   }, [contacts, selectedContacts, parseAddress])
 
   // Add a new function to export only Potentially French contacts
@@ -1073,7 +1073,7 @@ export default function Home() {
 
   const exportPotentiallyFrenchToCSV = useCallback((stateValue: string) => {
     if (contacts.length === 0) {
-      alert("No contacts to export")
+      toast.error("No contacts to export")
       return
     }
 
@@ -1081,7 +1081,7 @@ export default function Home() {
     const frenchContacts = contacts.filter((contact) => contact.status === "Potentially French")
 
     if (frenchContacts.length === 0) {
-      alert("No Potentially French contacts found to export")
+      toast.error("No Potentially French contacts found to export")
       return
     }
 
@@ -1147,7 +1147,7 @@ export default function Home() {
     URL.revokeObjectURL(url)
 
     // Show success message
-    alert(`Successfully exported ${frenchContacts.length} Potentially French contacts to CSV`)
+    toast.success(`Successfully exported ${frenchContacts.length} Potentially French contacts to CSV`)
 
     // Close dialog and reset state value
     setIsExportStateDialogOpen(false)
@@ -1186,10 +1186,10 @@ export default function Home() {
         setFileUploaded(false)
 
         // Show confirmation
-        alert("New session started. All data has been cleared.")
+        toast.success("New session started. All data has been cleared.")
       }
     } else {
-      alert("No active session to clear.")
+      toast.error("No active session to clear.")
     }
   }, [contacts])
 
@@ -1259,7 +1259,7 @@ export default function Home() {
         }, 2000)
       }
     } else {
-      alert("No recent contact interaction found")
+      toast.error("No recent contact interaction found")
     }
   }, [findMostRecentContact])
 
@@ -1679,7 +1679,7 @@ export default function Home() {
                 const fn = (newContactForm.firstName || "").trim()
                 const ln = (newContactForm.lastName || "").trim()
                 if (!fn && !ln) {
-                  alert('Please provide at least a first or last name')
+                  toast.error('Please provide at least a first or last name')
                   return
                 }
 
@@ -1721,7 +1721,7 @@ export default function Home() {
 
                 setNewContactForm({ firstName: "", lastName: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
                 setIsAddContactOpen(false)
-                alert('Contact added')
+                toast.success('Contact added')
               }}>Create</Button>
             </div>
           </DialogContent>
@@ -1770,7 +1770,7 @@ export default function Home() {
                 onClick={() => {
                   const trimmedValue = exportStateValue.trim()
                   if (!trimmedValue) {
-                    alert("Please enter a state value")
+                    toast.error("Please enter a state value")
                     return
                   }
                   exportPotentiallyFrenchToCSV(trimmedValue)
