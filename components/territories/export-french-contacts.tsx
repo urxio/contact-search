@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { FileSpreadsheet } from "lucide-react"
-import * as XLSX from "xlsx"
+// XLSX is dynamically imported on export to reduce initial bundle size (~500KB+)
 
 interface Contact {
   id: string
@@ -76,10 +76,12 @@ export function ExportFrenchContacts({ contacts }: ExportFrenchContactsProps) {
     }
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true)
 
     try {
+      const XLSX = await import("xlsx")
+
       // Filter only French contacts
       const frenchContacts = contacts.filter(
         (contact) => contact.status === "Potentially French" || contact.status === "french",
