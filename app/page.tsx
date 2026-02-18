@@ -30,7 +30,6 @@ import {
   FileSpreadsheet,
   Import,
   Plus,
-  ScanSearch,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -1317,22 +1316,6 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 mr-4">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => detectDuplicateAddresses()}
-                    disabled={contacts.length === 0}
-                    className="flex items-center gap-1 bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-900/20 dark:border-orange-800 dark:hover:bg-orange-900/40"
-                  >
-                    <ScanSearch className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <span className="hidden sm:inline">Find Dupes</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Mark contacts with duplicate addresses as "Duplicate"</TooltipContent>
-              </Tooltip>
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
