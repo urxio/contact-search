@@ -30,13 +30,14 @@ import {
   FileSpreadsheet,
   Import,
   Plus,
+  ScanSearch,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import * as XLSX from "xlsx"
+// XLSX is dynamically imported on file upload/export to reduce initial bundle size (~500KB+)
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Dialog,
@@ -371,8 +372,9 @@ export default function Home() {
 
     const reader = new FileReader()
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import("xlsx")
         const data = e.target?.result
         const workbook = XLSX.read(data, { type: "binary" })
         const sheetName = workbook.SheetNames[0]
@@ -421,12 +423,22 @@ export default function Home() {
           }
         })
 
-        setContacts(processedContacts)
+        // Mark duplicate addresses before setting state
+        const seen = new Map<string, boolean>()
+        const deduped = processedContacts.map((c) => {
+          const key = `${c.address} ${c.city} ${c.zipcode}`.toLowerCase().replace(/\s+/g, " ").trim()
+          if (!key) return c
+          if (seen.has(key)) return { ...c, status: "Duplicate" as const }
+          seen.set(key, true)
+          return c
+        })
+
+        setContacts(deduped)
         setFileUploaded(true)
-        // Run detection automatically after import (non-blocking)
+        // Run French name detection automatically after import (non-blocking)
         setTimeout(() => {
           try {
-            ; (detectFrenchNames as any)?.(false, processedContacts)
+            ; (detectFrenchNames as any)?.(false, deduped)
           } catch (e) {
             console.warn("detectFrenchNames not available yet", e)
           }
@@ -850,6 +862,44 @@ export default function Home() {
     [contacts, selectedContacts],
   )
 
+  // Detect contacts sharing the same address and mark duplicates (keeps the first, marks the rest)
+  const detectDuplicateAddresses = useCallback((sourceContacts?: EnhancedContact[]) => {
+    const base = sourceContacts ?? contacts
+    if (!base || base.length === 0) return 0
+
+    const seen = new Map<string, string>() // normalized address -> first contact id
+    let duplicateCount = 0
+
+    const updated = base.map((c) => {
+      // Normalize: lowercase, collapse whitespace
+      const normalized = `${c.address} ${c.city} ${c.zipcode}`
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim()
+
+      if (!normalized) return c
+
+      if (seen.has(normalized)) {
+        if (c.status !== "Duplicate") {
+          duplicateCount++
+          return { ...c, status: "Duplicate" as const }
+        }
+        return c
+      }
+
+      seen.set(normalized, c.id)
+      return c
+    })
+
+    setContacts(updated)
+
+    if (!sourceContacts) {
+      alert(`Duplicate address detection completed. Marked ${duplicateCount} contact${duplicateCount !== 1 ? "s" : ""} as Duplicate.`)
+    }
+
+    return duplicateCount
+  }, [contacts])
+
   // Function to import data
   const importData = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -906,11 +956,13 @@ export default function Home() {
   }, [contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId])
 
   // Add this function after the shareData function
-  const exportToExcel = useCallback(() => {
+  const exportToExcel = useCallback(async () => {
     if (contacts.length === 0) {
       alert("No contacts to export")
       return
     }
+
+    const XLSX = await import("xlsx")
 
     // Determine which contacts to export (all or selected)
     const contactsToExport =
@@ -1265,6 +1317,22 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 mr-4">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => detectDuplicateAddresses()}
+                    disabled={contacts.length === 0}
+                    className="flex items-center gap-1 bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-900/20 dark:border-orange-800 dark:hover:bg-orange-900/40"
+                  >
+                    <ScanSearch className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <span className="hidden sm:inline">Find Dupes</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Mark contacts with duplicate addresses as "Duplicate"</TooltipContent>
+              </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
