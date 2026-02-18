@@ -2141,7 +2141,7 @@ export default function Home() {
                                   {contact.territoryStatus && (
                                     <Tooltip>
                                       <TooltipTrigger>
-                                        <MapPin className="h-4 w-4 text-purple-500" />
+                                        <MapPin className="h-4 w-4 text-red-500" />
                                       </TooltipTrigger>
                                       <TooltipContent>Different territory</TooltipContent>
                                     </Tooltip>
@@ -2527,7 +2527,7 @@ export default function Home() {
                             {contact.territoryStatus && (
                               <Badge
                                 variant="outline"
-                                className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200"
+                                className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200"
                               >
                                 <MapPin className="h-3 w-3 mr-1" /> Different territory
                               </Badge>
