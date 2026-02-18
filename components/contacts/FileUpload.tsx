@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import * as XLSX from "xlsx"
+// XLSX is dynamically imported on file upload to reduce initial bundle size (~500KB+)
 import { EnhancedContact } from "@/hooks/useContacts"
 
 interface FileUploadProps {
@@ -78,8 +78,9 @@ export function FileUpload({
 
         const reader = new FileReader()
 
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
+                const XLSX = await import("xlsx")
                 const data = e.target?.result
                 const workbook = XLSX.read(data, { type: "binary" })
                 const sheetName = workbook.SheetNames[0]
