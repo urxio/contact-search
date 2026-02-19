@@ -55,13 +55,21 @@ export async function GET(req: NextRequest) {
     // Ensure new columns exist (idempotent migration)
     await ensureSchema()
 
-    // Fetch ALL submissions (all users, all submissions) — no deduplication
+    // Fetch ALL submissions — include most-used zipcode derived from contacts JSONB
     const result = await pool.query(`
       SELECT
         id, user_id, submitted_at,
         contact_count, potentially_french, not_french, duplicate, not_checked,
         global_notes, territory_zipcode, territory_page_range,
-        review_status, archived
+        review_status, archived,
+        (
+          SELECT c->>'zipcode'
+          FROM jsonb_array_elements(contacts) AS c
+          WHERE c->>'zipcode' IS NOT NULL AND c->>'zipcode' != ''
+          GROUP BY c->>'zipcode'
+          ORDER BY COUNT(*) DESC
+          LIMIT 1
+        ) AS top_zipcode
       FROM submissions
       ORDER BY user_id ASC, submitted_at DESC
     `)

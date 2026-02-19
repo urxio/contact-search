@@ -22,6 +22,7 @@ interface Submission {
   territory_page_range: string
   review_status: ReviewStatus
   archived: boolean
+  top_zipcode: string | null
 }
 
 interface UserGroup {
@@ -178,11 +179,15 @@ export default function AdminDashboard() {
               )}
             </p>
           </div>
-          <form action="/api/admin/logout" method="POST">
-            <button type="submit" className="text-sm text-gray-500 hover:text-red-500 transition-colors">
-              Sign out
-            </button>
-          </form>
+          <button
+            onClick={async () => {
+              await fetch("/api/admin/logout", { method: "POST" })
+              window.location.href = "/"
+            }}
+            className="text-sm text-gray-500 hover:text-red-500 transition-colors"
+          >
+            Sign out
+          </button>
         </div>
 
         {/* ── Summary cards ── */}
@@ -313,9 +318,13 @@ export default function AdminDashboard() {
                             </td>
 
                             <td className="px-5 py-3 text-gray-500 text-xs">
-                              {sub.territory_zipcode
-                                ? `ZIP: ${sub.territory_zipcode}${sub.territory_page_range ? ` · Pages: ${sub.territory_page_range}` : ""}`
-                                : "—"}
+                              {(() => {
+                                const zip = sub.top_zipcode || sub.territory_zipcode
+                                if (!zip) return "—"
+                                const pages = sub.territory_page_range ? ` · Pages: ${sub.territory_page_range}` : ""
+                                const label = sub.top_zipcode ? "Most used: " : "ZIP: "
+                                return `${label}${zip}${pages}`
+                              })()}
                             </td>
 
                             <td className="px-4 py-3 text-right font-medium">{sub.contact_count}</td>
