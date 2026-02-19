@@ -931,7 +931,7 @@ export default function Home() {
       territoryPageRange,
       lastVerifiedId,
       exportDate: new Date().toISOString(),
-      version: "1.5",
+      version: "2.0",
     }
 
     const jsonString = JSON.stringify(dataToExport, null, 2)
@@ -1068,7 +1068,7 @@ export default function Home() {
       territoryPageRange,
       lastVerifiedId,
       exportDate: new Date().toISOString(),
-      version: "1.5",
+      version: "2.0",
     }
 
     const jsonString = JSON.stringify(dataToExport)
@@ -1491,25 +1491,34 @@ export default function Home() {
         notFrench={notFrenchCount}
         detected={detectedCount}
       />
-      <main className="container mx-auto py-8 px-4 pb-24">
-        <div className="flex justify-between items-center mb-6 pb-4 border-b">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              OTMRT Helper
-            </h1>
-            <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded-md">
-              v1.7
-            </span>
-            {/* User ID badge */}
+      {/* ── Sticky navbar ── */}
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+
+          {/* Left — wordmark + version + user badge */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Coloured icon dot */}
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+              <span className="text-white text-xs font-black leading-none">O</span>
+            </div>
+
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate">
+                OTMRT Helper
+              </span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 shrink-0">
+                v2
+              </span>
+            </div>
+
+            {/* User badge */}
+            <div className="hidden sm:block w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
             {userId ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => {
-                      setUserIdInput(userId)
-                      setIsUserIdDialogOpen(true)
-                    }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-800 dark:text-green-300 text-xs font-medium transition-colors"
+                    onClick={() => { setUserIdInput(userId); setIsUserIdDialogOpen(true) }}
+                    className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-800 dark:text-green-300 text-xs font-medium transition-colors"
                   >
                     <UserCircle className="h-3.5 w-3.5" />
                     {userId}
@@ -1520,7 +1529,7 @@ export default function Home() {
             ) : (
               <button
                 onClick={() => setIsUserIdDialogOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium transition-colors"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium transition-colors"
               >
                 <UserCircle className="h-3.5 w-3.5" />
                 Sign in
@@ -1528,76 +1537,79 @@ export default function Home() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 mr-4">
+          {/* Right — actions */}
+          <div className="flex items-center gap-2 shrink-0">
 
-              {/* Send for Review — primary user action */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={sendForReview}
-                    disabled={isSendingReview || contacts.length === 0}
-                    className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
-                  >
-                    <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span className="hidden sm:inline">{isSendingReview ? "Sending..." : "Send for Review"}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {userId ? `Submit your work as "${userId}"` : "Sign in first to submit your work"}
-                </TooltipContent>
-              </Tooltip>
+            {/* Send for Review */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  onClick={sendForReview}
+                  disabled={isSendingReview || contacts.length === 0}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-sm disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs font-semibold">
+                    {isSendingReview ? "Sending…" : "Send for Review"}
+                  </span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {userId ? `Submit your work as "${userId}"` : "Sign in first to submit your work"}
+              </TooltipContent>
+            </Tooltip>
 
-              {/* Burger menu — admin/power-user tools */}
-              <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="hidden sm:inline">More</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onClick={() => setIsExportStateDialogOpen(true)}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
-                    Export CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <label htmlFor="import-data" className="flex items-center cursor-pointer w-full">
-                      <Import className="h-4 w-4 mr-2 text-amber-600" />
-                      Import JSON
-                    </label>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={exportData}>
-                    <FileJson className="h-4 w-4 mr-2 text-blue-600" />
-                    Export JSON (backup)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <a href="/overview" className="flex items-center cursor-pointer w-full">
-                      <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
-                      Feature Overview
-                    </a>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <a href="/admin" className="flex items-center cursor-pointer w-full">
-                      <ShieldCheck className="h-4 w-4 mr-2 text-purple-600" />
-                      Admin Dashboard
-                    </a>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {/* More / burger menu */}
+            <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="flex items-center gap-1 border-gray-200 dark:border-gray-700">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline text-xs">More</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setIsExportStateDialogOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                  Export CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <label htmlFor="import-data" className="flex items-center cursor-pointer w-full">
+                    <Import className="h-4 w-4 mr-2 text-amber-600" />
+                    Import JSON
+                  </label>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={exportData}>
+                  <FileJson className="h-4 w-4 mr-2 text-blue-600" />
+                  Export JSON (backup)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a href="/overview" className="flex items-center cursor-pointer w-full">
+                    <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
+                    Feature Overview
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <a href="/admin" className="flex items-center cursor-pointer w-full">
+                    <ShieldCheck className="h-4 w-4 mr-2 text-purple-600" />
+                    Admin Dashboard
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            </div>
-
+            {/* Theme switcher */}
             <ThemeSwitcher />
           </div>
         </div>
+      </header>
+
+      <main className="container mx-auto py-8 px-4 pb-24">
 
         {/* Add Contact Dialog (main page) */}
         <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
