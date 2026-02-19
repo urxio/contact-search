@@ -20,6 +20,14 @@ interface Contact {
   territoryStatus: boolean
 }
 
+interface SubmissionSummary {
+  id: number
+  submitted_at: string
+  contact_count: number
+  territory_zipcode: string
+  territory_page_range: string
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "Potentially French": "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   "Not French":         "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
@@ -30,8 +38,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function UserDetailPage({
   params,
+  searchParams,
 }: {
   params: { userId: string }
+  searchParams: { submissionId?: string }
 }) {
   const cookieStore = cookies()
   const session = cookieStore.get("admin_session")
@@ -40,16 +50,29 @@ export default async function UserDetailPage({
   }
 
   const userId = decodeURIComponent(params.userId)
+  const submissionId = searchParams.submissionId ? parseInt(searchParams.submissionId) : null
 
-  const result = await pool.query(
-    `SELECT * FROM submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
+  // Fetch all submissions for this user (for the switcher)
+  const allResult = await pool.query(
+    `SELECT id, submitted_at, contact_count, territory_zipcode, territory_page_range
+     FROM submissions WHERE user_id = $1 ORDER BY submitted_at DESC`,
     [userId]
   )
+  if (allResult.rows.length === 0) notFound()
+  const allSubmissions: SubmissionSummary[] = allResult.rows
 
+  // Fetch the specific submission (by ID if provided, otherwise latest)
+  const targetId = submissionId ?? allSubmissions[0].id
+  const result = await pool.query(
+    `SELECT * FROM submissions WHERE id = $1 AND user_id = $2`,
+    [targetId, userId]
+  )
   if (result.rows.length === 0) notFound()
 
   const submission = result.rows[0]
   const contacts: Contact[] = submission.contacts
+  const isLatest = targetId === allSubmissions[0].id
+  const submissionIndex = allSubmissions.findIndex((s) => s.id === targetId)
 
   const potentiallyFrench = contacts.filter((c) => c.status === "Potentially French")
   const notFrench         = contacts.filter((c) => c.status === "Not French")
@@ -62,20 +85,50 @@ export default async function UserDetailPage({
 
         {/* Back + header */}
         <div className="mb-6">
-          <Link
-            href="/admin"
-            className="text-sm text-blue-600 hover:underline mb-4 inline-block"
-          >
+          <Link href="/admin" className="text-sm text-blue-600 hover:underline mb-4 inline-block">
             ← Back to dashboard
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {userId}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Submitted {new Date(submission.submitted_at).toLocaleString()}
-            {submission.territory_zipcode && ` · Territory ZIP: ${submission.territory_zipcode}`}
-            {submission.territory_page_range && ` · Pages: ${submission.territory_page_range}`}
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                {userId}
+                {isLatest && (
+                  <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-full px-2 py-0.5 font-semibold">
+                    latest
+                  </span>
+                )}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Submission {allSubmissions.length - submissionIndex} of {allSubmissions.length} ·{" "}
+                {new Date(submission.submitted_at).toLocaleString()}
+                {submission.territory_zipcode && ` · Territory ZIP: ${submission.territory_zipcode}`}
+                {submission.territory_page_range && ` · Pages: ${submission.territory_page_range}`}
+              </p>
+            </div>
+
+            {/* Submission switcher — shown when user has multiple */}
+            {allSubmissions.length > 1 && (
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs text-gray-400 mb-1">Switch submission:</span>
+                <div className="flex flex-wrap gap-1 justify-end max-w-xs">
+                  {allSubmissions.map((s, i) => (
+                    <Link
+                      key={s.id}
+                      href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${s.id}`}
+                      className={`text-xs rounded-lg px-2.5 py-1 font-medium transition-colors border ${
+                        s.id === targetId
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {i === 0 ? "Latest" : new Date(s.submitted_at).toLocaleDateString()}
+                      {i === 0 && s.id !== targetId && " ↑"}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stat pills */}
@@ -110,8 +163,8 @@ export default async function UserDetailPage({
         {/* Download JSON */}
         <div className="flex justify-end mb-4">
           <a
-            href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&format=json`}
-            download={`${userId}-submission.json`}
+            href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&submissionId=${targetId}&format=json`}
+            download={`${userId}-submission-${targetId}.json`}
             className="inline-block bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
           >
             ↓ Download JSON
@@ -150,9 +203,7 @@ export default async function UserDetailPage({
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{contact.zipcode}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{contact.phone}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[contact.status] ?? "bg-gray-100 text-gray-700"}`}
-                    >
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[contact.status] ?? "bg-gray-100 text-gray-700"}`}>
                       {contact.status}
                     </span>
                   </td>

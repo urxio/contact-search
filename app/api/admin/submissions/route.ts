@@ -16,11 +16,19 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get("userId")
 
     if (userId) {
-      // Fetch full contact data for a specific user (most recent submission)
-      const result = await pool.query(
-        `SELECT * FROM submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
-        [userId]
-      )
+      const submissionId = searchParams.get("submissionId")
+
+      // Fetch a specific submission by ID, or fall back to latest for this user
+      const result = submissionId
+        ? await pool.query(
+            `SELECT * FROM submissions WHERE id = $1 AND user_id = $2`,
+            [parseInt(submissionId), userId]
+          )
+        : await pool.query(
+            `SELECT * FROM submissions WHERE user_id = $1 ORDER BY submitted_at DESC LIMIT 1`,
+            [userId]
+          )
+
       if (result.rows.length === 0) {
         return NextResponse.json({ error: "No submission found" }, { status: 404 })
       }
@@ -30,10 +38,13 @@ export async function GET(req: NextRequest) {
       const format = searchParams.get("format")
       if (format === "json") {
         const json = JSON.stringify(row, null, 2)
+        const filename = submissionId
+          ? `${userId}-submission-${submissionId}.json`
+          : `${userId}-submission.json`
         return new NextResponse(json, {
           headers: {
             "Content-Type": "application/json",
-            "Content-Disposition": `attachment; filename="${userId}-submission.json"`,
+            "Content-Disposition": `attachment; filename="${filename}"`,
           },
         })
       }
@@ -41,14 +52,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(row)
     }
 
-    // Fetch summary of all submissions (latest per user)
+    // Fetch ALL submissions (all users, all submissions) — no deduplication
     const result = await pool.query(`
-      SELECT DISTINCT ON (user_id)
+      SELECT
         id, user_id, submitted_at,
         contact_count, potentially_french, not_french, duplicate, not_checked,
         global_notes, territory_zipcode, territory_page_range
       FROM submissions
-      ORDER BY user_id, submitted_at DESC
+      ORDER BY user_id ASC, submitted_at DESC
     `)
 
     return NextResponse.json(result.rows)
