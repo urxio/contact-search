@@ -30,6 +30,7 @@ import {
   FileSpreadsheet,
   Import,
   Plus,
+  Send,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -185,6 +186,10 @@ export default function Home() {
   const [isExportStateDialogOpen, setIsExportStateDialogOpen] = useState(false)
   const [exportStateValue, setExportStateValue] = useState("")
 
+  // User ID — read from ?uid= URL param on load, persisted in localStorage
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isSendingReview, setIsSendingReview] = useState(false)
+
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
@@ -280,6 +285,17 @@ export default function Home() {
 
     if (savedViewType) {
       setViewType(savedViewType)
+    }
+
+    // Capture user ID from ?uid= URL param, fall back to localStorage
+    const params = new URLSearchParams(window.location.search)
+    const uidFromUrl = params.get("uid")
+    if (uidFromUrl) {
+      localStorage.setItem("userId", uidFromUrl)
+      setUserId(uidFromUrl)
+    } else {
+      const savedUserId = localStorage.getItem("userId")
+      if (savedUserId) setUserId(savedUserId)
     }
 
     // Add keyboard shortcuts
@@ -1228,6 +1244,44 @@ export default function Home() {
     setExportStateValue("")
   }, [contacts, parseAddress])
 
+  // Send work to admin for review
+  const sendForReview = useCallback(async () => {
+    if (!userId) {
+      toast.error("No user ID found. Please access this app using your assigned link (e.g. ?uid=your-name).")
+      return
+    }
+    if (contacts.length === 0) {
+      toast.error("No contacts to submit. Please import contacts first.")
+      return
+    }
+
+    setIsSendingReview(true)
+    try {
+      const res = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          contacts,
+          globalNotes,
+          territoryZipcode,
+          territoryPageRange,
+        }),
+      })
+
+      if (res.ok) {
+        toast.success(`Work submitted for review! (${contacts.length} contacts sent as "${userId}")`)
+      } else {
+        const data = await res.json()
+        toast.error(`Submission failed: ${data.error ?? "Unknown error"}`)
+      }
+    } catch (err) {
+      toast.error("Submission failed. Check your connection and try again.")
+    } finally {
+      setIsSendingReview(false)
+    }
+  }, [userId, contacts, globalNotes, territoryZipcode, territoryPageRange])
+
   // Modify the startNewSession function to reset the file input element
   const startNewSession = useCallback(() => {
     if (contacts.length > 0) {
@@ -1890,6 +1944,27 @@ export default function Home() {
                     <RefreshCw className="h-4 w-4 text-red-600 dark:text-red-400" />
                     <span>New Session</span>
                   </Button>
+
+                  {/* Send for Review — submits work to admin */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={sendForReview}
+                        disabled={isSendingReview || contacts.length === 0}
+                        className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
+                      >
+                        <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span>{isSendingReview ? "Sending..." : "Send for Review"}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {userId
+                        ? `Submit your work as "${userId}"`
+                        : "Add ?uid=your-name to the URL to enable submissions"}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
               </div>
