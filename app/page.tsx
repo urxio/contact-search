@@ -9,7 +9,6 @@ import {
   Upload,
   Check,
   Copy,
-  HelpCircle,
   ChevronDown,
   ChevronRight,
   Search,
@@ -17,7 +16,6 @@ import {
   AlertCircleIcon,
   Clock,
   StickyNote,
-  Keyboard,
   LayoutGrid,
   LayoutList,
   CheckCircle2,
@@ -165,7 +163,6 @@ export default function Home() {
   const [territoryZipcode, setTerritoryZipcode] = useState("")
   const [territoryPageRange, setTerritoryPageRange] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [isDocOpen, setIsDocOpen] = useState(false)
 
   // Add new state variables for efficiency features
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
@@ -178,7 +175,6 @@ export default function Home() {
 
   // Add a keyboard shortcuts help dialog
   // Add this state variable with the other state variables
-  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false)
 
   // Add-contact dialog state
   const [isAddContactOpen, setIsAddContactOpen] = useState(false)
@@ -1599,234 +1595,6 @@ export default function Home() {
 
             </div>
 
-            <Dialog open={isDocOpen} onOpenChange={setIsDocOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-1">
-                  <HelpCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Help</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>OTM Helper Documentation</DialogTitle>
-                  <DialogDescription>
-                    <Tabs defaultValue="import" className="w-full">
-                      <TabsList className="grid grid-cols-5">
-                        <TabsTrigger value="import">Import/Export</TabsTrigger>
-                        <TabsTrigger value="statistics">Statistics</TabsTrigger>
-                        <TabsTrigger value="contact">Contact Management</TabsTrigger>
-                        <TabsTrigger value="verification">Verification</TabsTrigger>
-                        <TabsTrigger value="shortcuts">Shortcuts</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="import" className="p-4">
-                        <h3 className="text-lg font-medium mb-2">Import & Export</h3>
-                        <p className="mb-2">The application supports several data formats:</p>
-
-                        <h4 className="font-medium mt-4">Excel Import Format</h4>
-                        <p className="mb-2">The Excel file should have the following columns in this order:</p>
-                        <ol className="list-decimal pl-5 space-y-1">
-                          <li>First Name</li>
-                          <li>Last Name</li>
-                          <li>Address</li>
-                          <li>City</li>
-                          <li>Zipcode</li>
-                          <li>Phone</li>
-                        </ol>
-
-                        <h4 className="font-medium mt-4">JSON Export/Import</h4>
-                        <p>
-                          The JSON export includes all contact data, notes, and application settings. This is the best
-                          format for backing up your work.
-                        </p>
-
-                        <h4 className="font-medium mt-4">Excel Export</h4>
-                        <p>The Excel export creates a spreadsheet with the following columns:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Contact Name</li>
-                          <li>House Number (parsed from address)</li>
-                          <li>Direction (N, S, E, W, etc.)</li>
-                          <li>Street Name</li>
-                          <li>Apt Num</li>
-                          <li>City</li>
-                          <li>ZIP Code</li>
-                          <li>Phone Number</li>
-                          <li>Status</li>
-                          <li>Notes</li>
-                        </ul>
-                        <p className="mt-2">You can export all contacts or just selected contacts.</p>
-                      </TabsContent>
-                      <TabsContent value="statistics" className="p-4">
-                        <h3 className="text-lg font-medium mb-2">Statistics</h3>
-                        <p>The statistics section shows a summary of your contacts:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>
-                            <span className="font-medium">Progress Bar:</span> Shows the percentage of contacts that
-                            have been checked
-                          </li>
-                          <li>
-                            <span className="font-medium">Not Checked:</span> Contacts that haven't been checked yet
-                          </li>
-                          <li>
-                            <span className="font-medium">Potentially French:</span> Contacts marked as potentially
-                            French
-                          </li>
-                          <li>
-                            <span className="font-medium">Not French:</span> Contacts marked as not French
-                          </li>
-                        </ul>
-                      </TabsContent>
-                      <TabsContent value="contact" className="p-4">
-                        <h3 className="text-lg font-medium mb-2">Contact Management</h3>
-                        <p className="mb-2">The contacts table allows you to:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Click on a row to expand and see more details</li>
-                          <li>Edit contact information directly in the expanded view</li>
-                          <li>Search for contacts using the search box</li>
-                          <li>Filter contacts by status</li>
-                          <li>Toggle between list and grid views</li>
-                          <li>Select multiple contacts for batch operations</li>
-                          <li>Mark contacts that need address or phone updates</li>
-                        </ul>
-
-                        <h4 className="font-medium mt-4">Batch Operations</h4>
-                        <p>
-                          When you select multiple contacts, a batch action bar appears at the bottom of the screen
-                          allowing you to:
-                        </p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Mark selected contacts as "Not checked"</li>
-                          <li>Mark selected contacts as "Potentially French"</li>
-                          <li>Mark selected contacts as "Not French"</li>
-                          <li>
-                            Mark selected contacts as "Done" (sets them as "Potentially French" and clears selection)
-                          </li>
-                        </ul>
-                      </TabsContent>
-                      <TabsContent value="verification" className="p-4">
-                        <h3 className="text-lg font-medium mb-2">Verification Process</h3>
-                        <p className="mb-2">The application provides several tools to help verify contacts:</p>
-
-                        <h4 className="font-medium mt-4">Search Tools</h4>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>
-                            <span className="font-medium">TruePeopleSearch:</span> Search for contact information by
-                            name and zipcode
-                          </li>
-                          <li>
-                            <span className="font-medium">OTM:</span> Copy the contact name and open Online Territory
-                            Manager
-                          </li>
-                          <li>
-                            <span className="font-medium">Forebears.io:</span> Search for surname origins and
-                            distribution
-                          </li>
-                        </ul>
-
-                        <h4 className="font-medium mt-4">Verification Status</h4>
-                        <p>Each contact has a verification status bar showing which tools have been used:</p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>Left section: Forebears.io check</li>
-                          <li>Middle section: TruePeopleSearch check</li>
-                          <li>Right section: OTM check</li>
-                        </ul>
-
-                        <h4 className="font-medium mt-4">Recent Contact Navigation</h4>
-                        <p>
-                          The "Recent" button helps you navigate to the most recently interacted contact, making it easy
-                          to continue where you left off.
-                        </p>
-                      </TabsContent>
-                      <TabsContent value="shortcuts" className="p-4">
-                        <h3 className="text-lg font-medium mb-2">Keyboard Shortcuts</h3>
-                        <div className="grid grid-cols-2 gap-2 mt-4">
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+F</kbd>
-                            <span>Focus search</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+A</kbd>
-                            <span>Select/deselect all</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+G</kbd>
-                            <span>Toggle grid/list view</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
-                            <span>Export to CSV</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
-                            <span>Add new contact (open Add dialog)</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+1</kbd>
-                            <span>Mark as Not checked</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+2</kbd>
-                            <span>Mark as Potentially French</span>
-                          </div>
-                          <div className="bg-muted p-2 rounded flex items-center">
-                            <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+3</kbd>
-                            <span>Mark as Not French</span>
-                          </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={isKeyboardHelpOpen} onOpenChange={setIsKeyboardHelpOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-1">
-                  <Keyboard className="h-4 w-4" />
-                  <span className="hidden sm:inline">Keys</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Keyboard Shortcuts</DialogTitle>
-                  <DialogDescription>
-                    <div className="grid grid-cols-2 gap-2 mt-4">
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+F</kbd>
-                        <span>Focus search</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+A</kbd>
-                        <span>Select/deselect all</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+G</kbd>
-                        <span>Toggle grid/list view</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+E</kbd>
-                        <span>Export to CSV</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+J</kbd>
-                        <span>Add new contact (open Add dialog)</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+1</kbd>
-                        <span>Mark as Not checked</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+2</kbd>
-                        <span>Mark as Potentially French</span>
-                      </div>
-                      <div className="bg-muted p-2 rounded flex items-center">
-                        <kbd className="px-2 py-1 bg-background rounded mr-2">Ctrl+3</kbd>
-                        <span>Mark as Not French</span>
-                      </div>
-                    </div>
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
             <ThemeSwitcher />
           </div>
         </div>
