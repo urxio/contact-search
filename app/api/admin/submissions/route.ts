@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { pool, ensureSchema } from "@/lib/db"
 import { cookies } from "next/headers"
 
 export async function GET(req: NextRequest) {
@@ -51,6 +51,9 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json(row)
     }
+
+    // Ensure new columns exist (idempotent migration)
+    await ensureSchema()
 
     // Fetch ALL submissions (all users, all submissions) — no deduplication
     const result = await pool.query(`

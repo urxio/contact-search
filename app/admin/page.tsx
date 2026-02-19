@@ -47,19 +47,30 @@ export default function AdminDashboard() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState<Record<number, boolean>>({})
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
   const fetchSubmissions = useCallback(async () => {
-    const res = await fetch("/api/admin/submissions")
-    if (res.status === 401) {
-      router.push("/admin/login")
-      return
+    try {
+      const res = await fetch("/api/admin/submissions")
+      if (res.status === 401) {
+        router.push("/admin/login")
+        return
+      }
+      const data = await res.json()
+      if (!res.ok || !Array.isArray(data)) {
+        setFetchError(data?.error ?? "Failed to load submissions.")
+        setLoading(false)
+        return
+      }
+      setSubmissions(data as Submission[])
+      setFetchError(null)
+    } catch (err) {
+      setFetchError("Network error — could not reach the server.")
     }
-    const data: Submission[] = await res.json()
-    setSubmissions(data)
     setLoading(false)
   }, [router])
 
@@ -126,6 +137,23 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <p className="text-gray-400 text-sm animate-pulse">Loading…</p>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 font-semibold mb-2">Error loading dashboard</p>
+          <p className="text-gray-400 text-sm mb-4">{fetchError}</p>
+          <button
+            onClick={() => { setLoading(true); setFetchError(null); fetchSubmissions() }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     )
   }
