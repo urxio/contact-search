@@ -457,6 +457,7 @@ type OtmMatch = {
 
 type OtmResult = {
   otmRowCount: number
+  otmRawRowCount?: number
   submissionCount: number
   matchCount: number
   matches: OtmMatch[]
@@ -655,7 +656,15 @@ function OtmPanel() {
           {/* Result summary bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex flex-wrap gap-4 text-sm">
-              <span className="text-gray-500">OTM addresses scanned: <strong className="text-gray-900 dark:text-white">{result.otmRowCount}</strong></span>
+              <span className="text-gray-500">
+                OTM addresses loaded:{" "}
+                <strong className="text-gray-900 dark:text-white">{result.otmRowCount}</strong>
+                {result.otmRawRowCount !== undefined && result.otmRawRowCount !== result.otmRowCount && (
+                  <span className="ml-1 text-xs text-amber-500" title="Rows with a blank address cell were skipped">
+                    ({result.otmRawRowCount} rows in sheet)
+                  </span>
+                )}
+              </span>
               <span className="text-gray-500">Submissions checked: <strong className="text-gray-900 dark:text-white">{result.submissionCount}</strong></span>
               <span className={result.matchCount > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
                 {result.matchCount > 0 ? `⚠ ${result.matchCount} duplicate${result.matchCount !== 1 ? "s" : ""} found` : "✓ No duplicates found"}

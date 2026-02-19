@@ -47,9 +47,13 @@ export async function POST(req: NextRequest) {
     const XLSX = await import("xlsx")
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const workbook = XLSX.read(buffer, { type: "buffer" })
+    // dense: true reads ALL cells regardless of the sheet's declared range,
+    // which prevents xlsx from capping rows at the !ref boundary.
+    const workbook = XLSX.read(buffer, { type: "buffer", dense: true })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+    // sheetRows: 0 means no row limit; defval: "" fills missing cells so
+    // row arrays have consistent length even for sparse sheets.
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, sheetRows: 0, defval: "" })
 
     if (rows.length < 2) {
       return NextResponse.json({ error: "Excel file is empty or has no data rows" }, { status: 400 })
@@ -172,6 +176,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       otmRowCount: otmRows.length,
+      otmRawRowCount: rows.length - 1,   // total non-header rows seen in the sheet
       submissionCount: result.rows.length,
       matchCount: matches.length,
       matches,
