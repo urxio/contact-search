@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -46,6 +46,7 @@ function pct(a: number, total: number) {
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<"submissions" | "otm">("submissions")
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -164,7 +165,7 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto">
 
         {/* ── Header ── */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -189,6 +190,29 @@ export default function AdminDashboard() {
             Sign out
           </button>
         </div>
+
+        {/* ── Tab switcher ── */}
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-8 w-fit">
+          {(["submissions", "otm"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
+            >
+              {tab === "submissions" ? "Submissions" : "OTM Dups Check"}
+            </button>
+          ))}
+        </div>
+
+        {/* ── OTM Dups Check panel ── */}
+        {activeTab === "otm" && <OtmPanel />}
+
+        {/* ── Submissions tab ── */}
+        {activeTab === "submissions" && <>
 
         {/* ── Summary cards ── */}
         {visible.length > 0 && (
@@ -388,6 +412,7 @@ export default function AdminDashboard() {
             )
           })}
         </div>
+        </>}
       </div>
     </div>
   )
@@ -409,6 +434,285 @@ function StatRow({ label, value, color = "text-gray-600 dark:text-gray-400" }: {
     <div className="flex items-center justify-between gap-2">
       <span className="text-gray-500">{label}</span>
       <span className={`font-semibold ${color}`}>{value}</span>
+    </div>
+  )
+}
+
+// ── OTM Dups Check panel ──────────────────────────────────────────────────────
+
+type OtmMatch = {
+  submissionId: number
+  userId: string
+  submittedAt: string
+  contactName: string
+  contactAddress: string
+  contactCity: string
+  contactZipcode: string
+  contactStatus: string
+  matchType: "exact" | "loose"
+  otmAddress: string
+  otmCity: string
+  otmZipcode: string
+}
+
+type OtmResult = {
+  otmRowCount: number
+  submissionCount: number
+  matchCount: number
+  matches: OtmMatch[]
+}
+
+function OtmPanel() {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [fileName, setFileName]   = useState<string | null>(null)
+  const [running, setRunning]     = useState(false)
+  const [result, setResult]       = useState<OtmResult | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+  const [filter, setFilter]       = useState<"all" | "exact" | "loose">("all")
+  const [search, setSearch]       = useState("")
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (f) setFileName(f.name)
+    setResult(null)
+    setError(null)
+  }
+
+  const runCheck = async () => {
+    const file = fileRef.current?.files?.[0]
+    if (!file) { setError("Please select an Excel file first."); return }
+
+    setRunning(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/admin/otm-check", { method: "POST", body: form })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? "Check failed"); return }
+      setResult(data as OtmResult)
+    } catch {
+      setError("Network error — could not reach the server.")
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const filtered = result?.matches.filter(m => {
+    if (filter !== "all" && m.matchType !== filter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        m.contactName.toLowerCase().includes(q) ||
+        m.contactAddress.toLowerCase().includes(q) ||
+        m.contactCity.toLowerCase().includes(q) ||
+        m.contactZipcode.toLowerCase().includes(q) ||
+        m.userId.toLowerCase().includes(q)
+      )
+    }
+    return true
+  }) ?? []
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* Upload card */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">OTM Address Comparison</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          Upload an Excel file containing OTM addresses. The tool will scan all active user submissions
+          and flag any contact whose address matches an address in the OTM file.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Hidden file input */}
+          <input
+            ref={fileRef}
+            type="file"
+            id="otm-upload"
+            accept=".xlsx,.xls"
+            onChange={handleFile}
+            className="hidden"
+          />
+
+          {/* Upload trigger */}
+          <label
+            htmlFor="otm-upload"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12V4m0 0L8 8m4-4l4 4" />
+            </svg>
+            {fileName ? "Change file" : "Upload OTM Excel"}
+          </label>
+
+          {/* File name pill */}
+          {fileName && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-300 font-medium border border-gray-200 dark:border-gray-700">
+              📄 {fileName}
+            </span>
+          )}
+
+          {/* Run button */}
+          <button
+            onClick={runCheck}
+            disabled={!fileName || running}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+          >
+            {running ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Running…
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                Run Comparison
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Column hint */}
+        <p className="mt-3 text-xs text-gray-400">
+          Expected columns in the OTM file: <span className="font-medium">Address</span> (required) · <span className="font-medium">City</span> · <span className="font-medium">Zipcode</span>
+        </p>
+
+        {/* Error */}
+        {error && (
+          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800">
+            <svg className="h-4 w-4 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+            </svg>
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Results */}
+      {result && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+
+          {/* Result summary bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <span className="text-gray-500">OTM addresses scanned: <strong className="text-gray-900 dark:text-white">{result.otmRowCount}</strong></span>
+              <span className="text-gray-500">Submissions checked: <strong className="text-gray-900 dark:text-white">{result.submissionCount}</strong></span>
+              <span className={result.matchCount > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                {result.matchCount > 0 ? `⚠ ${result.matchCount} duplicate${result.matchCount !== 1 ? "s" : ""} found` : "✓ No duplicates found"}
+              </span>
+            </div>
+
+            {/* Filter + search */}
+            {result.matchCount > 0 && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search results…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="h-8 px-3 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-44"
+                />
+                <select
+                  value={filter}
+                  onChange={e => setFilter(e.target.value as any)}
+                  className="h-8 px-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none"
+                >
+                  <option value="all">All matches</option>
+                  <option value="exact">Exact only</option>
+                  <option value="loose">Loose only</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Match table */}
+          {filtered.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">User</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact name</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Submitted address</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">OTM address</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Match</th>
+                    <th className="px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((m, i) => (
+                    <tr key={i} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-5 py-3">
+                        <p className="font-semibold text-gray-900 dark:text-white text-xs">{m.userId}</p>
+                        <p className="text-[10px] text-gray-400">{new Date(m.submittedAt).toLocaleDateString()}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-medium">{m.contactName || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        <p>{m.contactAddress}</p>
+                        {(m.contactCity || m.contactZipcode) && (
+                          <p className="text-gray-400">{[m.contactCity, m.contactZipcode].filter(Boolean).join(", ")}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        <p>{m.otmAddress}</p>
+                        {(m.otmCity || m.otmZipcode) && (
+                          <p className="text-gray-400">{[m.otmCity, m.otmZipcode].filter(Boolean).join(", ")}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          m.contactStatus === "Potentially French"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            : m.contactStatus === "Not French"
+                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                            : m.contactStatus === "Duplicate"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        }`}>
+                          {m.contactStatus || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+                          m.matchType === "exact"
+                            ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                            : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                        }`}>
+                          {m.matchType === "exact" ? "Exact" : "Loose"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/admin/user/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
+                          className="text-xs text-blue-600 hover:underline font-semibold"
+                        >
+                          View →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : result.matchCount > 0 ? (
+            <p className="px-6 py-8 text-center text-gray-400 text-sm">No matches for current filter / search.</p>
+          ) : (
+            <div className="px-6 py-12 text-center">
+              <p className="text-green-600 font-semibold text-lg mb-1">✓ No duplicates found</p>
+              <p className="text-gray-400 text-sm">None of the submitted contact addresses matched any address in the uploaded OTM file.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
