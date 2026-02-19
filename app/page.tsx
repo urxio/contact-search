@@ -55,6 +55,7 @@ import { Filter } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { createContact as persistContact } from "@/actions/contact-actions"
 import { toast } from "sonner"
+import { FloatingProgress } from "@/components/ui/floating-progress"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -1386,6 +1387,13 @@ export default function Home() {
 
   return (
     <TooltipProvider>
+      <FloatingProgress
+        total={contacts.length}
+        notChecked={notCheckedCount}
+        potentiallyFrench={potentiallyFrenchCount}
+        notFrench={notFrenchCount}
+        detected={detectedCount}
+      />
       <main className="container mx-auto py-8 px-4 pb-24">
         <div className="flex justify-between items-center mb-6 pb-4 border-b">
           <div className="flex items-center gap-2">
