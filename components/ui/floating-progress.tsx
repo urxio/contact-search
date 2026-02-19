@@ -35,9 +35,6 @@ export function FloatingProgress({
 
   if (total === 0 || !visible) return null
 
-  const checked = potentiallyFrench + notFrench + detected
-  const checkProgress = Math.round((checked / total) * 100)
-
   const segments = [
     {
       label: "Potentially French",
@@ -76,43 +73,6 @@ export function FloatingProgress({
             className="w-full bg-gradient-to-b from-blue-400 to-purple-500 rounded-full transition-all duration-150"
             style={{ height: `${scrollProgress}%` }}
           />
-        </div>
-
-        {/* Divider */}
-        <div className="w-8 h-px bg-gray-200 dark:bg-gray-700" />
-
-        {/* Contact check progress — circular */}
-        <div className="relative flex items-center justify-center">
-          <svg width="44" height="44" viewBox="0 0 44 44" className="-rotate-90">
-            {/* Track */}
-            <circle
-              cx="22" cy="22" r="18"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              className="text-gray-100 dark:text-gray-800"
-            />
-            {/* Progress */}
-            <circle
-              cx="22" cy="22" r="18"
-              fill="none"
-              stroke="url(#progressGradient)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={`${2 * Math.PI * 18}`}
-              strokeDashoffset={`${2 * Math.PI * 18 * (1 - checkProgress / 100)}`}
-              className="transition-all duration-500"
-            />
-            <defs>
-              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#a855f7" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <span className="absolute text-[10px] font-bold text-gray-700 dark:text-gray-200 rotate-0">
-            {checkProgress}%
-          </span>
         </div>
 
         {/* Divider */}
