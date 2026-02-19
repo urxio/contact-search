@@ -53,7 +53,14 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Filter } from "lucide-react"
+import { Filter, MoreHorizontal } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { createContact as persistContact } from "@/actions/contact-actions"
 import { toast } from "sonner"
@@ -192,6 +199,7 @@ export default function Home() {
   const [isSendingReview, setIsSendingReview] = useState(false)
   const [isUserIdDialogOpen, setIsUserIdDialogOpen] = useState(false)
   const [userIdInput, setUserIdInput] = useState("")
+  const [isPostExportDialogOpen, setIsPostExportDialogOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -1157,6 +1165,9 @@ export default function Home() {
     const exportCount = contactsToExport.length
     const selectionText = selectedContacts.length > 0 ? "selected" : "all"
     toast.success(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
+
+    // Prompt to start a new session after export
+    setTimeout(() => setIsPostExportDialogOpen(true), 800)
   }, [contacts, selectedContacts, parseAddress])
 
   // Add a new function to export only Potentially French contacts
@@ -1521,21 +1532,8 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 mr-4">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsExportStateDialogOpen(true)}
-                    className="flex items-center gap-1 bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    <span className="hidden sm:inline">Export CSV</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Export Potentially French contacts to CSV file</TooltipContent>
-              </Tooltip>
 
+              {/* Send for Review — primary user action */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1554,25 +1552,33 @@ export default function Home() {
                 </TooltipContent>
               </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="flex items-center gap-1 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
-                    >
-                      <label htmlFor="import-data" className="flex items-center cursor-pointer">
-                        <Import className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <span className="hidden sm:inline">Import</span>
-                      </label>
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Import JSON data file</TooltipContent>
-              </Tooltip>
+              {/* Burger menu — admin/power-user tools */}
+              <Input type="file" id="import-data" accept=".json" onChange={importData} className="hidden" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-1">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="hidden sm:inline">More</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => setIsExportStateDialogOpen(true)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+                    Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <label htmlFor="import-data" className="flex items-center cursor-pointer w-full">
+                      <Import className="h-4 w-4 mr-2 text-amber-600" />
+                      Import JSON
+                    </label>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={exportData}>
+                    <FileJson className="h-4 w-4 mr-2 text-blue-600" />
+                    Export JSON (backup)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
             </div>
 
@@ -2963,6 +2969,40 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ── Post-Export New Session Dialog ── */}
+      <Dialog open={isPostExportDialogOpen} onOpenChange={setIsPostExportDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-green-500" />
+              Export complete!
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to start a new session and import a new Excel file?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => {
+                setIsPostExportDialogOpen(false)
+                startNewSession()
+              }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Yes, start new session
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsPostExportDialogOpen(false)}
+              className="w-full"
+            >
+              No, keep working
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── User ID Login Dialog ── */}
       <Dialog open={isUserIdDialogOpen} onOpenChange={setIsUserIdDialogOpen}>
