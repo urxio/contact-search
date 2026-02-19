@@ -2220,30 +2220,6 @@ export default function Home() {
                                     </TooltipTrigger>
                                     <TooltipContent>Search on TruePeopleSearch</TooltipContent>
                                   </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Button
-                                        variant={contact.checkedOnOTM ? "secondary" : "outline"}
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          copyAndSearchOTM(contact)
-                                        }}
-                                        className={
-                                          contact.checkedOnOTM
-                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                        }
-                                      >
-                                        {copiedId === contact.id ? (
-                                          <Check className="h-4 w-4 text-green-500" />
-                                        ) : (
-                                          <Copy className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Copy Name & Open OTM</TooltipContent>
-                                  </Tooltip>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -2545,30 +2521,6 @@ export default function Home() {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>Search on TruePeopleSearch</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant={contact.checkedOnOTM ? "secondary" : "outline"}
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    copyAndSearchOTM(contact)
-                                  }}
-                                  className={
-                                    contact.checkedOnOTM
-                                      ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                      : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                  }
-                                >
-                                  {copiedId === contact.id ? (
-                                    <Check className="h-4 w-4 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Copy Name & Open OTM</TooltipContent>
                             </Tooltip>
                           </div>
                         </CardFooter>
