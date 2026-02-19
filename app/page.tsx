@@ -840,6 +840,39 @@ export default function Home() {
     }
   }, [])
 
+  // Notify user to resume from last verified contact when they return to the site
+  const resumeToastShown = useRef(false)
+  useEffect(() => {
+    if (resumeToastShown.current) return
+    if (!lastVerifiedId || contacts.length === 0) return
+
+    const lastContact = contacts.find((c) => c.id === lastVerifiedId)
+    if (!lastContact) return
+
+    resumeToastShown.current = true
+
+    // Small delay so the page has rendered the contact rows first
+    const timer = setTimeout(() => {
+      toast("Welcome back!", {
+        description: `Pick up where you left off — last verified: ${lastContact.fullName}`,
+        duration: 8000,
+        action: {
+          label: "Resume",
+          onClick: () => {
+            const element = document.getElementById(`contact-row-${lastVerifiedId}`)
+            if (element) {
+              element.scrollIntoView({ behavior: "smooth", block: "center" })
+              element.classList.add("bg-green-200", "dark:bg-green-800")
+              setTimeout(() => element.classList.remove("bg-green-200", "dark:bg-green-800"), 2000)
+            }
+          },
+        },
+      })
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [lastVerifiedId, contacts])
+
   // Add keyboard shortcuts for batch operations
   // Add this to the useEffect for keyboard shortcuts
   const deleteSelectedContacts = useCallback(() => {
