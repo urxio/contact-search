@@ -11,7 +11,7 @@ import {
   Import,
   Search,
   Globe,
-  Copy,
+  ShieldCheck,
   CheckCircle2,
   CircleSlash,
   Clock,
@@ -129,9 +129,9 @@ const sections = [
         desc: "Opens TruePeopleSearch in a new tab pre-filled with the contact's name and ZIP code. The button turns green once clicked so you can track which contacts you've looked up.",
       },
       {
-        icon: <Copy className="h-5 w-5 text-indigo-500" />,
-        title: "OTM",
-        desc: "Copies the contact's full name to your clipboard and opens the Online Territory Manager in a new tab, ready for you to paste and search. Button turns green once used.",
+        icon: <ShieldCheck className="h-5 w-5 text-indigo-500" />,
+        title: "OTM duplicate check (automatic)",
+        desc: "The \"Copy Name & Open OTM\" button has been removed. OTM address checking is now handled automatically in the background by the admin — your Potentially French contacts are compared against the full OTM address list after you submit. No action needed on your end.",
       },
       {
         icon: <Globe className="h-5 w-5 text-indigo-500" />,
