@@ -57,7 +57,8 @@ export async function GET(req: NextRequest) {
       SELECT
         id, user_id, submitted_at,
         contact_count, potentially_french, not_french, duplicate, not_checked,
-        global_notes, territory_zipcode, territory_page_range
+        global_notes, territory_zipcode, territory_page_range,
+        review_status, archived
       FROM submissions
       ORDER BY user_id ASC, submitted_at DESC
     `)
@@ -65,6 +66,63 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result.rows)
   } catch (err: any) {
     console.error("Admin fetch error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// PATCH — update review_status or archived flag for a submission
+export async function PATCH(req: NextRequest) {
+  const cookieStore = cookies()
+  const adminSession = cookieStore.get("admin_session")
+  if (adminSession?.value !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const { id, review_status, archived } = body
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing submission id" }, { status: 400 })
+    }
+
+    const VALID_STATUSES = ["pending", "in_review", "reviewed"]
+    if (review_status !== undefined) {
+      if (!VALID_STATUSES.includes(review_status)) {
+        return NextResponse.json({ error: "Invalid review_status" }, { status: 400 })
+      }
+      await pool.query(`UPDATE submissions SET review_status = $1 WHERE id = $2`, [review_status, id])
+    }
+
+    if (archived !== undefined) {
+      await pool.query(`UPDATE submissions SET archived = $1 WHERE id = $2`, [!!archived, id])
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("Admin PATCH error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// DELETE — permanently remove a submission
+export async function DELETE(req: NextRequest) {
+  const cookieStore = cookies()
+  const adminSession = cookieStore.get("admin_session")
+  if (adminSession?.value !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get("id")
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 })
+    }
+    await pool.query(`DELETE FROM submissions WHERE id = $1`, [parseInt(id)])
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("Admin DELETE error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

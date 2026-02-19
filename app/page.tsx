@@ -32,6 +32,7 @@ import {
   Plus,
   Send,
   UserCircle,
+  ShieldCheck,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -58,6 +59,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -1575,6 +1577,14 @@ export default function Home() {
                   <DropdownMenuItem onClick={exportData}>
                     <FileJson className="h-4 w-4 mr-2 text-blue-600" />
                     Export JSON (backup)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <a href="/admin" className="flex items-center cursor-pointer w-full">
+                      <ShieldCheck className="h-4 w-4 mr-2 text-purple-600" />
+                      Admin Dashboard
+                    </a>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

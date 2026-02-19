@@ -33,7 +33,9 @@ export async function ensureSchema() {
       global_notes TEXT,
       territory_zipcode TEXT,
       territory_page_range TEXT,
-      contacts     JSONB       NOT NULL
+      contacts     JSONB       NOT NULL,
+      review_status TEXT NOT NULL DEFAULT 'pending',
+      archived      BOOLEAN NOT NULL DEFAULT FALSE
     )
   `)
 
@@ -41,4 +43,8 @@ export async function ensureSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS submissions_user_id_idx ON submissions(user_id)
   `)
+
+  // Add new columns to existing tables (idempotent — errors ignored)
+  await pool.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending'`)
+  await pool.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`)
 }
