@@ -30,6 +30,7 @@ import {
   FileSpreadsheet,
   Import,
   Plus,
+  Sparkles,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -83,7 +84,7 @@ interface BaseContact {
 // Update the EnhancedContact interface to include territoryStatus
 interface EnhancedContact extends BaseContact {
   id: string
-  status: "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected"
+  status: "Not checked" | "Potentially French" | "Not French" | "Duplicate"
   notes: string
   isExpanded: boolean
   checkedOnTPS: boolean
@@ -188,7 +189,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
-  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected">("All")
+  const [statusFilter, setStatusFilter] = useState<"All" | "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Possibly French">("All")
 
   // useRef hook for the file input
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -207,7 +208,9 @@ export default function Home() {
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
       // Apply status filter
-      if (statusFilter !== "All" && contact.status !== statusFilter) {
+      if (statusFilter === "Possibly French") {
+        if (!contact.frenchNameMatched) return false
+      } else if (statusFilter !== "All" && contact.status !== statusFilter) {
         return false
       }
 
@@ -243,7 +246,7 @@ export default function Home() {
   )
   const notFrenchCount = useMemo(() => contacts.filter((c) => c.status === "Not French").length, [contacts])
 
-  const detectedCount = useMemo(() => contacts.filter((c) => c.status === "Detected").length, [contacts])
+  const possiblyFrenchCount = useMemo(() => contacts.filter((c) => c.frenchNameMatched).length, [contacts])
 
   const potentiallyFrenchPercentage = useMemo(
     () => (contacts.length > 0 ? Math.round((potentiallyFrenchCount / contacts.length) * 100) : 0),
@@ -744,7 +747,7 @@ export default function Home() {
       await loadDictionaryIfNeeded()
       const surname = contact.lastName || contact.fullName || ""
       const matched = isPotentiallyFrench(surname)
-      if (matched) contact.status = "Detected"
+      if (matched) contact.frenchNameMatched = true
     } catch (e) {
       console.warn("name-detection not available", e)
     }
@@ -947,7 +950,7 @@ export default function Home() {
           const surname = c.lastName || c.fullName || ""
           const matched = isPotentiallyFrench(surname)
           if (matched) changed++
-          return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
+          return { ...c, frenchNameMatched: matched }
         })
         setContacts(updated)
       } else {
@@ -957,13 +960,13 @@ export default function Home() {
             const surname = c.lastName || c.fullName || ""
             const matched = isPotentiallyFrench(surname)
             if (matched) changed++
-            return { ...c, frenchNameMatched: matched, status: matched ? "Detected" : c.status }
+            return { ...c, frenchNameMatched: matched }
           }),
         )
       }
 
       setIsDetecting(false)
-      toast.success(`Name detection completed. Marked ${changed} contacts as Detected.`)
+      toast.success(`Name detection completed. Tagged ${changed} contacts as Possibly French.`)
     },
     [contacts, selectedContacts],
   )
@@ -1425,7 +1428,7 @@ export default function Home() {
         notChecked={notCheckedCount}
         potentiallyFrench={potentiallyFrenchCount}
         notFrench={notFrenchCount}
-        detected={detectedCount}
+        detected={possiblyFrenchCount}
       />
       <main className="container mx-auto py-8 px-4 pb-24">
         <div className="flex justify-between items-center mb-6 pb-4 border-b">
@@ -1777,7 +1780,7 @@ export default function Home() {
                 try {
                   await loadDictionaryIfNeeded()
                   if (isPotentiallyFrench(created.lastName || created.fullName)) {
-                    created.status = "Detected"
+                    created.frenchNameMatched = true
                   }
                 } catch (e) {
                   console.warn('detection not available', e)
@@ -1966,7 +1969,7 @@ export default function Home() {
                     className="h-2 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full"
                     style={{
                       width: `${contacts.length > 0
-                        ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
+                        ? Math.round(((potentiallyFrenchCount + notFrenchCount) / contacts.length) * 100)
                         : 0
                         }%`,
                     }}
@@ -1974,7 +1977,7 @@ export default function Home() {
                 </div>
                 <span className="text-sm font-medium">
                   {contacts.length > 0
-                    ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
+                    ? Math.round(((potentiallyFrenchCount + notFrenchCount) / contacts.length) * 100)
                     : 0}
                   %
                 </span>
@@ -2014,12 +2017,12 @@ export default function Home() {
               </div>
 
               <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-                <div className="rounded-full p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
-                  <Globe className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <div className="rounded-full p-2 bg-purple-100 dark:bg-purple-900/30 mr-3">
+                  <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <div className="text-lg font-bold">{detectedCount}</div>
-                  <div className="text-xs text-muted-foreground">Detected</div>
+                  <div className="text-lg font-bold">{possiblyFrenchCount}</div>
+                  <div className="text-xs text-muted-foreground">Possibly French</div>
                 </div>
               </div>
             </div>
@@ -2111,7 +2114,7 @@ export default function Home() {
                       <SelectItem value="All">All</SelectItem>
                       <SelectItem value="Not checked">Not checked</SelectItem>
                       <SelectItem value="Potentially French">Potentially French</SelectItem>
-                      <SelectItem value="Detected">Detected</SelectItem>
+                      <SelectItem value="Possibly French">Possibly French (tagged)</SelectItem>
                       <SelectItem value="Duplicate">Duplicate</SelectItem>
                       <SelectItem value="Not French">Not French</SelectItem>
                     </SelectContent>
@@ -2148,10 +2151,10 @@ export default function Home() {
                             ? "bg-green-50 dark:bg-green-900/20"
                             : contact.status === "Duplicate"
                               ? "bg-amber-50 dark:bg-amber-900/20"
-                              : contact.status === "Detected"
-                                ? "bg-purple-50 dark:bg-purple-900/20"
-                                : contact.status === "Not French"
-                                  ? "bg-red-50 dark:bg-red-900/20"
+                              : contact.status === "Not French"
+                                ? "bg-red-50 dark:bg-red-900/20"
+                                : contact.frenchNameMatched
+                                  ? "bg-purple-50 dark:bg-purple-900/20"
                                   : "" // Not checked stays white/default
 
                         return (
@@ -2214,6 +2217,12 @@ export default function Home() {
                                       <TooltipContent>Different territory</TooltipContent>
                                     </Tooltip>
                                   )}
+                                  {contact.frenchNameMatched && (
+                                    <span className="inline-flex items-center gap-0.5 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                      <Sparkles className="h-2.5 w-2.5" />
+                                      Possibly French
+                                    </span>
+                                  )}
                                 </div>
                                 {/* Add verification status bar with 3 distinct sections */}
                                 <div className="mt-1 flex h-1.5 w-full rounded-full overflow-hidden">
@@ -2247,13 +2256,11 @@ export default function Home() {
                                       ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
                                       : contact.status === "Not French"
                                         ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
-                                        : contact.status === "Detected"
-                                          ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
-                                          : contact.status === "Duplicate"
-                                            ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
-                                            : contact.status === "Not checked"
-                                              ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
-                                              : ""
+                                        : contact.status === "Duplicate"
+                                          ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
+                                          : contact.status === "Not checked"
+                                            ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
+                                            : ""
                                       }`}
                                   >
                                     <SelectValue placeholder={contact.status} />
@@ -2261,7 +2268,6 @@ export default function Home() {
                                   <SelectContent>
                                     <SelectItem value="Not checked">Not checked</SelectItem>
                                     <SelectItem value="Potentially French">Potentially French</SelectItem>
-                                    <SelectItem value="Detected">Detected</SelectItem>
                                     <SelectItem value="Duplicate">Duplicate</SelectItem>
                                     <SelectItem value="Not French">Not French</SelectItem>
                                   </SelectContent>
@@ -2600,6 +2606,14 @@ export default function Home() {
                                 <MapPin className="h-3 w-3 mr-1" /> Different territory
                               </Badge>
                             )}
+                            {contact.frenchNameMatched && (
+                              <Badge
+                                variant="outline"
+                                className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200"
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" /> Possibly French
+                              </Badge>
+                            )}
                           </div>
                         </CardContent>
                         <CardFooter className="flex justify-between pt-2">
@@ -2789,7 +2803,6 @@ export default function Home() {
                                     <SelectContent>
                                       <SelectItem value="Not checked">Not checked</SelectItem>
                                       <SelectItem value="Potentially French">Potentially French</SelectItem>
-                                      <SelectItem value="Detected">Detected</SelectItem>
                                       <SelectItem value="Duplicate">Duplicate</SelectItem>
                                       <SelectItem value="Not French">Not French</SelectItem>
                                     </SelectContent>
@@ -2846,15 +2859,6 @@ export default function Home() {
               >
                 <RefreshCw className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
                 Duplicate
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Detected")}
-                className="bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:hover:bg-purple-900/40"
-              >
-                <Badge className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
-                Detected
               </Button>
               <Button
                 size="sm"

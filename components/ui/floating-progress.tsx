@@ -43,7 +43,7 @@ export function FloatingProgress({
       dot: "bg-green-500",
     },
     {
-      label: "Detected",
+      label: "Possibly French",
       count: detected,
       color: "bg-purple-500",
       dot: "bg-purple-500",
