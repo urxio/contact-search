@@ -1741,178 +1741,181 @@ export default function Home() {
           </DialogContent>
         </Dialog>
 
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle>Upload Excel File</CardTitle>
-            <CardDescription>Upload an Excel file to process contacts.</CardDescription>
-          </CardHeader>
+        {/* ── Upload & session row ── */}
+        <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
+            <Input
+              type="file"
+              id="excel-upload"
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+              className="hidden"
+              ref={fileInputRef}
+            />
 
-          <CardContent>
-            <div className="flex flex-col space-y-4">
-              <div className="flex items-center space-x-4">
+            {/* Import button */}
+            <Button asChild disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shrink-0">
+              <label htmlFor="excel-upload" className="flex items-center gap-2 cursor-pointer">
+                <Upload className="h-4 w-4" />
+                <span>{isLoading ? "Loading…" : "Import Excel File"}</span>
+              </label>
+            </Button>
+
+            {/* Uploaded indicator */}
+            {fileUploaded && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-2.5 py-1">
+                <Check className="h-3.5 w-3.5" />
+                File loaded
+              </span>
+            )}
+
+            {/* Column hint */}
+            <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
+              Columns: First Name · Last Name · Address · City · Zipcode · Phone
+            </p>
+
+            {/* New Session — pushed to the right */}
+            <div className="sm:ml-auto shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startNewSession}
+                className="flex items-center gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                New Session
+              </Button>
+            </div>
+          </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="border-t border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 px-5 py-3 flex items-start gap-2">
+              <AlertCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Territory / General Notes ── */}
+        {contacts.length > 0 && (
+          <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+              <MapPin className="h-4 w-4 text-indigo-500" />
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Territory & Notes</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-5 py-4">
+              <div>
+                <label htmlFor="territory-zipcode" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                  Territory Zipcode
+                </label>
                 <Input
-                  type="file"
-                  id="excel-upload"
-                  accept=".xlsx, .xls"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  ref={fileInputRef}
+                  id="territory-zipcode"
+                  placeholder="Enter zipcode…"
+                  value={territoryZipcode}
+                  onChange={(e) => setTerritoryZipcode(e.target.value)}
+                  className="h-9 text-sm"
                 />
-                <div className="flex items-center gap-2">
-                  <Button asChild disabled={isLoading} className="bg-purple-600 hover:bg-purple-700">
-                    <label htmlFor="excel-upload" className="flex items-center space-x-2 cursor-pointer">
-                      <Upload className="h-4 w-4" />
-                      <span>{isLoading ? "Loading..." : "Import Excel File"}</span>
-                    </label>
-                  </Button>
-                  {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
-
-                  {/* detection runs automatically after import; manual detect buttons removed */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={startNewSession}
-                    className="flex items-center gap-1 bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
-                  >
-                    <RefreshCw className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    <span>New Session</span>
-                  </Button>
-
-                </div>
-                {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
               </div>
-              <div className="text-sm text-muted-foreground">
-                <p>Required columns: First Name, Last Name, Address, City, Zipcode, Phone</p>
+              <div>
+                <label htmlFor="territory-page-range" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                  Page Range
+                </label>
+                <Input
+                  id="territory-page-range"
+                  placeholder="e.g. 1–10"
+                  value={territoryPageRange}
+                  onChange={(e) => setTerritoryPageRange(e.target.value)}
+                  className="h-9 text-sm"
+                />
               </div>
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircleIcon className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {contacts.length > 0 && (
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle>General Notes</CardTitle>
-              <CardDescription>Add information about this territory.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="territory-zipcode" className="block text-sm font-medium mb-1">
-                    Territory Zipcode
-                  </label>
-                  <Input
-                    id="territory-zipcode"
-                    placeholder="Enter zipcode..."
-                    value={territoryZipcode}
-                    onChange={(e) => setTerritoryZipcode(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="territory-page-range" className="block text-sm font-medium mb-1">
-                    Page Range
-                  </label>
-                  <Input
-                    id="territory-page-range"
-                    placeholder="e.g., 1-10"
-                    value={territoryPageRange}
-                    onChange={(e) => setTerritoryPageRange(e.target.value)}
-                  />
-                </div>
-                <div className="md:col-span-1">
-                  <label htmlFor="territory-notes" className="block text-sm font-medium mb-1">
-                    Notes
-                  </label>
-                  <Textarea
-                    id="territory-notes"
-                    placeholder="Add notes here..."
-                    value={globalNotes}
-                    onChange={(e) => setGlobalNotes(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Compact Statistics Section */}
-        {contacts.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Statistics</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Checked:</span>
-                <div className="w-48 h-2 bg-gray-100 rounded-full dark:bg-gray-800 overflow-hidden">
-                  <div
-                    className="h-2 bg-gradient-to-r from-blue-400 to-purple-600 rounded-full"
-                    style={{
-                      width: `${contacts.length > 0
-                        ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
-                        : 0
-                        }%`,
-                    }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium">
-                  {contacts.length > 0
-                    ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
-                    : 0}
-                  %
-                </span>
-              </div>
-            </div>
-
-            {/* Compact Stat Cards */}
-            <div className="grid grid-cols-4 gap-3">
-              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-                <div className="rounded-full p-2 bg-blue-100 dark:bg-blue-900/30 mr-3">
-                  <XCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <div className="text-lg font-bold">{notCheckedCount}</div>
-                  <div className="text-xs text-muted-foreground">Not Checked</div>
-                </div>
-              </div>
-
-              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-                <div className="rounded-full p-2 bg-green-100 dark:bg-green-900/30 mr-3">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <div className="text-lg font-bold">{potentiallyFrenchCount}</div>
-                  <div className="text-xs text-muted-foreground">Potentially French</div>
-                </div>
-              </div>
-
-              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-                <div className="rounded-full p-2 bg-red-100 dark:bg-red-900/30 mr-3">
-                  <CircleSlash className="h-4 w-4 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <div className="text-lg font-bold">{notFrenchCount}</div>
-                  <div className="text-xs text-muted-foreground">Not French</div>
-                </div>
-              </div>
-
-              <div className="flex items-center p-3 rounded-lg border bg-white dark:bg-gray-800">
-                <div className="rounded-full p-2 bg-yellow-100 dark:bg-yellow-900/30 mr-3">
-                  <Globe className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div>
-                  <div className="text-lg font-bold">{detectedCount}</div>
-                  <div className="text-xs text-muted-foreground">Detected</div>
-                </div>
+              <div>
+                <label htmlFor="territory-notes" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                  Notes
+                </label>
+                <Textarea
+                  id="territory-notes"
+                  placeholder="Add notes here…"
+                  value={globalNotes}
+                  onChange={(e) => setGlobalNotes(e.target.value)}
+                  className="min-h-[72px] text-sm resize-none"
+                />
               </div>
             </div>
           </div>
         )}
+
+        {/* ── Statistics ── */}
+        {contacts.length > 0 && (() => {
+          const checkedPct = contacts.length > 0
+            ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
+            : 0
+          return (
+            <div className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+              {/* Header row with progress */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Statistics</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-36 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${checkedPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 tabular-nums w-8 text-right">{checkedPct}%</span>
+                  <span className="text-xs text-gray-400">checked</span>
+                </div>
+              </div>
+
+              {/* Stat tiles */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800">
+                {/* Not Checked */}
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                    <XCircle className="h-4.5 w-4.5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{notCheckedCount}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Not Checked</p>
+                  </div>
+                </div>
+
+                {/* Potentially French */}
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="h-9 w-9 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-4.5 w-4.5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{potentiallyFrenchCount}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Pot. French</p>
+                  </div>
+                </div>
+
+                {/* Not French */}
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="h-9 w-9 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                    <CircleSlash className="h-4.5 w-4.5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{notFrenchCount}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Not French</p>
+                  </div>
+                </div>
+
+                {/* Detected */}
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="h-9 w-9 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0">
+                    <Globe className="h-4.5 w-4.5 text-yellow-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{detectedCount}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Detected</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {contacts.length > 0 && (
           <Card className="mb-4">
