@@ -126,6 +126,9 @@ export async function POST(req: NextRequest) {
       const contacts: any[] = Array.isArray(sub.contacts) ? sub.contacts : []
 
       for (const c of contacts) {
+        // Only compare "Potentially French" contacts against the OTM list
+        if (String(c.status ?? "").trim() !== "Potentially French") continue
+
         const cAddr = String(c.address ?? "").trim()
         const cCity = String(c.city    ?? "").trim()
         const cZip  = String(c.zipcode ?? "").trim()

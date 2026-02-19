@@ -462,6 +462,9 @@ type OtmResult = {
   matches: OtmMatch[]
 }
 
+const OTM_LS_KEY  = "otm_last_result"
+const OTM_LS_NAME = "otm_last_filename"
+
 function OtmPanel() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName]   = useState<string | null>(null)
@@ -470,12 +473,29 @@ function OtmPanel() {
   const [error, setError]         = useState<string | null>(null)
   const [filter, setFilter]       = useState<"all" | "exact" | "loose">("all")
   const [search, setSearch]       = useState("")
+  const [restored, setRestored]   = useState(false)
+
+  // ── Restore last result from localStorage on mount ────────────────────────
+  useEffect(() => {
+    try {
+      const savedName   = localStorage.getItem(OTM_LS_NAME)
+      const savedResult = localStorage.getItem(OTM_LS_KEY)
+      if (savedResult) {
+        setResult(JSON.parse(savedResult) as OtmResult)
+        setFileName(savedName ?? "previous file")
+        setRestored(true)
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [])
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) setFileName(f.name)
     setResult(null)
     setError(null)
+    setRestored(false)
   }
 
   const runCheck = async () => {
@@ -485,6 +505,7 @@ function OtmPanel() {
     setRunning(true)
     setError(null)
     setResult(null)
+    setRestored(false)
 
     try {
       const form = new FormData()
@@ -492,12 +513,29 @@ function OtmPanel() {
       const res = await fetch("/api/admin/otm-check", { method: "POST", body: form })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? "Check failed"); return }
-      setResult(data as OtmResult)
+      const otmResult = data as OtmResult
+      setResult(otmResult)
+      // Persist to localStorage for next visit
+      try {
+        localStorage.setItem(OTM_LS_KEY,  JSON.stringify(otmResult))
+        localStorage.setItem(OTM_LS_NAME, file.name)
+      } catch {
+        // ignore storage quota errors
+      }
     } catch {
       setError("Network error — could not reach the server.")
     } finally {
       setRunning(false)
     }
+  }
+
+  const clearSaved = () => {
+    localStorage.removeItem(OTM_LS_KEY)
+    localStorage.removeItem(OTM_LS_NAME)
+    setResult(null)
+    setFileName(null)
+    setRestored(false)
+    if (fileRef.current) fileRef.current.value = ""
   }
 
   const filtered = result?.matches.filter(m => {
@@ -552,7 +590,21 @@ function OtmPanel() {
           {fileName && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-300 font-medium border border-gray-200 dark:border-gray-700">
               📄 {fileName}
+              {restored && (
+                <span className="ml-1 text-[10px] text-indigo-500 font-semibold">(restored)</span>
+              )}
             </span>
+          )}
+
+          {/* Clear saved button — only show when restored results are displayed */}
+          {restored && (
+            <button
+              onClick={clearSaved}
+              className="text-xs text-gray-400 hover:text-red-500 underline transition-colors"
+              title="Clear saved results"
+            >
+              Clear saved
+            </button>
           )}
 
           {/* Run button */}
