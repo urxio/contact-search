@@ -104,6 +104,9 @@ export default function AdminDashboard() {
       s.map(sub => sub.id === id ? { ...sub, archived } : sub)
     )
     setBusy(b => ({ ...b, [id]: false }))
+    // When restoring (unarchiving), switch back to active view so the
+    // submission is visible and the page doesn't crash from an empty group.
+    if (!archived) setShowArchived(false)
   }, [])
 
   const deleteSubmission = useCallback(async (id: number) => {
@@ -376,30 +379,46 @@ export default function AdminDashboard() {
                               <span className="inline-flex items-center gap-1.5">
                                 <span className="text-xs text-gray-400">{checkedPct}%</span>
 
-                                <Link
-                                  href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
-                                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors"
-                                >
-                                  View
-                                </Link>
+                                {/* View button */}
+                                <span className="relative group/tip">
+                                  <Link
+                                    href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
+                                    className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors"
+                                  >
+                                    View
+                                  </Link>
+                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
+                                    View full submission
+                                  </span>
+                                </span>
 
-                                <button
-                                  disabled={isBusy}
-                                  onClick={() => toggleArchive(sub.id, !sub.archived)}
-                                  title={sub.archived ? "Unarchive" : "Archive"}
-                                  className="text-xs text-gray-400 hover:text-amber-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
-                                >
-                                  {sub.archived ? "↩" : "⊟"}
-                                </button>
+                                {/* Archive / Unarchive button */}
+                                <span className="relative group/tip">
+                                  <button
+                                    disabled={isBusy}
+                                    onClick={() => toggleArchive(sub.id, !sub.archived)}
+                                    className="text-xs text-gray-400 hover:text-amber-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
+                                  >
+                                    {sub.archived ? "↩" : "⊟"}
+                                  </button>
+                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
+                                    {sub.archived ? "Restore submission" : "Archive submission"}
+                                  </span>
+                                </span>
 
-                                <button
-                                  disabled={isBusy}
-                                  onClick={() => deleteSubmission(sub.id)}
-                                  title="Permanently delete"
-                                  className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
-                                >
-                                  🗑
-                                </button>
+                                {/* Delete button */}
+                                <span className="relative group/tip">
+                                  <button
+                                    disabled={isBusy}
+                                    onClick={() => deleteSubmission(sub.id)}
+                                    className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
+                                  >
+                                    🗑
+                                  </button>
+                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
+                                    Permanently delete
+                                  </span>
+                                </span>
                               </span>
                             </td>
                           </tr>
