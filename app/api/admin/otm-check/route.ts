@@ -67,13 +67,30 @@ export async function POST(req: NextRequest) {
     const colIdx = (aliases: string[]) =>
       headerRow.findIndex((h) => aliases.some((a) => h.includes(a)))
 
-    const addrCol    = colIdx(["address", "addr", "street"])
-    const cityCol    = colIdx(["city"])
-    const zipcodeCol = colIdx(["zip", "postal", "zipcode"])
+    // ── Two supported formats ──────────────────────────────────────────────
+    // Format A (split):  HouseNum | StreetDir | Street | AptBoxNum | City | Zip
+    //   e.g. OTM export with columns HouseNum, StreetDir, StreetName, AptBoxNum
+    // Format B (single): Address | City | Zip
+    //   e.g. a simple list with a single combined address column
 
-    if (addrCol === -1) {
+    const houseNumCol  = colIdx(["housenum", "house num", "house_num", "streetnumber", "number"])
+    const streetDirCol = colIdx(["streetdir", "street dir", "street_dir", "direction", "strdir"])
+    const streetCol    = colIdx(["streetname", "street name", "street_name", "stname"])
+    const aptCol       = colIdx(["aptboxnum", "apt", "unit", "suite", "apt/unit"])
+    const addrCol      = colIdx(["address", "addr"])   // Format B fallback
+    const cityCol      = colIdx(["city"])
+    const zipcodeCol   = colIdx(["zip", "postal", "zipcode"])
+
+    // Determine which format we have
+    const isSplitFormat = houseNumCol !== -1 || streetCol !== -1
+
+    if (!isSplitFormat && addrCol === -1) {
       return NextResponse.json(
-        { error: "Could not find an address column. Expected a header containing 'Address', 'Addr', or 'Street'." },
+        {
+          error:
+            "Could not find address columns. Expected either a single 'Address' column, " +
+            "or split columns like 'HouseNum' / 'Street' / 'StreetDir'.",
+        },
         { status: 400 }
       )
     }
@@ -85,7 +102,21 @@ export async function POST(req: NextRequest) {
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i] as any[]
-      const address = String(row[addrCol] ?? "").trim()
+
+      let address: string
+      if (isSplitFormat) {
+        // Assemble address from split columns: "2427 N Scuppers Ln APT 300"
+        const parts = [
+          houseNumCol  >= 0 ? String(row[houseNumCol]  ?? "").trim() : "",
+          streetDirCol >= 0 ? String(row[streetDirCol] ?? "").trim() : "",
+          streetCol    >= 0 ? String(row[streetCol]    ?? "").trim() : "",
+          aptCol       >= 0 ? String(row[aptCol]       ?? "").trim() : "",
+        ].filter(Boolean)
+        address = parts.join(" ").trim()
+      } else {
+        address = String(row[addrCol] ?? "").trim()
+      }
+
       if (!address) continue
       const city    = cityCol    >= 0 ? String(row[cityCol]    ?? "").trim() : ""
       const zipcode = zipcodeCol >= 0 ? String(row[zipcodeCol] ?? "").trim() : ""
