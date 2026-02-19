@@ -31,6 +31,7 @@ import {
   Import,
   Plus,
   Send,
+  UserCircle,
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -186,9 +187,11 @@ export default function Home() {
   const [isExportStateDialogOpen, setIsExportStateDialogOpen] = useState(false)
   const [exportStateValue, setExportStateValue] = useState("")
 
-  // User ID — read from ?uid= URL param on load, persisted in localStorage
+  // User ID — entered by the user via a login dialog, persisted in localStorage
   const [userId, setUserId] = useState<string | null>(null)
   const [isSendingReview, setIsSendingReview] = useState(false)
+  const [isUserIdDialogOpen, setIsUserIdDialogOpen] = useState(false)
+  const [userIdInput, setUserIdInput] = useState("")
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -287,15 +290,13 @@ export default function Home() {
       setViewType(savedViewType)
     }
 
-    // Capture user ID from ?uid= URL param, fall back to localStorage
-    const params = new URLSearchParams(window.location.search)
-    const uidFromUrl = params.get("uid")
-    if (uidFromUrl) {
-      localStorage.setItem("userId", uidFromUrl)
-      setUserId(uidFromUrl)
+    // Load saved user ID from localStorage, or prompt them to enter one
+    const savedUserId = localStorage.getItem("userId")
+    if (savedUserId) {
+      setUserId(savedUserId)
     } else {
-      const savedUserId = localStorage.getItem("userId")
-      if (savedUserId) setUserId(savedUserId)
+      // No ID yet — open the login dialog after a short delay
+      setTimeout(() => setIsUserIdDialogOpen(true), 500)
     }
 
     // Add keyboard shortcuts
@@ -1247,7 +1248,7 @@ export default function Home() {
   // Send work to admin for review
   const sendForReview = useCallback(async () => {
     if (!userId) {
-      toast.error("No user ID found. Please access this app using your assigned link (e.g. ?uid=your-name).")
+      setIsUserIdDialogOpen(true)
       return
     }
     if (contacts.length === 0) {
@@ -1490,6 +1491,32 @@ export default function Home() {
             <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium rounded-md">
               v1.7
             </span>
+            {/* User ID badge */}
+            {userId ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      setUserIdInput(userId)
+                      setIsUserIdDialogOpen(true)
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-800 dark:text-green-300 text-xs font-medium transition-colors"
+                  >
+                    <UserCircle className="h-3.5 w-3.5" />
+                    {userId}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Click to change your name</TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={() => setIsUserIdDialogOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium transition-colors"
+              >
+                <UserCircle className="h-3.5 w-3.5" />
+                Sign in
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -2953,6 +2980,57 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ── User ID Login Dialog ── */}
+      <Dialog open={isUserIdDialogOpen} onOpenChange={setIsUserIdDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-blue-500" />
+              {userId ? "Change your name" : "Welcome! Enter your name"}
+            </DialogTitle>
+            <DialogDescription>
+              {userId
+                ? "Update the name used to identify your submitted work."
+                : "Enter your name or a unique ID. This will be attached to your work when you send it for review."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <Input
+              placeholder="e.g. Boris, Team-A, John-Smith"
+              value={userIdInput}
+              onChange={(e) => setUserIdInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const trimmed = userIdInput.trim()
+                  if (!trimmed) return
+                  localStorage.setItem("userId", trimmed)
+                  setUserId(trimmed)
+                  setIsUserIdDialogOpen(false)
+                  setUserIdInput("")
+                  toast.success(`Signed in as "${trimmed}"`)
+                }
+              }}
+              autoFocus
+            />
+            <Button
+              onClick={() => {
+                const trimmed = userIdInput.trim()
+                if (!trimmed) return
+                localStorage.setItem("userId", trimmed)
+                setUserId(trimmed)
+                setIsUserIdDialogOpen(false)
+                setUserIdInput("")
+                toast.success(`Signed in as "${trimmed}"`)
+              }}
+              disabled={!userIdInput.trim()}
+              className="w-full"
+            >
+              {userId ? "Update" : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }
