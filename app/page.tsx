@@ -1165,9 +1165,6 @@ export default function Home() {
     const exportCount = contactsToExport.length
     const selectionText = selectedContacts.length > 0 ? "selected" : "all"
     toast.success(`Successfully exported ${exportCount} ${selectionText} contacts to Excel`)
-
-    // Prompt to start a new session after export
-    setTimeout(() => setIsPostExportDialogOpen(true), 800)
   }, [contacts, selectedContacts, parseAddress])
 
   // Add a new function to export only Potentially French contacts
@@ -1283,6 +1280,8 @@ export default function Home() {
 
       if (res.ok) {
         toast.success(`Work submitted for review! (${contacts.length} contacts sent as "${userId}")`)
+        // Ask if they'd like to start a new session
+        setTimeout(() => setIsPostExportDialogOpen(true), 1000)
       } else {
         const data = await res.json()
         toast.error(`Submission failed: ${data.error ?? "Unknown error"}`)
@@ -2970,13 +2969,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Post-Export New Session Dialog ── */}
+      {/* ── Post-Submit New Session Dialog ── */}
       <Dialog open={isPostExportDialogOpen} onOpenChange={setIsPostExportDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-green-500" />
-              Export complete!
+              <Send className="h-5 w-5 text-green-500" />
+              Submitted for review!
             </DialogTitle>
             <DialogDescription>
               Would you like to start a new session and import a new Excel file?
