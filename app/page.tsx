@@ -1541,14 +1541,17 @@ export default function Home() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={exportData}
+                    onClick={sendForReview}
+                    disabled={isSendingReview || contacts.length === 0}
                     className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
                   >
-                    <FileJson className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span className="hidden sm:inline">JSON</span>
+                    <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="hidden sm:inline">{isSendingReview ? "Sending..." : "Send for Review"}</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Export data to JSON file</TooltipContent>
+                <TooltipContent>
+                  {userId ? `Submit your work as "${userId}"` : "Sign in first to submit your work"}
+                </TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -1972,26 +1975,6 @@ export default function Home() {
                     <span>New Session</span>
                   </Button>
 
-                  {/* Send for Review — submits work to admin */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={sendForReview}
-                        disabled={isSendingReview || contacts.length === 0}
-                        className="flex items-center gap-1 bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
-                      >
-                        <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <span>{isSendingReview ? "Sending..." : "Send for Review"}</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {userId
-                        ? `Submit your work as "${userId}"`
-                        : "Add ?uid=your-name to the URL to enable submissions"}
-                    </TooltipContent>
-                  </Tooltip>
                 </div>
                 {fileUploaded && <Check className="text-green-500 h-4 w-4" />}
               </div>
