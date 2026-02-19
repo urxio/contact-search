@@ -388,6 +388,46 @@ export default function Home() {
           throw new Error("No data found in the Excel file")
         }
 
+        // Validate header row columns
+        const REQUIRED_COLUMNS: { name: string; index: number; aliases: string[] }[] = [
+          { name: "First Name", index: FIXED_COLUMNS.FIRST_NAME, aliases: ["first name", "firstname", "first"] },
+          { name: "Last Name",  index: FIXED_COLUMNS.LAST_NAME,  aliases: ["last name", "lastname", "last"] },
+          { name: "Address",    index: FIXED_COLUMNS.ADDRESS,    aliases: ["address", "addr", "street"] },
+          { name: "City",       index: FIXED_COLUMNS.CITY,       aliases: ["city"] },
+          { name: "Zipcode",    index: FIXED_COLUMNS.ZIPCODE,    aliases: ["zipcode", "zip code", "zip", "postal code", "postal"] },
+          { name: "Phone",      index: FIXED_COLUMNS.PHONE,      aliases: ["phone", "phone number", "telephone", "tel"] },
+        ]
+
+        const headerRow: string[] = (rawData[0] as any[]).map((h) =>
+          String(h ?? "").toLowerCase().trim()
+        )
+
+        const missingColumns: string[] = []
+        for (const col of REQUIRED_COLUMNS) {
+          const headerAtIndex = headerRow[col.index] ?? ""
+          const matchesAlias = col.aliases.some((alias) => headerAtIndex.includes(alias))
+          if (!matchesAlias) {
+            // Also check if the header exists anywhere in the row (wrong order)
+            const foundElsewhere = headerRow.some((h) => col.aliases.some((alias) => h.includes(alias)))
+            if (foundElsewhere) {
+              missingColumns.push(`"${col.name}" found but in the wrong column position (expected column ${col.index + 1})`)
+            } else {
+              missingColumns.push(`"${col.name}" (expected in column ${col.index + 1})`)
+            }
+          }
+        }
+
+        if (missingColumns.length > 0) {
+          const errorMsg = `Invalid column format. Missing or misplaced columns:\n• ${missingColumns.join("\n• ")}\n\nRequired order: First Name, Last Name, Address, City, Zipcode, Phone`
+          setError(errorMsg)
+          toast.error("Invalid file format", {
+            description: `${missingColumns.length} column${missingColumns.length > 1 ? "s" : ""} missing or misplaced. Check the error details above.`,
+            duration: 6000,
+          })
+          setIsLoading(false)
+          return
+        }
+
         // Skip header row (index 0) and process data rows
         const processedContacts = rawData.slice(1).map((row) => {
           // Extract values by position based on the new format
