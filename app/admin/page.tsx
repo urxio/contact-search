@@ -463,6 +463,7 @@ type OtmMatch = {
   submissionId: number
   userId: string
   submittedAt: string
+  contactId: string
   contactName: string
   contactAddress: string
   contactCity: string
@@ -507,6 +508,8 @@ function OtmPanel() {
   const [restored, setRestored]     = useState(false)
   const [savedFile, setSavedFile]   = useState<SavedFileInfo | null>(null)
   const [savingFile, setSavingFile] = useState(false)
+  const [dismissed, setDismissed]   = useState<Set<string>>(new Set())
+  const [removing, setRemoving]     = useState<Set<string>>(new Set())
 
   // ── On mount: restore localStorage result + fetch DB-saved file metadata ──
   useEffect(() => {
@@ -610,7 +613,38 @@ function OtmPanel() {
     if (fileRef.current) fileRef.current.value = ""
   }
 
+  // ── Remove a single OTM dup contact from the DB ───────────────────────────
+  const removeMatch = async (m: OtmMatch) => {
+    const key = `${m.submissionId}:${m.contactId}`
+    setRemoving(prev => new Set(prev).add(key))
+    try {
+      const res = await fetch(
+        `/api/admin/otm-contact?submissionId=${m.submissionId}&contactId=${encodeURIComponent(m.contactId)}`,
+        { method: "DELETE" }
+      )
+      if (res.ok) {
+        setDismissed(prev => new Set(prev).add(key))
+      } else {
+        const data = await res.json()
+        alert("Failed to remove contact: " + (data.error ?? "Unknown error"))
+      }
+    } catch {
+      alert("Network error — could not remove contact.")
+    } finally {
+      setRemoving(prev => { const s = new Set(prev); s.delete(key); return s })
+    }
+  }
+
+  // ── Remove ALL visible OTM dup contacts at once ───────────────────────────
+  const removeAllMatches = async () => {
+    if (!result) return
+    const visible = result.matches.filter(m => !dismissed.has(`${m.submissionId}:${m.contactId}`))
+    if (!window.confirm(`Remove all ${visible.length} duplicate contact${visible.length !== 1 ? "s" : ""} from their submissions? This cannot be undone.`)) return
+    await Promise.all(visible.map(removeMatch))
+  }
+
   const filtered = result?.matches.filter(m => {
+    if (dismissed.has(`${m.submissionId}:${m.contactId}`)) return false
     if (filter !== "all" && m.matchType !== filter) return false
     if (search) {
       const q = search.toLowerCase()
@@ -817,9 +851,24 @@ function OtmPanel() {
                   ].filter(Boolean).join(" · ") || "none"}
                 </span>
               )}
-              <span className={result.matchCount > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
-                {result.matchCount > 0 ? `⚠ ${result.matchCount} duplicate${result.matchCount !== 1 ? "s" : ""} found` : "✓ No duplicates found"}
+              <span className={filtered.length > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
+                {filtered.length > 0
+                  ? `⚠ ${filtered.length} duplicate${filtered.length !== 1 ? "s" : ""} found`
+                  : dismissed.size > 0
+                    ? `✓ All ${dismissed.size} duplicate${dismissed.size !== 1 ? "s" : ""} removed`
+                    : "✓ No duplicates found"}
               </span>
+              {filtered.length > 0 && (
+                <button
+                  onClick={removeAllMatches}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold border border-red-200 dark:border-red-800 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Remove all
+                </button>
+              )}
             </div>
 
             {/* Filter + search */}
@@ -903,12 +952,32 @@ function OtmPanel() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/user/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
-                          className="text-xs text-blue-600 hover:underline font-semibold"
-                        >
-                          View →
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/user/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
+                            className="text-xs text-blue-600 hover:underline font-semibold"
+                          >
+                            View →
+                          </Link>
+                          <button
+                            onClick={() => removeMatch(m)}
+                            disabled={removing.has(`${m.submissionId}:${m.contactId}`)}
+                            title="Remove this contact from the submission"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+                          >
+                            {removing.has(`${m.submissionId}:${m.contactId}`) ? (
+                              <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                            ) : (
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

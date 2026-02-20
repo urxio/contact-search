@@ -172,6 +172,7 @@ export async function POST(req: NextRequest) {
       submissionId: number
       userId: string
       submittedAt: string
+      contactId: string
       contactName: string
       contactAddress: string
       contactCity: string
@@ -219,6 +220,7 @@ export async function POST(req: NextRequest) {
             submissionId:    sub.id,
             userId:          sub.user_id,
             submittedAt:     sub.submitted_at,
+            contactId:       String(c.id ?? ""),
             contactName:     String(c.fullName ?? ""),
             contactAddress:  cAddr,
             contactCity:     cCity,
