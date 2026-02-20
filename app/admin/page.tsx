@@ -485,18 +485,23 @@ type OtmResult = {
 const OTM_LS_KEY  = "otm_last_result"
 const OTM_LS_NAME = "otm_last_filename"
 
+type SavedFileInfo = { exists: boolean; filename?: string; uploadedAt?: string }
+
 function OtmPanel() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [fileName, setFileName]   = useState<string | null>(null)
-  const [running, setRunning]     = useState(false)
-  const [result, setResult]       = useState<OtmResult | null>(null)
-  const [error, setError]         = useState<string | null>(null)
-  const [filter, setFilter]       = useState<"all" | "exact" | "loose">("all")
-  const [search, setSearch]       = useState("")
-  const [restored, setRestored]   = useState(false)
+  const [fileName, setFileName]     = useState<string | null>(null)
+  const [running, setRunning]       = useState(false)
+  const [result, setResult]         = useState<OtmResult | null>(null)
+  const [error, setError]           = useState<string | null>(null)
+  const [filter, setFilter]         = useState<"all" | "exact" | "loose">("all")
+  const [search, setSearch]         = useState("")
+  const [restored, setRestored]     = useState(false)
+  const [savedFile, setSavedFile]   = useState<SavedFileInfo | null>(null)
+  const [savingFile, setSavingFile] = useState(false)
 
-  // ── Restore last result from localStorage on mount ────────────────────────
+  // ── On mount: restore localStorage result + fetch DB-saved file metadata ──
   useEffect(() => {
+    // Restore last result from localStorage (fast, works offline)
     try {
       const savedName   = localStorage.getItem(OTM_LS_NAME)
       const savedResult = localStorage.getItem(OTM_LS_KEY)
@@ -505,9 +510,13 @@ function OtmPanel() {
         setFileName(savedName ?? "previous file")
         setRestored(true)
       }
-    } catch {
-      // ignore parse errors
-    }
+    } catch { /* ignore parse errors */ }
+
+    // Fetch DB-saved file metadata (works across browsers/sessions)
+    fetch("/api/admin/otm-file")
+      .then(r => r.json())
+      .then((data: SavedFileInfo) => setSavedFile(data))
+      .catch(() => setSavedFile({ exists: false }))
   }, [])
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,6 +527,7 @@ function OtmPanel() {
     setRestored(false)
   }
 
+  // ── Run check using a newly uploaded file ─────────────────────────────────
   const runCheck = async () => {
     const file = fileRef.current?.files?.[0]
     if (!file) { setError("Please select an Excel file first."); return }
@@ -535,13 +545,46 @@ function OtmPanel() {
       if (!res.ok) { setError(data.error ?? "Check failed"); return }
       const otmResult = data as OtmResult
       setResult(otmResult)
-      // Persist to localStorage for next visit
+
+      // Persist result to localStorage for fast reload
       try {
         localStorage.setItem(OTM_LS_KEY,  JSON.stringify(otmResult))
         localStorage.setItem(OTM_LS_NAME, file.name)
-      } catch {
-        // ignore storage quota errors
-      }
+      } catch { /* ignore quota errors */ }
+
+      // Also save the file bytes to Neon DB for cross-browser persistence
+      setSavingFile(true)
+      try {
+        const saveForm = new FormData()
+        saveForm.append("file", file)
+        const saveRes = await fetch("/api/admin/otm-file", { method: "POST", body: saveForm })
+        if (saveRes.ok) setSavedFile(await saveRes.json())
+      } catch { /* non-critical — don't block the result display */ }
+      finally { setSavingFile(false) }
+
+    } catch {
+      setError("Network error — could not reach the server.")
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  // ── Run check using the DB-saved file (no upload needed) ─────────────────
+  const runWithSaved = async () => {
+    setRunning(true)
+    setError(null)
+    setResult(null)
+    setRestored(false)
+    try {
+      const res = await fetch("/api/admin/otm-check?useSaved=true", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? "Check failed"); return }
+      const otmResult = data as OtmResult
+      setResult(otmResult)
+      try {
+        localStorage.setItem(OTM_LS_KEY,  JSON.stringify(otmResult))
+        localStorage.setItem(OTM_LS_NAME, savedFile?.filename ?? "saved file")
+      } catch { /* ignore quota errors */ }
     } catch {
       setError("Network error — could not reach the server.")
     } finally {
@@ -679,6 +722,49 @@ function OtmPanel() {
         <p className="mt-3 text-xs text-gray-400">
           Supports OTM split-column format: <span className="font-medium">HouseNum</span> · <span className="font-medium">StreetDir</span> · <span className="font-medium">StreetName</span> · <span className="font-medium">AptBoxNum</span> · <span className="font-medium">City</span> · <span className="font-medium">Zip</span> — or a single <span className="font-medium">Address</span> column
         </p>
+
+        {/* DB-saved file — shown when a file has been stored in Neon */}
+        {savedFile?.exists && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800">
+            <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-5L11 4H6a2 2 0 00-2 2z" />
+              </svg>
+              <span className="font-semibold">{savedFile.filename}</span>
+              {savedFile.uploadedAt && (
+                <span className="text-indigo-400 font-normal">
+                  · saved {new Date(savedFile.uploadedAt).toLocaleString()}
+                </span>
+              )}
+              {savingFile && (
+                <span className="animate-pulse text-indigo-400">· saving…</span>
+              )}
+            </span>
+
+            <button
+              onClick={runWithSaved}
+              disabled={running}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+            >
+              {running ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Running…
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Run with saved file
+                </>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

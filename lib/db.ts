@@ -47,4 +47,14 @@ export async function ensureSchema() {
   // Add new columns to existing tables (idempotent — errors ignored)
   await pool.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pending'`)
   await pool.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`)
+
+  // OTM file storage — single-row singleton (id is always 1)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS otm_files (
+      id          INT PRIMARY KEY,
+      filename    TEXT NOT NULL,
+      filedata    BYTEA NOT NULL,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
 }

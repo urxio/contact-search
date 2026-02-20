@@ -36,17 +36,37 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Parse multipart form — expect a single file field named "file"
-    const form = await req.formData()
-    const file = form.get("file") as File | null
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
+    const { searchParams } = new URL(req.url)
+    const useSaved = searchParams.get("useSaved") === "true"
+
+    let buffer: Buffer
+
+    if (useSaved) {
+      // ── Load file bytes from Neon DB ──────────────────────────────────────
+      const fileRow = await pool.query(
+        `SELECT filedata FROM otm_files WHERE id = 1`
+      )
+      if (fileRow.rows.length === 0) {
+        return NextResponse.json(
+          { error: "No saved OTM file found. Please upload one first." },
+          { status: 400 }
+        )
+      }
+      // pg returns BYTEA columns as Node.js Buffer automatically
+      buffer = fileRow.rows[0].filedata as Buffer
+    } else {
+      // ── Parse multipart upload (existing behaviour) ───────────────────────
+      const form = await req.formData()
+      const file = form.get("file") as File | null
+      if (!file) {
+        return NextResponse.json({ error: "No file uploaded" }, { status: 400 })
+      }
+      buffer = Buffer.from(await file.arrayBuffer())
     }
 
     // Dynamically import xlsx (it's already a project dependency)
     const XLSX = await import("xlsx")
 
-    const buffer = Buffer.from(await file.arrayBuffer())
     // dense: true reads ALL cells regardless of the sheet's declared range,
     // which prevents xlsx from capping rows at the !ref boundary.
     const workbook = XLSX.read(buffer, { type: "buffer", dense: true })
