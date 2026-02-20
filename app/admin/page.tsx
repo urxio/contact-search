@@ -643,6 +643,21 @@ function OtmPanel() {
     await Promise.all(visible.map(removeMatch))
   }
 
+  // ── Clear a single OTM dup from the results page (UI only, no DB write) ──
+  const clearMatch = (m: OtmMatch) => {
+    const key = `${m.submissionId}:${m.contactId}`
+    setDismissed(prev => new Set(prev).add(key))
+  }
+
+  // ── Clear ALL visible OTM dup contacts from the results page ─────────────
+  const clearAllMatches = () => {
+    if (!result) return
+    const keys = result.matches
+      .filter(m => !dismissed.has(`${m.submissionId}:${m.contactId}`))
+      .map(m => `${m.submissionId}:${m.contactId}`)
+    setDismissed(prev => new Set([...prev, ...keys]))
+  }
+
   const filtered = result?.matches.filter(m => {
     if (dismissed.has(`${m.submissionId}:${m.contactId}`)) return false
     if (filter !== "all" && m.matchType !== filter) return false
@@ -859,15 +874,26 @@ function OtmPanel() {
                     : "✓ No duplicates found"}
               </span>
               {filtered.length > 0 && (
-                <button
-                  onClick={removeAllMatches}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold border border-red-200 dark:border-red-800 transition-colors"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Remove all
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={clearAllMatches}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-xs font-semibold border border-amber-200 dark:border-amber-800 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear all names
+                  </button>
+                  <button
+                    onClick={removeAllMatches}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-semibold border border-red-200 dark:border-red-800 transition-colors"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Remove all
+                  </button>
+                </div>
               )}
             </div>
 
@@ -952,17 +978,30 @@ function OtmPanel() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Link
                             href={`/admin/user/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
                             className="text-xs text-blue-600 hover:underline font-semibold"
                           >
                             View →
                           </Link>
+                          {/* Clear — dismiss from this list only (no DB write) */}
+                          <button
+                            onClick={() => clearMatch(m)}
+                            disabled={removing.has(`${m.submissionId}:${m.contactId}`)}
+                            title="Dismiss from this list"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-xs font-medium border border-amber-200 dark:border-amber-800 transition-colors disabled:opacity-50"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Clear
+                          </button>
+                          {/* Remove — delete contact entirely from submission */}
                           <button
                             onClick={() => removeMatch(m)}
                             disabled={removing.has(`${m.submissionId}:${m.contactId}`)}
-                            title="Remove this contact from the submission"
+                            title="Delete contact from submission entirely"
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
                           >
                             {removing.has(`${m.submissionId}:${m.contactId}`) ? (
