@@ -480,6 +480,15 @@ type OtmResult = {
   submissionCount: number
   matchCount: number
   matches: OtmMatch[]
+  detectedColumns?: {
+    houseNum: string | null
+    streetDir: string | null
+    street: string | null
+    apt: string | null
+    city: string | null
+    zip: string | null
+    address: string | null
+  }
 }
 
 const OTM_LS_KEY  = "otm_last_result"
@@ -794,6 +803,20 @@ function OtmPanel() {
                 )}
               </span>
               <span className="text-gray-500">Submissions checked: <strong className="text-gray-900 dark:text-white">{result.submissionCount}</strong></span>
+              {/* Column detection debug — shows which headers were found */}
+              {result.detectedColumns && (
+                <span className="text-gray-400 text-xs" title="Columns detected in the OTM Excel file">
+                  Cols: {[
+                    result.detectedColumns.houseNum  && `HouseNum→${result.detectedColumns.houseNum}`,
+                    result.detectedColumns.streetDir && `Dir→${result.detectedColumns.streetDir}`,
+                    result.detectedColumns.street    && `Street→${result.detectedColumns.street}`,
+                    result.detectedColumns.apt       && `Apt→${result.detectedColumns.apt}`,
+                    result.detectedColumns.city      && `City→${result.detectedColumns.city}`,
+                    result.detectedColumns.zip       && `Zip→${result.detectedColumns.zip}`,
+                    result.detectedColumns.address   && `Addr→${result.detectedColumns.address}`,
+                  ].filter(Boolean).join(" · ") || "none"}
+                </span>
+              )}
               <span className={result.matchCount > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
                 {result.matchCount > 0 ? `⚠ ${result.matchCount} duplicate${result.matchCount !== 1 ? "s" : ""} found` : "✓ No duplicates found"}
               </span>

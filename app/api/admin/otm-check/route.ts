@@ -93,13 +93,21 @@ export async function POST(req: NextRequest) {
     // Format B (single): Address | City | Zip
     //   e.g. a simple list with a single combined address column
 
-    const houseNumCol  = colIdx(["housenum", "house num", "house_num", "streetnumber", "number"])
-    const streetDirCol = colIdx(["streetdir", "street dir", "street_dir", "direction", "strdir"])
-    const streetCol    = colIdx(["streetname", "street name", "street_name", "stname"])
-    const aptCol       = colIdx(["aptboxnum", "apt", "unit", "suite", "apt/unit"])
-    const addrCol      = colIdx(["address", "addr"])   // Format B fallback
-    const cityCol      = colIdx(["city"])
-    const zipcodeCol   = colIdx(["zip", "postal", "zipcode"])
+    // Exact-match helper: only matches if the full header cell equals one of
+    // the given names. Safer than .includes() for short words like "apt",
+    // "zip", "city" that could appear as substrings of unrelated headers.
+    const colExact = (names: string[]) =>
+      headerRow.findIndex((h) => names.includes(h))
+
+    // Street column: "Street" (exact) is the actual OTM column name.
+    // Also accept common variants like "StreetName", "StreetAddress".
+    const streetCol    = colExact(["street", "streetname", "street name", "street_name", "stname", "streetaddress"])
+    const houseNumCol  = colExact(["housenum", "house num", "house_num", "houseno", "streetnumber", "streetnum", "number"])
+    const streetDirCol = colExact(["streetdir", "street dir", "street_dir", "strdir"])
+    const aptCol       = colExact(["aptboxnum", "apt", "unit", "suite", "aptnumber", "aptno"])
+    const addrCol      = colIdx(["address", "addr"])   // Format B fallback (single combined column)
+    const cityCol      = colExact(["city"])
+    const zipcodeCol   = colExact(["zip", "zipcode", "zip code", "postal", "postalcode"])
 
     // Determine which format we have
     const isSplitFormat = houseNumCol !== -1 || streetCol !== -1
@@ -227,10 +235,20 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       otmRowCount: otmRows.length,
-      otmRawRowCount: rows.length - 1,   // total non-header rows seen in the sheet
+      otmRawRowCount: rows.length - 1,
       submissionCount: result.rows.length,
       matchCount: matches.length,
       matches,
+      // Debug: which columns were detected (header names at each index)
+      detectedColumns: {
+        houseNum:  houseNumCol  >= 0 ? headerRow[houseNumCol]  : null,
+        streetDir: streetDirCol >= 0 ? headerRow[streetDirCol] : null,
+        street:    streetCol    >= 0 ? headerRow[streetCol]    : null,
+        apt:       aptCol       >= 0 ? headerRow[aptCol]       : null,
+        city:      cityCol      >= 0 ? headerRow[cityCol]      : null,
+        zip:       zipcodeCol   >= 0 ? headerRow[zipcodeCol]   : null,
+        address:   addrCol      >= 0 ? headerRow[addrCol]      : null,
+      },
     })
   } catch (err: any) {
     console.error("OTM check error:", err)
