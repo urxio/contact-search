@@ -172,6 +172,7 @@ export default function Home() {
   // Add this new state variable with the other state variables
   const [lastVerifiedId, setLastVerifiedId] = useState<string | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
+  const [showOverviewPrompt, setShowOverviewPrompt] = useState(false)
 
   // Add a keyboard shortcuts help dialog
   // Add this state variable with the other state variables
@@ -302,7 +303,8 @@ export default function Home() {
     if (savedUserId) {
       setUserId(savedUserId)
     } else {
-      // No ID yet — open the login dialog after a short delay
+      // No userId = first-time visitor. Open the login dialog.
+      // After they save their name, the save handler will show the overview prompt.
       setTimeout(() => setIsUserIdDialogOpen(true), 500)
     }
 
@@ -2779,11 +2781,13 @@ export default function Home() {
                 if (e.key === "Enter") {
                   const trimmed = userIdInput.trim()
                   if (!trimmed) return
+                  const isFirstTime = !localStorage.getItem("userId")
                   localStorage.setItem("userId", trimmed)
                   setUserId(trimmed)
                   setIsUserIdDialogOpen(false)
                   setUserIdInput("")
                   toast.success(`Signed in as "${trimmed}"`)
+                  if (isFirstTime) setTimeout(() => setShowOverviewPrompt(true), 400)
                 }
               }}
               autoFocus
@@ -2792,16 +2796,49 @@ export default function Home() {
               onClick={() => {
                 const trimmed = userIdInput.trim()
                 if (!trimmed) return
+                const isFirstTime = !localStorage.getItem("userId")
                 localStorage.setItem("userId", trimmed)
                 setUserId(trimmed)
                 setIsUserIdDialogOpen(false)
                 setUserIdInput("")
                 toast.success(`Signed in as "${trimmed}"`)
+                if (isFirstTime) setTimeout(() => setShowOverviewPrompt(true), 400)
               }}
               disabled={!userIdInput.trim()}
               className="w-full"
             >
               {userId ? "Update" : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── First-visit Feature Overview prompt ── */}
+      <Dialog open={showOverviewPrompt} onOpenChange={setShowOverviewPrompt}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              👋 Welcome to OTMRT Helper!
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-1">
+              It looks like this is your first time here. Would you like a quick tour of all the features before you get started?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <a
+              href="/overview"
+              onClick={() => setShowOverviewPrompt(false)}
+              className="inline-flex items-center justify-center gap-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              Show me the Feature Overview
+            </a>
+            <Button
+              variant="ghost"
+              className="w-full text-gray-500 hover:text-gray-700"
+              onClick={() => setShowOverviewPrompt(false)}
+            >
+              Skip for now — I'll explore on my own
             </Button>
           </div>
         </DialogContent>
