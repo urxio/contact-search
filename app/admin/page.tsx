@@ -492,8 +492,9 @@ type OtmResult = {
   }
 }
 
-const OTM_LS_KEY  = "otm_last_result"
-const OTM_LS_NAME = "otm_last_filename"
+const OTM_LS_KEY       = "otm_last_result"
+const OTM_LS_NAME      = "otm_last_filename"
+const OTM_LS_DISMISSED = "otm_dismissed"
 
 type SavedFileInfo = { exists: boolean; filename?: string; uploadedAt?: string }
 
@@ -511,6 +512,13 @@ function OtmPanel() {
   const [dismissed, setDismissed]   = useState<Set<string>>(new Set())
   const [removing, setRemoving]     = useState<Set<string>>(new Set())
 
+  // ── Persist dismissed set to localStorage whenever it changes ─────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem(OTM_LS_DISMISSED, JSON.stringify([...dismissed]))
+    } catch { /* ignore quota errors */ }
+  }, [dismissed])
+
   // ── On mount: restore localStorage result + fetch DB-saved file metadata ──
   useEffect(() => {
     // Restore last result from localStorage (fast, works offline)
@@ -521,6 +529,10 @@ function OtmPanel() {
         setResult(JSON.parse(savedResult) as OtmResult)
         setFileName(savedName ?? "previous file")
         setRestored(true)
+      }
+      const savedDismissed = localStorage.getItem(OTM_LS_DISMISSED)
+      if (savedDismissed) {
+        setDismissed(new Set(JSON.parse(savedDismissed) as string[]))
       }
     } catch { /* ignore parse errors */ }
 
@@ -548,6 +560,7 @@ function OtmPanel() {
     setError(null)
     setResult(null)
     setRestored(false)
+    setDismissed(new Set())
 
     try {
       const form = new FormData()
@@ -587,6 +600,7 @@ function OtmPanel() {
     setError(null)
     setResult(null)
     setRestored(false)
+    setDismissed(new Set())
     try {
       const res = await fetch("/api/admin/otm-check?useSaved=true", { method: "POST" })
       const data = await res.json()
