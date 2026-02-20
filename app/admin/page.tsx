@@ -492,9 +492,8 @@ type OtmResult = {
   }
 }
 
-const OTM_LS_KEY       = "otm_last_result"
-const OTM_LS_NAME      = "otm_last_filename"
-const OTM_LS_DISMISSED = "otm_dismissed"
+const OTM_LS_KEY  = "otm_last_result"
+const OTM_LS_NAME = "otm_last_filename"
 
 type SavedFileInfo = { exists: boolean; filename?: string; uploadedAt?: string }
 
@@ -512,13 +511,6 @@ function OtmPanel() {
   const [dismissed, setDismissed]   = useState<Set<string>>(new Set())
   const [removing, setRemoving]     = useState<Set<string>>(new Set())
 
-  // ── Persist dismissed set to localStorage whenever it changes ─────────────
-  useEffect(() => {
-    try {
-      localStorage.setItem(OTM_LS_DISMISSED, JSON.stringify([...dismissed]))
-    } catch { /* ignore quota errors */ }
-  }, [dismissed])
-
   // ── On mount: restore localStorage result + fetch DB-saved file metadata ──
   useEffect(() => {
     // Restore last result from localStorage (fast, works offline)
@@ -529,10 +521,6 @@ function OtmPanel() {
         setResult(JSON.parse(savedResult) as OtmResult)
         setFileName(savedName ?? "previous file")
         setRestored(true)
-      }
-      const savedDismissed = localStorage.getItem(OTM_LS_DISMISSED)
-      if (savedDismissed) {
-        setDismissed(new Set(JSON.parse(savedDismissed) as string[]))
       }
     } catch { /* ignore parse errors */ }
 
@@ -657,19 +645,35 @@ function OtmPanel() {
     await Promise.all(visible.map(removeMatch))
   }
 
-  // ── Clear a single OTM dup from the results page (UI only, no DB write) ──
+  // ── Clear a single OTM dup: dismiss from UI and remove from saved result ──
   const clearMatch = (m: OtmMatch) => {
     const key = `${m.submissionId}:${m.contactId}`
     setDismissed(prev => new Set(prev).add(key))
+    // Also strip from localStorage so it's gone on reload
+    setResult(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, matches: prev.matches.filter(x => `${x.submissionId}:${x.contactId}` !== key), matchCount: prev.matchCount - 1 }
+      try { localStorage.setItem(OTM_LS_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
+      return updated
+    })
   }
 
   // ── Clear ALL visible OTM dup contacts from the results page ─────────────
   const clearAllMatches = () => {
     if (!result) return
-    const keys = result.matches
-      .filter(m => !dismissed.has(`${m.submissionId}:${m.contactId}`))
-      .map(m => `${m.submissionId}:${m.contactId}`)
-    setDismissed(prev => new Set([...prev, ...keys]))
+    const visibleKeys = new Set(
+      result.matches
+        .filter(m => !dismissed.has(`${m.submissionId}:${m.contactId}`))
+        .map(m => `${m.submissionId}:${m.contactId}`)
+    )
+    setDismissed(prev => new Set([...prev, ...visibleKeys]))
+    // Strip all visible matches from localStorage too
+    setResult(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, matches: prev.matches.filter(m => !visibleKeys.has(`${m.submissionId}:${m.contactId}`)), matchCount: prev.matchCount - visibleKeys.size }
+      try { localStorage.setItem(OTM_LS_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
+      return updated
+    })
   }
 
   const filtered = result?.matches.filter(m => {
