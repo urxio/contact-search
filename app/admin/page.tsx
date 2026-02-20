@@ -200,9 +200,9 @@ export default function AdminDashboard() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 activeTab === tab
-                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                  ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
