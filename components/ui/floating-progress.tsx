@@ -68,7 +68,7 @@ export function FloatingProgress({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col items-center gap-2 w-8">
 
         {/* Scroll progress — thin vertical bar */}
-        <div className="w-0.5 h-14 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        <div className="w-1.5 h-14 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
           <div
             className="w-full bg-gradient-to-b from-blue-400 to-purple-500 rounded-full transition-all duration-150"
             style={{ height: `${scrollProgress}%` }}
