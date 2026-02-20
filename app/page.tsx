@@ -1572,6 +1572,21 @@ export default function Home() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem asChild>
+                  <a href="/overview" className="flex items-center cursor-pointer w-full">
+                    <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
+                    Feature Overview
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <a href="/admin" className="flex items-center cursor-pointer w-full">
+                    <ShieldCheck className="h-4 w-4 mr-2 text-purple-600" />
+                    Admin Dashboard
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsExportStateDialogOpen(true)}>
                   <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
                   Export CSV
@@ -1586,21 +1601,6 @@ export default function Home() {
                 <DropdownMenuItem onClick={exportData}>
                   <FileJson className="h-4 w-4 mr-2 text-blue-600" />
                   Export JSON (backup)
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a href="/overview" className="flex items-center cursor-pointer w-full">
-                    <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
-                    Feature Overview
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
-                <DropdownMenuItem asChild>
-                  <a href="/admin" className="flex items-center cursor-pointer w-full">
-                    <ShieldCheck className="h-4 w-4 mr-2 text-purple-600" />
-                    Admin Dashboard
-                  </a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
