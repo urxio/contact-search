@@ -1996,19 +1996,22 @@ export default function Home() {
                     </TooltipTrigger>
                     <TooltipContent>Add a new contact (Ctrl+J)</TooltipContent>
                   </Tooltip>
-                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Filter by Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All</SelectItem>
-                      <SelectItem value="Not checked">Not checked</SelectItem>
-                      <SelectItem value="Potentially French">Potentially French</SelectItem>
-                      <SelectItem value="Detected">Detected</SelectItem>
-                      <SelectItem value="Duplicate">Duplicate</SelectItem>
-                      <SelectItem value="Not French">Not French</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {/* Status filter tab switcher */}
+                  <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl flex-wrap">
+                    {(["All", "Not checked", "Potentially French", "Not French", "Duplicate", "Detected"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setStatusFilter(f as any)}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                          statusFilter === f
+                            ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]"
+                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
