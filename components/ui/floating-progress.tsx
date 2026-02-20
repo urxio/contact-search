@@ -65,10 +65,10 @@ export function FloatingProgress({
   return (
     <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-3">
       {/* Card */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl p-3 flex flex-col items-center gap-3 w-14">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col items-center gap-2 w-8">
 
-        {/* Scroll progress — thin vertical bar on the left edge of card */}
-        <div className="w-1 h-24 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        {/* Scroll progress — thin vertical bar */}
+        <div className="w-0.5 h-14 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
           <div
             className="w-full bg-gradient-to-b from-blue-400 to-purple-500 rounded-full transition-all duration-150"
             style={{ height: `${scrollProgress}%` }}
@@ -76,13 +76,13 @@ export function FloatingProgress({
         </div>
 
         {/* Divider */}
-        <div className="w-8 h-px bg-gray-200 dark:bg-gray-700" />
+        <div className="w-4 h-px bg-gray-200 dark:bg-gray-700" />
 
         {/* Status dots */}
-        <div className="flex flex-col gap-1.5 items-center">
+        <div className="flex flex-col gap-1 items-center">
           {segments.map((seg) => (
             <div key={seg.label} className="group relative flex items-center justify-center">
-              <div className={`w-2.5 h-2.5 rounded-full ${seg.dot}`} />
+              <div className={`w-1.5 h-1.5 rounded-full ${seg.dot}`} />
               {/* Tooltip on hover */}
               <div className="absolute right-full mr-2 hidden group-hover:flex items-center gap-1.5 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap shadow-lg">
                 <div className={`w-2 h-2 rounded-full ${seg.dot} flex-shrink-0`} />
@@ -93,8 +93,8 @@ export function FloatingProgress({
         </div>
 
         {/* Total */}
-        <div className="text-[9px] font-medium text-gray-400 dark:text-gray-500 text-center leading-tight">
-          {total}<br/>total
+        <div className="text-[8px] font-medium text-gray-400 dark:text-gray-500 text-center leading-tight">
+          {total}
         </div>
       </div>
     </div>
