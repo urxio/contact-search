@@ -1858,7 +1858,7 @@ export default function Home() {
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Statistics</span>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-36 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="w-36 h-0.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                       style={{ width: `${checkedPct}%` }}
