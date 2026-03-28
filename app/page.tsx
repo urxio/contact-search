@@ -1542,6 +1542,24 @@ export default function Home() {
           {/* Right — actions */}
           <div className="flex items-center gap-2 shrink-0">
 
+            {/* Zipcode Tracker */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  className="flex items-center gap-1.5 border-gray-200 dark:border-gray-700"
+                >
+                  <a href="https://zipcode-tracker-kappa.vercel.app/" target="_blank" rel="noopener noreferrer">
+                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline text-xs font-semibold">Zipcode Tracker</span>
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Track your zipcode progress</TooltipContent>
+            </Tooltip>
+
             {/* Send for Review */}
             <Tooltip>
               <TooltipTrigger asChild>
