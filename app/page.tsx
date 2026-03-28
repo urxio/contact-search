@@ -1545,17 +1545,25 @@ export default function Home() {
             {/* Zipcode Tracker */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  asChild
-                  className="flex items-center gap-1.5 border-gray-200 dark:border-gray-700"
+                <a
+                  href="https://zipcode-tracker-kappa.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                    bg-white/40 dark:bg-white/10 backdrop-blur-xl
+                    border border-white/60 dark:border-white/20
+                    shadow-[0_4px_16px_rgba(16,185,129,0.12)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.08)]
+                    hover:bg-emerald-50/60 dark:hover:bg-emerald-500/15
+                    hover:border-emerald-300/70 dark:hover:border-emerald-400/30
+                    hover:shadow-[0_4px_20px_rgba(16,185,129,0.25)]
+                    transition-all duration-200 ease-out"
                 >
-                  <a href="https://zipcode-tracker-kappa.vercel.app/" target="_blank" rel="noopener noreferrer">
-                    <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                    <span className="hidden sm:inline text-xs font-semibold">Zipcode Tracker</span>
-                  </a>
-                </Button>
+                  <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-emerald-400/10 to-teal-400/10 dark:from-emerald-400/5 dark:to-teal-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <MapPin className="h-3.5 w-3.5 text-emerald-500 drop-shadow-sm relative z-10" />
+                  <span className="hidden sm:inline relative z-10 bg-gradient-to-r from-emerald-700 to-teal-600 dark:from-emerald-300 dark:to-teal-300 bg-clip-text text-transparent">
+                    Zipcode Tracker
+                  </span>
+                </a>
               </TooltipTrigger>
               <TooltipContent>Track your zipcode progress</TooltipContent>
             </Tooltip>
