@@ -1549,12 +1549,12 @@ export default function Home() {
                   href="https://zipcode-tracker-kappa.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                  className="group relative inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold
                     bg-white/40 dark:bg-white/10 backdrop-blur-xl
-                    border border-white/60 dark:border-white/20
+                    border border-emerald-300 dark:border-emerald-500/40
                     shadow-[0_4px_16px_rgba(16,185,129,0.12)] dark:shadow-[0_4px_16px_rgba(16,185,129,0.08)]
                     hover:bg-emerald-50/60 dark:hover:bg-emerald-500/15
-                    hover:border-emerald-300/70 dark:hover:border-emerald-400/30
+                    hover:border-emerald-400 dark:hover:border-emerald-400/60
                     hover:shadow-[0_4px_20px_rgba(16,185,129,0.25)]
                     transition-all duration-200 ease-out"
                 >
