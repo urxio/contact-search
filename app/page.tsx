@@ -2128,23 +2128,6 @@ export default function Home() {
                                     </Tooltip>
                                   )}
                                 </div>
-                                {/* Add verification status bar with 3 distinct sections */}
-                                <div className="mt-1 flex h-1.5 w-full rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                      } flex-1`}
-                                  ></div>
-                                  <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                                  <div
-                                    className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                      } flex-1`}
-                                  ></div>
-                                  <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                                  <div
-                                    className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                      } flex-1`}
-                                  ></div>
-                                </div>
                               </TableCell>
                               <TableCell>{contact.address}</TableCell>
                               <TableCell>{contact.city}</TableCell>
@@ -2426,26 +2409,6 @@ export default function Home() {
                                 <span>{contact.phone}</span>
                               </div>
                             )}
-                          </div>
-
-                          {/* Add verification status bar with 3 distinct sections */}
-                          <div className="mt-2 mb-1">
-                            <div className="flex h-1.5 w-full rounded-full overflow-hidden">
-                              <div
-                                className={`h-full ${contact.checkedOnForebears ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
-                              ></div>
-                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                              <div
-                                className={`h-full ${contact.checkedOnTPS ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
-                              ></div>
-                              <div className="w-0.5 bg-white dark:bg-gray-700"></div>
-                              <div
-                                className={`h-full ${contact.checkedOnOTM ? "bg-blue-500" : "bg-gray-100 dark:bg-gray-800"
-                                  } flex-1`}
-                              ></div>
-                            </div>
                           </div>
 
                           <div className="flex gap-1 mt-2">
