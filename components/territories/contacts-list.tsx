@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
+import { toast } from "sonner"
 // Local Contact shape used by this component. We declare it here to avoid
 // depending on an external type that may not match the runtime shape.
 // Keep this narrow: expand only if new compiler errors indicate missing fields.
@@ -219,7 +220,7 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
   const updateBatchStatus = useCallback(
     (newStatus: Contact["status"]) => {
       if (selectedContacts.length === 0) {
-        alert("Please select contacts to update")
+        toast.error("Please select contacts to update")
         return
       }
 
@@ -237,7 +238,7 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
         })
         .catch((error: any) => {
           console.error("Error updating batch status:", error)
-          alert("Error updating contacts. Some changes may not have been saved.")
+          toast.error("Error updating contacts. Some changes may not have been saved.")
         })
     },
     [selectedContacts],
@@ -444,7 +445,7 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
                   const fn = (newContact.first_name || "").trim()
                   const ln = (newContact.last_name || "").trim()
                   if (!fn && !ln) {
-                    alert('Please provide at least a first or last name')
+                    toast.error('Please provide at least a first or last name')
                     return
                   }
 
@@ -480,7 +481,7 @@ export function ContactsList({ contacts: initialContacts, territoryId }: Contact
 
                   setNewContact({ first_name: "", last_name: "", full_name: "", address: "", city: "", zipcode: "", phone: "", notes: "" })
                   setIsAddContactOpen(false)
-                  alert('Contact added')
+                  toast.success('Contact added')
                 }}>Create</Button>
               </div>
             </DialogContent>

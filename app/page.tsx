@@ -48,6 +48,16 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
@@ -200,6 +210,8 @@ export default function Home() {
   const [isUserIdDialogOpen, setIsUserIdDialogOpen] = useState(false)
   const [userIdInput, setUserIdInput] = useState("")
   const [isPostExportDialogOpen, setIsPostExportDialogOpen] = useState(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isNewSessionConfirmOpen, setIsNewSessionConfirmOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -906,11 +918,13 @@ export default function Home() {
       toast.error("Please select contacts to delete")
       return
     }
+    setIsDeleteConfirmOpen(true)
+  }, [selectedContacts])
 
-    if (confirm(`Are you sure you want to delete ${selectedContacts.length} contacts?`)) {
-      setContacts((prevContacts) => prevContacts.filter((contact) => !selectedContacts.includes(contact.id)))
-      setSelectedContacts([])
-    }
+  const confirmDeleteSelectedContacts = useCallback(() => {
+    setContacts((prevContacts) => prevContacts.filter((contact) => !selectedContacts.includes(contact.id)))
+    setSelectedContacts([])
+    toast.success(`Deleted ${selectedContacts.length} contact${selectedContacts.length !== 1 ? "s" : ""}`)
   }, [selectedContacts])
 
   // Function to mark selected contacts as done (Potentially French)
@@ -1297,41 +1311,40 @@ export default function Home() {
   // Modify the startNewSession function to reset the file input element
   const startNewSession = useCallback(() => {
     if (contacts.length > 0) {
-      if (confirm("Are you sure you want to start a new session? This will clear all current data.")) {
-        // Clear all data
-        setContacts([])
-        setGlobalNotes("")
-        setTerritoryZipcode("")
-        setTerritoryPageRange("")
-        setLastVerifiedId(null)
-        setSelectedContacts([])
-        setSearchQuery("")
-        setStatusFilter("All")
-        setShowUpdateNeeded(false)
-        setError(null) // Clear any previous errors
-
-        // Reset the file input element
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""
-        }
-
-        // Clear localStorage
-        localStorage.removeItem("contacts")
-        localStorage.removeItem("globalNotes")
-        localStorage.removeItem("territoryZipcode")
-        localStorage.removeItem("territoryPageRange")
-        localStorage.removeItem("lastVerifiedId")
-
-        // Set fileUploaded to false
-        setFileUploaded(false)
-
-        // Show confirmation
-        toast.success("New session started. All data has been cleared.")
-      }
+      setIsNewSessionConfirmOpen(true)
     } else {
       toast.error("No active session to clear.")
     }
   }, [contacts])
+
+  const confirmNewSession = useCallback(() => {
+    // Clear all data
+    setContacts([])
+    setGlobalNotes("")
+    setTerritoryZipcode("")
+    setTerritoryPageRange("")
+    setLastVerifiedId(null)
+    setSelectedContacts([])
+    setSearchQuery("")
+    setStatusFilter("All")
+    setShowUpdateNeeded(false)
+    setError(null)
+
+    // Reset the file input element
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+
+    // Clear localStorage
+    localStorage.removeItem("contacts")
+    localStorage.removeItem("globalNotes")
+    localStorage.removeItem("territoryZipcode")
+    localStorage.removeItem("territoryPageRange")
+    localStorage.removeItem("lastVerifiedId")
+
+    setFileUploaded(false)
+    toast.success("New session started. All data has been cleared.")
+  }, [])
 
   // Function to get status icon
   const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
@@ -1493,6 +1506,49 @@ export default function Home() {
         notFrench={notFrenchCount}
         detected={detectedCount}
       />
+
+      {/* ── Delete contacts confirmation ── */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedContacts.length} contact{selectedContacts.length !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The selected contact{selectedContacts.length !== 1 ? "s" : ""} will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmDeleteSelectedContacts}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── New session confirmation ── */}
+      <AlertDialog open={isNewSessionConfirmOpen} onOpenChange={setIsNewSessionConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start a new session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently clear all contacts, notes, and territory data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmNewSession}
+            >
+              Clear & start new
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── Sticky navbar ── */}
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
