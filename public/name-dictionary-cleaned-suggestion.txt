@@ -297,7 +297,6 @@ barre
 barreau
 barret
 barrier
-barry
 barthe
 barthelemy
 bassafoula
@@ -329,7 +328,6 @@ baudin
 baudoin
 baudouin
 baudry
-bauer
 bayang
 bayekola
 bayi
@@ -349,8 +347,6 @@ beaumont
 beauvais
 bebbe
 bebe
-beck
-becker
 begue
 bekolo
 bekono
@@ -361,19 +357,18 @@ belhaj
 belibi
 belin
 belinga
-bell
 bella
 bellanger
 belle
 bellec
 bello
 bemba
-ben
 benali
 benamar
 benani
 benard
 benazo
+benbouchta
 benbrahim
 benchekroun
 benchekroun pale
@@ -381,6 +376,7 @@ beng
 bengono
 benjelloun
 benkirane
+benlamine
 benmoussa
 benmoussa tia
 bennani
@@ -396,7 +392,6 @@ bensouda
 bentaleb
 benzakour
 berard
-berger
 bernard
 bernier
 berrada
@@ -417,7 +412,7 @@ besse
 besson
 beugre
 beyala
-bianchi
+beye
 bibila
 biboussi
 bichara
@@ -543,9 +538,11 @@ boucher
 bouchet
 boudet
 boudzoumou
+boue
 bouesso
 bouetoumoussa
 boueya
+bougard
 bouiti
 bouity
 bouka
@@ -595,7 +592,6 @@ bouyou
 bouziane
 bouzid
 bouzidi
-boyer
 brahim
 bras
 braud
@@ -628,7 +624,6 @@ camus
 capelle
 capron
 cardon
-cardoso
 cariou
 carlier
 caron
@@ -753,7 +748,6 @@ dauphin
 david
 davy
 dawai
-dayas
 de almeida
 defo
 degbe
@@ -1300,7 +1294,6 @@ hayatou
 hebert
 henri
 henry
-hernandez
 herve
 hessana
 hicham
@@ -1378,7 +1371,6 @@ jacquin
 jacquot
 jalal
 jamal
-james
 jamet
 jan
 janin
@@ -1475,7 +1467,6 @@ kettani
 khaldi
 khalid
 khalil
-khan
 khoubbieh
 kiba
 kibamba
@@ -1768,7 +1759,6 @@ loison
 loko
 lombard
 lopes
-lopez
 lotfi
 loua
 louppe
@@ -1971,7 +1961,6 @@ marteau
 martel
 martineau
 martinet
-martinez
 martins
 marty
 mary
@@ -3066,9 +3055,7 @@ sayi
 sbai
 schaeffer
 schmidt
-schmitt
 schneider
-schwartz
 sea
 sebti
 seguin
@@ -3374,7 +3361,6 @@ yobouet
 yoka
 yombi
 youmouri
-yong
 yonga
 yonta
 yoro
