@@ -3,79 +3,42 @@
 import React from "react"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Upload,
-  Check,
-  Copy,
-  ChevronDown,
-  ChevronRight,
-  Search,
-  Phone,
-  AlertCircleIcon,
-  Clock,
-  StickyNote,
-  LayoutGrid,
-  LayoutList,
-  CheckCircle2,
-  XCircle,
-  CircleSlash,
-  MapPin,
-  Globe,
-  RefreshCw,
-  FileJson,
-  FileSpreadsheet,
-  Import,
-  Plus,
-  Send,
-  UserCircle,
-  ShieldCheck,
-  BookOpen,
+  LayoutGrid, LayoutList, RefreshCw, FileJson, FileSpreadsheet,
+  Import, Plus, Send, UserCircle, ShieldCheck, BookOpen, Clock,
+  CheckCircle2, XCircle, CircleSlash, MapPin,
 } from "lucide-react"
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ThemeSwitcher } from "@/components/theme-switcher"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-// XLSX is dynamically imported on file upload/export to reduce initial bundle size (~500KB+)
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Filter, MoreHorizontal } from "lucide-react"
+import { MoreHorizontal } from "lucide-react"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { createContact as persistContact } from "@/actions/contact-actions"
 import { toast } from "sonner"
 import { FloatingProgress } from "@/components/ui/floating-progress"
+import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
+// Home sub-components
+import { ImportBar } from "@/components/home/ImportBar"
+import { TerritoryNotes } from "@/components/home/TerritoryNotes"
+import { StatsBar } from "@/components/home/StatsBar"
+import { BatchActionBar } from "@/components/home/BatchActionBar"
+import { ContactTable } from "@/components/home/ContactTable"
+import { ContactGrid } from "@/components/home/ContactGrid"
+import type { EnhancedContact, BaseContact } from "@/types/contact"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -89,33 +52,7 @@ const FIXED_COLUMNS = {
   PHONE: 5, // 6th column
 }
 
-// Update the BaseContact interface to match the new format
-interface BaseContact {
-  firstName: string
-  lastName: string
-  fullName: string // Combined name field
-  address: string
-  city: string
-  zipcode: string
-  phone: string
-}
-
-// Update the EnhancedContact interface to include territoryStatus
-interface EnhancedContact extends BaseContact {
-  id: string
-  status: "Not checked" | "Potentially French" | "Not French" | "Duplicate" | "Detected"
-  notes: string
-  isExpanded: boolean
-  checkedOnTPS: boolean
-  checkedOnOTM: boolean
-  checkedOnForebears: boolean
-  needAddressUpdate: boolean
-  needPhoneUpdate: boolean
-  lastInteraction?: Date // Add timestamp for last interaction
-  territoryStatus: boolean // Add territory status field
-  // Flag set by automated name detection (heuristic)
-  frenchNameMatched?: boolean
-}
+// EnhancedContact and BaseContact are imported from @/types/contact
 
 // Add this debug function at the top of the file, right after the interfaces
 const debugObject = (obj: any, label: string) => {
@@ -1817,180 +1754,37 @@ export default function Home() {
         </Dialog>
 
         {/* ── Upload & session row ── */}
-        <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
-            <Input
-              type="file"
-              id="excel-upload"
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-              className="hidden"
-              ref={fileInputRef}
-            />
-
-            {/* Import button */}
-            <Button asChild disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shrink-0">
-              <label htmlFor="excel-upload" className="flex items-center gap-2 cursor-pointer">
-                <Upload className="h-4 w-4" />
-                <span>{isLoading ? "Loading…" : "Import Excel File"}</span>
-              </label>
-            </Button>
-
-            {/* Uploaded indicator */}
-            {fileUploaded && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-2.5 py-1">
-                <Check className="h-3.5 w-3.5" />
-                File loaded
-              </span>
-            )}
-
-            {/* Column hint */}
-            <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
-              Columns: First Name · Last Name · Address · City · Zipcode · Phone
-            </p>
-
-            {/* New Session — pushed to the right */}
-            <div className="sm:ml-auto shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={startNewSession}
-                className="flex items-center gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                New Session
-              </Button>
-            </div>
-          </div>
-
-          {/* Error banner */}
-          {error && (
-            <div className="border-t border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 px-5 py-3 flex items-start gap-2">
-              <AlertCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-              <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
-            </div>
-          )}
-        </div>
+        <ImportBar
+          isLoading={isLoading}
+          fileUploaded={fileUploaded}
+          error={error}
+          fileInputRef={fileInputRef}
+          onFileUpload={handleFileUpload}
+          onNewSession={startNewSession}
+        />
 
         {/* ── Territory / General Notes ── */}
         {contacts.length > 0 && (
-          <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-              <MapPin className="h-4 w-4 text-indigo-500" />
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Territory & Notes</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-5 py-4">
-              <div>
-                <label htmlFor="territory-zipcode" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
-                  Territory Zipcode
-                </label>
-                <Input
-                  id="territory-zipcode"
-                  placeholder="Enter zipcode…"
-                  value={territoryZipcode}
-                  onChange={(e) => setTerritoryZipcode(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="territory-page-range" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
-                  Page Range
-                </label>
-                <Input
-                  id="territory-page-range"
-                  placeholder="e.g. 1–10"
-                  value={territoryPageRange}
-                  onChange={(e) => setTerritoryPageRange(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="territory-notes" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
-                  Notes
-                </label>
-                <Textarea
-                  id="territory-notes"
-                  placeholder="Add notes here…"
-                  value={globalNotes}
-                  onChange={(e) => setGlobalNotes(e.target.value)}
-                  className="min-h-[72px] text-sm resize-none"
-                />
-              </div>
-            </div>
-          </div>
+          <TerritoryNotes
+            territoryZipcode={territoryZipcode}
+            onZipcodeChange={setTerritoryZipcode}
+            territoryPageRange={territoryPageRange}
+            onPageRangeChange={setTerritoryPageRange}
+            globalNotes={globalNotes}
+            onNotesChange={setGlobalNotes}
+          />
         )}
 
         {/* ── Statistics ── */}
-        {contacts.length > 0 && (() => {
-          const checkedPct = contacts.length > 0
-            ? Math.round(((potentiallyFrenchCount + notFrenchCount + detectedCount) / contacts.length) * 100)
-            : 0
-          return (
-            <div className="mb-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-              {/* Header row with progress */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-800">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Statistics</span>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-20 h-0.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                      style={{ width: `${checkedPct}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 tabular-nums w-8 text-right">{checkedPct}%</span>
-                  <span className="text-xs text-gray-400">checked</span>
-                </div>
-              </div>
-
-              {/* Stat tiles */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800">
-                {/* Not Checked */}
-                <div className="flex items-center gap-3 px-5 py-4">
-                  <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
-                    <XCircle className="h-4.5 w-4.5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{notCheckedCount}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Not Checked</p>
-                  </div>
-                </div>
-
-                {/* Potentially French */}
-                <div className="flex items-center gap-3 px-5 py-4">
-                  <div className="h-9 w-9 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-4.5 w-4.5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{potentiallyFrenchCount}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Pot. French</p>
-                  </div>
-                </div>
-
-                {/* Not French */}
-                <div className="flex items-center gap-3 px-5 py-4">
-                  <div className="h-9 w-9 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
-                    <CircleSlash className="h-4.5 w-4.5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{notFrenchCount}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Not French</p>
-                  </div>
-                </div>
-
-                {/* Detected */}
-                <div className="flex items-center gap-3 px-5 py-4">
-                  <div className="h-9 w-9 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center shrink-0">
-                    <Globe className="h-4.5 w-4.5 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{detectedCount}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Detected</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+        {contacts.length > 0 && (
+          <StatsBar
+            total={contacts.length}
+            notChecked={notCheckedCount}
+            potentiallyFrench={potentiallyFrenchCount}
+            notFrench={notFrenchCount}
+            detected={detectedCount}
+          />
+        )}
 
         {contacts.length > 0 && (
           <Card className="mb-4">
@@ -2090,603 +1884,40 @@ export default function Home() {
 
               {/* List View */}
               {viewType === "list" && (
-                <ScrollArea className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[30px]">
-                          <Checkbox
-                            checked={selectedContacts.length > 0 && selectedContacts.length === filteredContacts.length}
-                            onCheckedChange={toggleSelectAll}
-                          />
-                        </TableHead>
-                        <TableHead className="w-[150px]">Name</TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>City</TableHead>
-                        <TableHead>Zipcode</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead className="w-[120px]">Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredContacts.map((contact) => {
-                        // Determine row styling based on status
-                        const rowColorClass =
-                          contact.status === "Potentially French"
-                            ? "bg-green-50 dark:bg-green-900/20"
-                            : contact.status === "Duplicate"
-                              ? "bg-amber-50 dark:bg-amber-900/20"
-                              : contact.status === "Detected"
-                                ? "bg-purple-50 dark:bg-purple-900/20"
-                                : contact.status === "Not French"
-                                  ? "bg-red-50 dark:bg-red-900/20"
-                                  : "" // Not checked stays white/default
-
-                        return (
-                          <React.Fragment key={contact.id}>
-                            {/* Add an ID to the TableRow for scrolling */}
-                            <TableRow
-                              id={`contact-row-${contact.id}`}
-                              className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${contact.id === lastVerifiedId
-                                ? "border-l-4 border-l-green-500 dark:border-l-green-400"
-                                : ""
-                                }`}
-                              onClick={() => toggleContactExpanded(contact.id)}
-                            >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={selectedContacts.includes(contact.id)}
-                                  onCheckedChange={() => toggleContactSelection(contact.id)}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  {contact.fullName}
-                                  {contact.id === lastVerifiedId && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Clock className="h-4 w-4 text-green-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>Last verified contact</TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {contact.notes && contact.notes.trim() !== "" && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <StickyNote className="h-4 w-4 text-blue-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>Has notes</TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {contact.needAddressUpdate && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <AlertCircleIcon className="h-4 w-4 text-amber-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>Address needs update</TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {contact.needPhoneUpdate && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Phone className="h-4 w-4 text-amber-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>Phone needs update</TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {contact.territoryStatus && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <MapPin className="h-4 w-4 text-red-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>Different territory</TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>{contact.address}</TableCell>
-                              <TableCell>{contact.city}</TableCell>
-                              <TableCell>{contact.zipcode}</TableCell>
-                              <TableCell>{contact.phone}</TableCell>
-                              <TableCell>
-                                <Select
-                                  value={contact.status}
-                                  onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-                                >
-                                  <SelectTrigger
-                                    className={`w-[140px] rounded-full ${contact.status === "Potentially French"
-                                      ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
-                                      : contact.status === "Not French"
-                                        ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
-                                        : contact.status === "Detected"
-                                          ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
-                                          : contact.status === "Duplicate"
-                                            ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
-                                            : contact.status === "Not checked"
-                                              ? "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
-                                              : ""
-                                      }`}
-                                  >
-                                    <SelectValue placeholder={contact.status} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Not checked">Not checked</SelectItem>
-                                    <SelectItem value="Potentially French">Potentially French</SelectItem>
-                                    <SelectItem value="Detected">Detected</SelectItem>
-                                    <SelectItem value="Duplicate">Duplicate</SelectItem>
-                                    <SelectItem value="Not French">Not French</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end space-x-2">
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          toggleContactExpanded(contact.id)
-                                        }}
-                                        className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                                      >
-                                        {contact.isExpanded ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
-                                  </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Button
-                                        variant={contact.checkedOnForebears ? "secondary" : "outline"}
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          searchOnForebears(contact)
-                                        }}
-                                        className={
-                                          contact.checkedOnForebears
-                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                        }
-                                      >
-                                        <Globe className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Search on Forebears.io</TooltipContent>
-                                  </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Button
-                                        variant={contact.checkedOnTPS ? "secondary" : "outline"}
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          searchOnTruePeopleSearch(contact)
-                                        }}
-                                        className={
-                                          contact.checkedOnTPS
-                                            ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                            : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                        }
-                                      >
-                                        <Search className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Search on TruePeopleSearch</TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {contact.isExpanded && (
-                              <TableRow className={`${rowColorClass} border-t-0`}>
-                                <TableCell colSpan={8} className="p-0">
-                                  <div className="p-4 bg-background/50 rounded-b-lg shadow-inner">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div>
-                                        <h3 className="text-sm font-medium mb-2">Contact Details</h3>
-                                        <div className="space-y-3 text-sm">
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">First Name:</span>
-                                            <Input
-                                              value={contact.firstName}
-                                              onChange={(e) =>
-                                                updateContactField(contact.id, "firstName", e.target.value)
-                                              }
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">Last Name:</span>
-                                            <Input
-                                              value={contact.lastName}
-                                              onChange={(e) =>
-                                                updateContactField(contact.id, "lastName", e.target.value)
-                                              }
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">Address:</span>
-                                            <Input
-                                              value={contact.address}
-                                              onChange={(e) =>
-                                                updateContactField(contact.id, "address", e.target.value)
-                                              }
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">City:</span>
-                                            <Input
-                                              value={contact.city}
-                                              onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">Zipcode:</span>
-                                            <Input
-                                              value={contact.zipcode}
-                                              onChange={(e) =>
-                                                updateContactField(contact.id, "zipcode", e.target.value)
-                                              }
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                          <div className="grid grid-cols-3 items-center gap-2">
-                                            <span className="font-medium">Phone:</span>
-                                            <Input
-                                              value={contact.phone}
-                                              onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
-                                              className="col-span-2 h-8"
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
-                                        <Textarea
-                                          placeholder="Add notes about this contact..."
-                                          value={contact.notes}
-                                          onChange={(e) => handleNotesChange(contact.id, e.target.value)}
-                                          className="mb-2 min-h-[80px]"
-                                        />
-                                        <div className="flex items-center space-x-4">
-                                          <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                              id={`address-update-${contact.id}`}
-                                              checked={contact.needAddressUpdate}
-                                              onCheckedChange={(checked) =>
-                                                handleAddressUpdateChange(contact.id, !!checked)
-                                              }
-                                            />
-                                            <label htmlFor={`address-update-${contact.id}`} className="text-sm">
-                                              Address updated
-                                            </label>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                              id={`phone-update-${contact.id}`}
-                                              checked={contact.needPhoneUpdate}
-                                              onCheckedChange={(checked) =>
-                                                handlePhoneUpdateChange(contact.id, !!checked)
-                                              }
-                                            />
-                                            <label htmlFor={`phone-update-${contact.id}`} className="text-sm">
-                                              Phone updated
-                                            </label>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                              id={`territory-status-${contact.id}`}
-                                              checked={contact.territoryStatus}
-                                              onCheckedChange={(checked) =>
-                                                handleTerritoryStatusChange(contact.id, !!checked)
-                                              }
-                                            />
-                                            <label htmlFor={`territory-status-${contact.id}`} className="text-sm">
-                                              Different territory
-                                            </label>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+                <ContactTable
+                  contacts={filteredContacts}
+                  selectedContacts={selectedContacts}
+                  lastVerifiedId={lastVerifiedId}
+                  onToggleSelectAll={toggleSelectAll}
+                  onToggleSelection={toggleContactSelection}
+                  onToggleExpanded={toggleContactExpanded}
+                  onStatusChange={handleStatusChange}
+                  onNotesChange={handleNotesChange}
+                  onFieldChange={updateContactField}
+                  onAddressUpdateChange={handleAddressUpdateChange}
+                  onPhoneUpdateChange={handlePhoneUpdateChange}
+                  onTerritoryStatusChange={handleTerritoryStatusChange}
+                  onSearchForebears={searchOnForebears}
+                  onSearchTPS={searchOnTruePeopleSearch}
+                />
               )}
-
               {/* Grid View */}
               {viewType === "grid" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredContacts.map((contact) => {
-                    const statusColor =
-                      contact.status === "Potentially French"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : contact.status === "Duplicate"
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                          : contact.status === "Not checked"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                            : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-
-                    return (
-                      <Card
-                        key={contact.id}
-                        id={`contact-row-${contact.id}`}
-                        className={`overflow-hidden cursor-pointer ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""
-                          }`}
-                        onClick={() => toggleContactExpanded(contact.id)}
-                      >
-                        <CardHeader className="pb-2">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={selectedContacts.includes(contact.id)}
-                                  onCheckedChange={() => toggleContactSelection(contact.id)}
-                                />
-                                <CardTitle className="text-base">{contact.fullName}</CardTitle>
-                              </div>
-                              <CardDescription className="mt-1">{contact.address}</CardDescription>
-                            </div>
-                            <Badge className={statusColor}>
-                              <div className="flex items-center gap-1">
-                                {getStatusIcon(contact.status)}
-                                <span>{contact.status}</span>
-                              </div>
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pb-2 pt-0">
-                          <div className="text-sm space-y-1">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>
-                                {contact.city}, {contact.zipcode}
-                              </span>
-                            </div>
-                            {contact.phone && (
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span>{contact.phone}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex gap-1 mt-2">
-                            {contact.id === lastVerifiedId && (
-                              <Badge
-                                variant="outline"
-                                className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200"
-                              >
-                                <Clock className="h-3 w-3 mr-1" /> Last verified
-                              </Badge>
-                            )}
-                            {contact.notes && contact.notes.trim() !== "" && (
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200"
-                              >
-                                <StickyNote className="h-3 w-3 mr-1" /> Has notes
-                              </Badge>
-                            )}
-                            {contact.needAddressUpdate && (
-                              <Badge
-                                variant="outline"
-                                className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
-                              >
-                                <AlertCircleIcon className="h-3 w-3 mr-1" /> Address update
-                              </Badge>
-                            )}
-                            {contact.needPhoneUpdate && (
-                              <Badge
-                                variant="outline"
-                                className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200"
-                              >
-                                <Phone className="h-3 w-3 mr-1" /> Phone update
-                              </Badge>
-                            )}
-                            {contact.territoryStatus && (
-                              <Badge
-                                variant="outline"
-                                className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200"
-                              >
-                                <MapPin className="h-3 w-3 mr-1" /> Different territory
-                              </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-between pt-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleContactExpanded(contact.id)
-                            }}
-                            className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            {contact.isExpanded ? "Less" : "More"}
-                          </Button>
-                          <div className="flex gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant={contact.checkedOnForebears ? "secondary" : "outline"}
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    searchOnForebears(contact)
-                                  }}
-                                  className={
-                                    contact.checkedOnForebears
-                                      ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                      : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                  }
-                                >
-                                  <Globe className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Search on Forebears.io</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant={contact.checkedOnTPS ? "secondary" : "outline"}
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    searchOnTruePeopleSearch(contact)
-                                  }}
-                                  className={
-                                    contact.checkedOnTPS
-                                      ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/50"
-                                      : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40"
-                                  }
-                                >
-                                  <Search className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Search on TruePeopleSearch</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </CardFooter>
-
-                        {contact.isExpanded && (
-                          <div className="p-4 bg-muted/30 border-t">
-                            <div className="grid grid-cols-1 gap-4">
-                              <div>
-                                <h3 className="text-sm font-medium mb-2">Contact Details</h3>
-                                <div className="space-y-3 text-sm">
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">First Name:</span>
-                                    <Input
-                                      value={contact.firstName}
-                                      onChange={(e) => updateContactField(contact.id, "firstName", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">Last Name:</span>
-                                    <Input
-                                      value={contact.lastName}
-                                      onChange={(e) => updateContactField(contact.id, "lastName", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">Address:</span>
-                                    <Input
-                                      value={contact.address}
-                                      onChange={(e) => updateContactField(contact.id, "address", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">City:</span>
-                                    <Input
-                                      value={contact.city}
-                                      onChange={(e) => updateContactField(contact.id, "city", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">Zipcode:</span>
-                                    <Input
-                                      value={contact.zipcode}
-                                      onChange={(e) => updateContactField(contact.id, "zipcode", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-3 items-center gap-2">
-                                    <span className="font-medium">Phone:</span>
-                                    <Input
-                                      value={contact.phone}
-                                      onChange={(e) => updateContactField(contact.id, "phone", e.target.value)}
-                                      className="col-span-2 h-8"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                              <div>
-                                <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
-                                <Textarea
-                                  placeholder="Add notes about this contact..."
-                                  value={contact.notes}
-                                  onChange={(e) => handleNotesChange(contact.id, e.target.value)}
-                                  className="mb-2 min-h-[80px]"
-                                />
-                                <div className="flex items-center space-x-4">
-                                  <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`address-update-grid-${contact.id}`}
-                                      checked={contact.needAddressUpdate}
-                                      onCheckedChange={(checked) => handleAddressUpdateChange(contact.id, !!checked)}
-                                    />
-                                    <label htmlFor={`address-update-grid-${contact.id}`} className="text-sm">
-                                      Address updated
-                                    </label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`phone-update-grid-${contact.id}`}
-                                      checked={contact.needPhoneUpdate}
-                                      onCheckedChange={(checked) => handlePhoneUpdateChange(contact.id, !!checked)}
-                                    />
-                                    <label htmlFor={`phone-update-grid-${contact.id}`} className="text-sm">
-                                      Phone updated
-                                    </label>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`territory-status-grid-${contact.id}`}
-                                      checked={contact.territoryStatus}
-                                      onCheckedChange={(checked) => handleTerritoryStatusChange(contact.id, !!checked)}
-                                    />
-                                    <label htmlFor={`territory-status-grid-${contact.id}`} className="text-sm">
-                                      Different territory
-                                    </label>
-                                  </div>
-                                </div>
-                                <div className="mt-2">
-                                  <Select
-                                    value={contact.status}
-                                    onValueChange={(value) => handleStatusChange(contact.id, value as any)}
-                                  >
-                                    <SelectTrigger className="w-full rounded-full">
-                                      <SelectValue placeholder={contact.status} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Not checked">Not checked</SelectItem>
-                                      <SelectItem value="Potentially French">Potentially French</SelectItem>
-                                      <SelectItem value="Detected">Detected</SelectItem>
-                                      <SelectItem value="Duplicate">Duplicate</SelectItem>
-                                      <SelectItem value="Not French">Not French</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </Card>
-                    )
-                  })}
-                </div>
+                <ContactGrid
+                  contacts={filteredContacts}
+                  selectedContacts={selectedContacts}
+                  lastVerifiedId={lastVerifiedId}
+                  onToggleSelection={toggleContactSelection}
+                  onToggleExpanded={toggleContactExpanded}
+                  onStatusChange={handleStatusChange}
+                  onNotesChange={handleNotesChange}
+                  onFieldChange={updateContactField}
+                  onAddressUpdateChange={handleAddressUpdateChange}
+                  onPhoneUpdateChange={handlePhoneUpdateChange}
+                  onTerritoryStatusChange={handleTerritoryStatusChange}
+                  onSearchForebears={searchOnForebears}
+                  onSearchTPS={searchOnTruePeopleSearch}
+                />
               )}
             </CardContent>
           </Card>
@@ -2694,74 +1925,11 @@ export default function Home() {
       </main>
 
       {/* Floating Batch Action Box */}
-      {selectedContacts.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50 transition-all duration-300 ease-in-out">
-          <div className="container mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{selectedContacts.length} contacts selected</span>
-              <Button size="sm" variant="outline" onClick={() => setSelectedContacts([])}>
-                Clear Selection
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Not checked")}
-                className="bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/40"
-              >
-                <XCircle className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
-                Not Checked
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Potentially French")}
-                className="bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/40"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
-                Potentially French
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Duplicate")}
-                className="bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/40"
-              >
-                <RefreshCw className="h-4 w-4 mr-2 text-amber-600 dark:text-amber-400" />
-                Duplicate
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Detected")}
-                className="bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:hover:bg-purple-900/40"
-              >
-                <Badge className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-400" />
-                Detected
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateBatchStatus("Not French")}
-                className="bg-red-50 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:hover:bg-red-900/40"
-              >
-                <CircleSlash className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
-                Not French
-              </Button>
-              <Button
-                size="sm"
-                variant="default"
-                className="bg-green-600 hover:bg-green-700"
-                onClick={() => setSelectedContacts([])}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BatchActionBar
+        selectedCount={selectedContacts.length}
+        onClearSelection={() => setSelectedContacts([])}
+        onUpdateBatch={updateBatchStatus}
+      />
 
       {/* ── Post-Submit New Session Dialog ── */}
       <Dialog open={isPostExportDialogOpen} onOpenChange={setIsPostExportDialogOpen}>
