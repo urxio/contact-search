@@ -693,7 +693,6 @@ clavier
 clement
 Clemence
 clerc
-coast
 cochet
 colas
 colin
@@ -705,7 +704,6 @@ collin
 combe
 combes
 comte
-congolese
 constant
 constantin
 cordier
@@ -1171,7 +1169,6 @@ gilbert
 gilles
 gillet
 gillot
-gimenez
 girard
 girardot
 giraud
@@ -1355,7 +1352,6 @@ issombo
 itali
 itoba
 itoua
-ivory
 iwandza
 jabrane
 jabri
@@ -1947,7 +1943,6 @@ mariam
 marie
 marin
 marion
-maroc
 marquet
 marquis
 marsli
@@ -2245,7 +2240,6 @@ morel
 moret
 morice
 morin
-morocco
 morvan
 mossa
 mostafa
@@ -2974,7 +2968,6 @@ roman
 rondeau
 roques
 rose
-rossi
 rossignol
 roth
 rouault
@@ -2985,7 +2978,6 @@ rousset
 roux
 rouxel
 royer
-ruiz
 ruth
 saad
 saadaoui
@@ -3048,8 +3040,6 @@ saya
 sayi
 sbai
 schaeffer
-schmidt
-schneider
 sea
 sebti
 seguin
@@ -3227,7 +3217,6 @@ tize
 tizi
 todou
 togbui
-togolese
 toh
 tokpa
 tom
