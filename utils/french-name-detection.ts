@@ -1,3 +1,16 @@
+// Shared with server-side dictionary tooling (app/api/admin/dictionary-feedback)
+// so a name is normalized identically everywhere it's compared.
+export function normalizeName(name: string): string {
+  return (name || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z\-\s']/g, "")
+    .trim()
+}
+
 let DICT: Set<string> | null = null
 
 export async function loadDictionaryIfNeeded(): Promise<void> {

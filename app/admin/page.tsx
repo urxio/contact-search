@@ -46,7 +46,7 @@ function pct(a: number, total: number) {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"submissions" | "otm">("submissions")
+  const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names">("submissions")
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
 
         {/* ── Tab switcher ── */}
         <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-8 w-fit">
-          {(["submissions", "otm"] as const).map((tab) => (
+          {(["submissions", "otm", "names"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -206,13 +206,16 @@ export default function AdminDashboard() {
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
-              {tab === "submissions" ? "Submissions" : "OTM Dups Check"}
+              {tab === "submissions" ? "Submissions" : tab === "otm" ? "OTM Dups Check" : "Name Feedback"}
             </button>
           ))}
         </div>
 
         {/* ── OTM Dups Check panel ── */}
         {activeTab === "otm" && <OtmPanel />}
+
+        {/* ── Name Feedback panel ── */}
+        {activeTab === "names" && <DictionaryFeedbackPanel />}
 
         {/* ── Submissions tab ── */}
         {activeTab === "submissions" && <>
@@ -1049,6 +1052,166 @@ function OtmPanel() {
               <p className="text-gray-400 text-sm">None of the submitted contact addresses matched any address in the uploaded OTM file.</p>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Name Feedback panel ───────────────────────────────────────────────────────
+// Aggregates the per-contact 👍/👎 "is this a French name" corrections users
+// leave in the main app, cross-references the live dictionary on GitHub, and
+// lets the admin apply add/remove changes as a direct commit.
+
+type NameFeedbackItem = {
+  name: string
+  frenchVotes: number
+  notFrenchVotes: number
+  voterCount: number
+  inDictionary: boolean
+  suggestedAction: "add" | "remove" | null
+}
+
+function DictionaryFeedbackPanel() {
+  const [items, setItems] = useState<NameFeedbackItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [dictionaryError, setDictionaryError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [onlySuggested, setOnlySuggested] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback")
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data?.error ?? "Failed to load name feedback.")
+        setLoading(false)
+        return
+      }
+      setItems(data.items ?? [])
+      setDictionaryError(data.dictionaryError ?? null)
+    } catch {
+      setError("Network error — could not reach the server.")
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const apply = async (item: NameFeedbackItem, action: "add" | "remove") => {
+    setBusy((b) => ({ ...b, [item.name]: true }))
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: item.name, action }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to ${action} "${item.name}": ${data?.error ?? "Unknown error"}`)
+      } else {
+        setItems((prev) =>
+          prev.map((it) =>
+            it.name === item.name
+              ? { ...it, inDictionary: action === "add", suggestedAction: null }
+              : it,
+          ),
+        )
+      }
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => ({ ...b, [item.name]: false }))
+    }
+  }
+
+  const visible = onlySuggested ? items.filter((i) => i.suggestedAction) : items
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Name Feedback</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Surnames users flagged with 👍/👎 in the main app, compared against the live dictionary file.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={onlySuggested}
+            onChange={(e) => setOnlySuggested(e.target.checked)}
+          />
+          Only show suggested changes
+        </label>
+      </div>
+
+      {dictionaryError && (
+        <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            Couldn't reach the dictionary file on GitHub ({dictionaryError}). Votes are still shown below, but
+            "in dictionary" status and Apply actions are unavailable until GITHUB_TOKEN is configured.
+          </p>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</p>
+      ) : error ? (
+        <p className="px-6 py-12 text-center text-red-500 text-sm">{error}</p>
+      ) : visible.length === 0 ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">
+          {onlySuggested ? "No pending suggestions — every flagged name already matches the dictionary." : "No name feedback yet."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-green-600 uppercase tracking-wide">👍 French</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-red-500 uppercase tracking-wide">👎 Not French</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">In dictionary?</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((item) => (
+                <tr key={item.name} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.name}</td>
+                  <td className="px-4 py-3 text-right text-green-600 font-semibold">{item.frenchVotes}</td>
+                  <td className="px-4 py-3 text-right text-red-500 font-semibold">{item.notFrenchVotes}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      item.inDictionary
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                    }`}>
+                      {item.inDictionary ? "Yes" : "No"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {item.suggestedAction && !dictionaryError && (
+                      <button
+                        disabled={!!busy[item.name]}
+                        onClick={() => apply(item, item.suggestedAction!)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${
+                          item.suggestedAction === "add"
+                            ? "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+                            : "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                        }`}
+                      >
+                        {busy[item.name] ? "Applying…" : item.suggestedAction === "add" ? "Add to dictionary" : "Remove from dictionary"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

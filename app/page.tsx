@@ -612,6 +612,20 @@ export default function Home() {
     )
   }, [])
 
+  // User correction of the automated French-name detection, kept separate from
+  // the workflow `status` field so it survives status changes and can later be
+  // mined (via the submissions JSONB) to improve the dictionary. Clicking the
+  // same value again clears the feedback.
+  const handleNameFeedbackChange = useCallback((id: string, feedback: "french" | "not-french") => {
+    setContacts((prevContacts) =>
+      prevContacts.map((contact) =>
+        contact.id === id
+          ? { ...contact, nameFeedback: contact.nameFeedback === feedback ? undefined : feedback }
+          : contact,
+      ),
+    )
+  }, [])
+
   // Function to update contact field
   const updateContactField = useCallback((id: string, field: keyof BaseContact, value: string) => {
     setContacts((prevContacts) =>
@@ -1897,6 +1911,7 @@ export default function Home() {
                   onAddressUpdateChange={handleAddressUpdateChange}
                   onPhoneUpdateChange={handlePhoneUpdateChange}
                   onTerritoryStatusChange={handleTerritoryStatusChange}
+                  onNameFeedbackChange={handleNameFeedbackChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
                 />
@@ -1915,6 +1930,7 @@ export default function Home() {
                   onAddressUpdateChange={handleAddressUpdateChange}
                   onPhoneUpdateChange={handlePhoneUpdateChange}
                   onTerritoryStatusChange={handleTerritoryStatusChange}
+                  onNameFeedbackChange={handleNameFeedbackChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
                 />

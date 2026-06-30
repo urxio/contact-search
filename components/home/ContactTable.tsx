@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, ThumbsUp, ThumbsDown,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 
@@ -28,6 +28,7 @@ interface ContactTableProps {
   onAddressUpdateChange: (id: string, v: boolean) => void
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
+  onNameFeedbackChange: (id: string, feedback: "french" | "not-french") => void
   onSearchForebears: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
 }
@@ -45,6 +46,7 @@ export function ContactTable({
   onAddressUpdateChange,
   onPhoneUpdateChange,
   onTerritoryStatusChange,
+  onNameFeedbackChange,
   onSearchForebears,
   onSearchTPS,
 }: ContactTableProps) {
@@ -181,6 +183,34 @@ export function ContactTable({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Button
+                            variant="outline" size="icon"
+                            onClick={(e) => { e.stopPropagation(); onNameFeedbackChange(contact.id, "french") }}
+                            className={contact.nameFeedback === "french"
+                              ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800"}
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Correct: this is a French name</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Button
+                            variant="outline" size="icon"
+                            onClick={(e) => { e.stopPropagation(); onNameFeedbackChange(contact.id, "not-french") }}
+                            className={contact.nameFeedback === "not-french"
+                              ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800"}
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Incorrect: this is not a French name</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger>
