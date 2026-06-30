@@ -13,40 +13,60 @@ function requireAdmin(): NextResponse | null {
   return null
 }
 
-// GET — aggregate per-contact nameFeedback across all submissions into a
-// per-surname tally, and cross-reference against the live dictionary file.
+// GET — aggregate per-contact nameFeedback AND "Potentially French" status
+// across all submissions into a per-surname tally, and cross-reference
+// against the live dictionary file.
 export async function GET() {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
 
   try {
-    const result = await pool.query(`
-      SELECT
-        c->>'lastName'     AS last_name,
-        c->>'fullName'     AS full_name,
-        c->>'nameFeedback' AS feedback,
-        s.user_id,
-        s.id AS submission_id
-      FROM submissions s, jsonb_array_elements(s.contacts) c
-      WHERE c->>'nameFeedback' IS NOT NULL AND s.archived = FALSE
-    `)
+    const [feedbackResult, statusResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          c->>'lastName'     AS last_name,
+          c->>'fullName'     AS full_name,
+          c->>'nameFeedback' AS feedback,
+          s.user_id
+        FROM submissions s, jsonb_array_elements(s.contacts) c
+        WHERE c->>'nameFeedback' IS NOT NULL AND s.archived = FALSE
+      `),
+      pool.query(`
+        SELECT
+          c->>'lastName' AS last_name,
+          c->>'fullName' AS full_name,
+          s.user_id
+        FROM submissions s, jsonb_array_elements(s.contacts) c
+        WHERE c->>'status' = 'Potentially French' AND s.archived = FALSE
+      `),
+    ])
 
     const tally = new Map<
       string,
-      { name: string; frenchVotes: number; notFrenchVotes: number; voters: Set<string> }
+      { name: string; frenchVotes: number; notFrenchVotes: number; statusCount: number; voters: Set<string> }
     >()
 
-    for (const row of result.rows) {
-      const source = row.last_name || row.full_name || ""
-      const name = normalizeName(source)
-      if (!name) continue
-
+    const getEntry = (name: string) => {
       if (!tally.has(name)) {
-        tally.set(name, { name, frenchVotes: 0, notFrenchVotes: 0, voters: new Set() })
+        tally.set(name, { name, frenchVotes: 0, notFrenchVotes: 0, statusCount: 0, voters: new Set() })
       }
-      const entry = tally.get(name)!
+      return tally.get(name)!
+    }
+
+    for (const row of feedbackResult.rows) {
+      const name = normalizeName(row.last_name || row.full_name || "")
+      if (!name) continue
+      const entry = getEntry(name)
       if (row.feedback === "french") entry.frenchVotes++
       else if (row.feedback === "not-french") entry.notFrenchVotes++
+      entry.voters.add(row.user_id)
+    }
+
+    for (const row of statusResult.rows) {
+      const name = normalizeName(row.last_name || row.full_name || "")
+      if (!name) continue
+      const entry = getEntry(name)
+      entry.statusCount++
       entry.voters.add(row.user_id)
     }
 
@@ -66,19 +86,23 @@ export async function GET() {
       .map((entry) => {
         const inDictionary = dictionarySet.has(entry.name)
         let suggestedAction: "add" | "remove" | null = null
-        if (entry.frenchVotes > entry.notFrenchVotes && !inDictionary) suggestedAction = "add"
-        else if (entry.notFrenchVotes > entry.frenchVotes && inDictionary) suggestedAction = "remove"
+        if (!inDictionary && (entry.frenchVotes > entry.notFrenchVotes || entry.statusCount > 0)) {
+          suggestedAction = "add"
+        } else if (inDictionary && entry.notFrenchVotes > entry.frenchVotes) {
+          suggestedAction = "remove"
+        }
 
         return {
           name: entry.name,
           frenchVotes: entry.frenchVotes,
           notFrenchVotes: entry.notFrenchVotes,
+          statusCount: entry.statusCount,
           voterCount: entry.voters.size,
           inDictionary,
           suggestedAction,
         }
       })
-      .sort((a, b) => (b.frenchVotes + b.notFrenchVotes) - (a.frenchVotes + a.notFrenchVotes))
+      .sort((a, b) => (b.frenchVotes + b.notFrenchVotes + b.statusCount) - (a.frenchVotes + a.notFrenchVotes + a.statusCount))
 
     return NextResponse.json({ items, dictionaryError })
   } catch (err: any) {

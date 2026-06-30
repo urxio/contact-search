@@ -612,20 +612,6 @@ export default function Home() {
     )
   }, [])
 
-  // User correction of the automated French-name detection, kept separate from
-  // the workflow `status` field so it survives status changes and can later be
-  // mined (via the submissions JSONB) to improve the dictionary. Clicking the
-  // same value again clears the feedback.
-  const handleNameFeedbackChange = useCallback((id: string, feedback: "french" | "not-french") => {
-    setContacts((prevContacts) =>
-      prevContacts.map((contact) =>
-        contact.id === id
-          ? { ...contact, nameFeedback: contact.nameFeedback === feedback ? undefined : feedback }
-          : contact,
-      ),
-    )
-  }, [])
-
   // Function to update contact field
   const updateContactField = useCallback((id: string, field: keyof BaseContact, value: string) => {
     setContacts((prevContacts) =>
@@ -778,6 +764,33 @@ export default function Home() {
     },
     [selectedContacts],
   )
+
+  // User correction of the automated French-name detection, kept separate
+  // from the workflow `status` field so it survives status changes and can
+  // later be mined (via the submissions JSONB) to improve the dictionary.
+  // Only available in bulk via the batch action bar.
+  const markSelectedNameFeedback = useCallback(
+    (feedback: "french" | "not-french") => {
+      if (selectedContacts.length === 0) {
+        toast.error("Please select contacts to update")
+        return
+      }
+
+      setContacts((prevContacts) =>
+        prevContacts.map((contact) =>
+          selectedContacts.includes(contact.id) ? { ...contact, nameFeedback: feedback } : contact,
+        ),
+      )
+
+      toast.success(
+        `Marked ${selectedContacts.length} contact${selectedContacts.length !== 1 ? "s" : ""} as ${feedback === "french" ? "French" : "Not French"} names`,
+      )
+    },
+    [selectedContacts],
+  )
+
+  const markSelectedAsFrenchName = useCallback(() => markSelectedNameFeedback("french"), [markSelectedNameFeedback])
+  const markSelectedAsNotFrenchName = useCallback(() => markSelectedNameFeedback("not-french"), [markSelectedNameFeedback])
 
   // Function to toggle contact selection
   const toggleContactSelection = useCallback((id: string) => {
@@ -1911,7 +1924,6 @@ export default function Home() {
                   onAddressUpdateChange={handleAddressUpdateChange}
                   onPhoneUpdateChange={handlePhoneUpdateChange}
                   onTerritoryStatusChange={handleTerritoryStatusChange}
-                  onNameFeedbackChange={handleNameFeedbackChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
                 />
@@ -1930,7 +1942,6 @@ export default function Home() {
                   onAddressUpdateChange={handleAddressUpdateChange}
                   onPhoneUpdateChange={handlePhoneUpdateChange}
                   onTerritoryStatusChange={handleTerritoryStatusChange}
-                  onNameFeedbackChange={handleNameFeedbackChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
                 />
@@ -1945,6 +1956,8 @@ export default function Home() {
         selectedCount={selectedContacts.length}
         onClearSelection={() => setSelectedContacts([])}
         onUpdateBatch={updateBatchStatus}
+        onMarkAsFrenchName={markSelectedAsFrenchName}
+        onMarkAsNotFrenchName={markSelectedAsNotFrenchName}
       />
 
       {/* ── Post-Submit New Session Dialog ── */}

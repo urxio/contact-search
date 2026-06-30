@@ -2,16 +2,24 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Check, XCircle, CheckCircle2, RefreshCw, CircleSlash } from "lucide-react"
+import { Check, XCircle, CheckCircle2, RefreshCw, CircleSlash, ThumbsUp, ThumbsDown } from "lucide-react"
 import type { EnhancedContact } from "@/types/contact"
 
 interface BatchActionBarProps {
   selectedCount: number
   onClearSelection: () => void
   onUpdateBatch: (status: EnhancedContact["status"]) => void
+  onMarkAsFrenchName: () => void
+  onMarkAsNotFrenchName: () => void
 }
 
-export function BatchActionBar({ selectedCount, onClearSelection, onUpdateBatch }: BatchActionBarProps) {
+export function BatchActionBar({
+  selectedCount,
+  onClearSelection,
+  onUpdateBatch,
+  onMarkAsFrenchName,
+  onMarkAsNotFrenchName,
+}: BatchActionBarProps) {
   if (selectedCount === 0) return null
 
   return (
@@ -68,6 +76,24 @@ export function BatchActionBar({ selectedCount, onClearSelection, onUpdateBatch 
           >
             <CircleSlash className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
             Not French
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onMarkAsFrenchName}
+            className="bg-emerald-50 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800 dark:hover:bg-emerald-900/40"
+          >
+            <ThumbsUp className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+            Mark as French Name
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onMarkAsNotFrenchName}
+            className="bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-800 dark:hover:bg-rose-900/40"
+          >
+            <ThumbsDown className="h-4 w-4 mr-2 text-rose-600 dark:text-rose-400" />
+            Mark as Not French
           </Button>
           <Button
             size="sm"

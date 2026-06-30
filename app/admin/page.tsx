@@ -1067,6 +1067,7 @@ type NameFeedbackItem = {
   name: string
   frenchVotes: number
   notFrenchVotes: number
+  statusCount: number
   voterCount: number
   inDictionary: boolean
   suggestedAction: "add" | "remove" | null
@@ -1136,7 +1137,7 @@ function DictionaryFeedbackPanel() {
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Name Feedback</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Surnames users flagged with 👍/👎 in the main app, compared against the live dictionary file.
+            Surnames users flagged with 👍/👎, or marked "Potentially French" in the main app, compared against the live dictionary file.
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer">
@@ -1174,6 +1175,7 @@ function DictionaryFeedbackPanel() {
                 <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
                 <th className="text-right px-4 py-2 text-xs font-semibold text-green-600 uppercase tracking-wide">👍 French</th>
                 <th className="text-right px-4 py-2 text-xs font-semibold text-red-500 uppercase tracking-wide">👎 Not French</th>
+                <th className="text-right px-4 py-2 text-xs font-semibold text-purple-500 uppercase tracking-wide">Marked Pot. French</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">In dictionary?</th>
                 <th className="px-4 py-2"></th>
               </tr>
@@ -1184,6 +1186,7 @@ function DictionaryFeedbackPanel() {
                   <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.name}</td>
                   <td className="px-4 py-3 text-right text-green-600 font-semibold">{item.frenchVotes}</td>
                   <td className="px-4 py-3 text-right text-red-500 font-semibold">{item.notFrenchVotes}</td>
+                  <td className="px-4 py-3 text-right text-purple-500 font-semibold">{item.statusCount}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       item.inDictionary
