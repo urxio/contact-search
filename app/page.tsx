@@ -200,6 +200,14 @@ export default function Home() {
     })
   }, [contacts, debouncedSearchQuery, statusFilter, showUpdateNeeded])
 
+  // "Mark as Not French" only makes sense for contacts the auto-detector
+  // already flagged — only show it when every selected contact is "Detected".
+  const canMarkSelectedNotFrench = useMemo(() => {
+    if (selectedContacts.length === 0) return false
+    const selectedSet = new Set(selectedContacts)
+    return contacts.filter((c) => selectedSet.has(c.id)).every((c) => c.status === "Detected")
+  }, [contacts, selectedContacts])
+
   // Update statistics calculations
   const notCheckedCount = useMemo(() => contacts.filter((c) => c.status === "Not checked").length, [contacts])
   const potentiallyFrenchCount = useMemo(
@@ -768,29 +776,22 @@ export default function Home() {
   // User correction of the automated French-name detection, kept separate
   // from the workflow `status` field so it survives status changes and can
   // later be mined (via the submissions JSONB) to improve the dictionary.
-  // Only available in bulk via the batch action bar.
-  const markSelectedNameFeedback = useCallback(
-    (feedback: "french" | "not-french") => {
-      if (selectedContacts.length === 0) {
-        toast.error("Please select contacts to update")
-        return
-      }
+  // Only available in bulk via the batch action bar. (Positive feedback is
+  // implied by marking a contact's status "Potentially French" instead.)
+  const markSelectedAsNotFrenchName = useCallback(() => {
+    if (selectedContacts.length === 0) {
+      toast.error("Please select contacts to update")
+      return
+    }
 
-      setContacts((prevContacts) =>
-        prevContacts.map((contact) =>
-          selectedContacts.includes(contact.id) ? { ...contact, nameFeedback: feedback } : contact,
-        ),
-      )
+    setContacts((prevContacts) =>
+      prevContacts.map((contact) =>
+        selectedContacts.includes(contact.id) ? { ...contact, nameFeedback: "not-french" } : contact,
+      ),
+    )
 
-      toast.success(
-        `Marked ${selectedContacts.length} contact${selectedContacts.length !== 1 ? "s" : ""} as ${feedback === "french" ? "French" : "Not French"} names`,
-      )
-    },
-    [selectedContacts],
-  )
-
-  const markSelectedAsFrenchName = useCallback(() => markSelectedNameFeedback("french"), [markSelectedNameFeedback])
-  const markSelectedAsNotFrenchName = useCallback(() => markSelectedNameFeedback("not-french"), [markSelectedNameFeedback])
+    toast.success(`Marked ${selectedContacts.length} contact${selectedContacts.length !== 1 ? "s" : ""} as Not French names`)
+  }, [selectedContacts])
 
   // Function to toggle contact selection
   const toggleContactSelection = useCallback((id: string) => {
@@ -1956,8 +1957,8 @@ export default function Home() {
         selectedCount={selectedContacts.length}
         onClearSelection={() => setSelectedContacts([])}
         onUpdateBatch={updateBatchStatus}
-        onMarkAsFrenchName={markSelectedAsFrenchName}
         onMarkAsNotFrenchName={markSelectedAsNotFrenchName}
+        canMarkNotFrench={canMarkSelectedNotFrench}
       />
 
       {/* ── Post-Submit New Session Dialog ── */}

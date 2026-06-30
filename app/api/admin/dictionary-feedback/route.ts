@@ -13,62 +13,42 @@ function requireAdmin(): NextResponse | null {
   return null
 }
 
-// GET — aggregate per-contact nameFeedback AND "Potentially French" status
-// across all submissions into a per-surname tally, and cross-reference
-// against the live dictionary file.
+// GET — two simple, actionable lists:
+//   addCandidates    — surnames from "Potentially French" contacts that
+//                       aren't in the dictionary yet (need adding)
+//   removeCandidates — surnames from contacts explicitly marked "Not French"
+//                       that are currently in the dictionary (need removing)
+// Anything already consistent with the dictionary is left out entirely.
 export async function GET() {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
 
   try {
-    const [feedbackResult, statusResult] = await Promise.all([
+    const [potentiallyFrenchResult, notFrenchResult] = await Promise.all([
       pool.query(`
-        SELECT
-          c->>'lastName'     AS last_name,
-          c->>'fullName'     AS full_name,
-          c->>'nameFeedback' AS feedback,
-          s.user_id
-        FROM submissions s, jsonb_array_elements(s.contacts) c
-        WHERE c->>'nameFeedback' IS NOT NULL AND s.archived = FALSE
-      `),
-      pool.query(`
-        SELECT
-          c->>'lastName' AS last_name,
-          c->>'fullName' AS full_name,
-          s.user_id
+        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name
         FROM submissions s, jsonb_array_elements(s.contacts) c
         WHERE c->>'status' = 'Potentially French' AND s.archived = FALSE
       `),
+      pool.query(`
+        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name
+        FROM submissions s, jsonb_array_elements(s.contacts) c
+        WHERE c->>'nameFeedback' = 'not-french' AND s.archived = FALSE
+      `),
     ])
 
-    const tally = new Map<
-      string,
-      { name: string; frenchVotes: number; notFrenchVotes: number; statusCount: number; voters: Set<string> }
-    >()
-
-    const getEntry = (name: string) => {
-      if (!tally.has(name)) {
-        tally.set(name, { name, frenchVotes: 0, notFrenchVotes: 0, statusCount: 0, voters: new Set() })
+    const tallyNames = (rows: { last_name: string | null; full_name: string | null }[]) => {
+      const counts = new Map<string, number>()
+      for (const row of rows) {
+        const name = normalizeName(row.last_name || row.full_name || "")
+        if (!name) continue
+        counts.set(name, (counts.get(name) ?? 0) + 1)
       }
-      return tally.get(name)!
+      return counts
     }
 
-    for (const row of feedbackResult.rows) {
-      const name = normalizeName(row.last_name || row.full_name || "")
-      if (!name) continue
-      const entry = getEntry(name)
-      if (row.feedback === "french") entry.frenchVotes++
-      else if (row.feedback === "not-french") entry.notFrenchVotes++
-      entry.voters.add(row.user_id)
-    }
-
-    for (const row of statusResult.rows) {
-      const name = normalizeName(row.last_name || row.full_name || "")
-      if (!name) continue
-      const entry = getEntry(name)
-      entry.statusCount++
-      entry.voters.add(row.user_id)
-    }
+    const potentiallyFrenchCounts = tallyNames(potentiallyFrenchResult.rows)
+    const notFrenchCounts = tallyNames(notFrenchResult.rows)
 
     let dictionaryLines: string[] = []
     let dictionaryError: string | null = null
@@ -76,35 +56,21 @@ export async function GET() {
       const { lines } = await getDictionaryFile()
       dictionaryLines = lines
     } catch (err: any) {
-      // Surface the feedback tally even if GitHub isn't reachable/configured —
-      // the admin can still see what's been flagged.
       dictionaryError = err?.message ?? "Failed to load dictionary from GitHub"
     }
     const dictionarySet = new Set(dictionaryLines)
 
-    const items = Array.from(tally.values())
-      .map((entry) => {
-        const inDictionary = dictionarySet.has(entry.name)
-        let suggestedAction: "add" | "remove" | null = null
-        if (!inDictionary && (entry.frenchVotes > entry.notFrenchVotes || entry.statusCount > 0)) {
-          suggestedAction = "add"
-        } else if (inDictionary && entry.notFrenchVotes > entry.frenchVotes) {
-          suggestedAction = "remove"
-        }
+    const addCandidates = Array.from(potentiallyFrenchCounts.entries())
+      .filter(([name]) => !dictionarySet.has(name))
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
 
-        return {
-          name: entry.name,
-          frenchVotes: entry.frenchVotes,
-          notFrenchVotes: entry.notFrenchVotes,
-          statusCount: entry.statusCount,
-          voterCount: entry.voters.size,
-          inDictionary,
-          suggestedAction,
-        }
-      })
-      .sort((a, b) => (b.frenchVotes + b.notFrenchVotes + b.statusCount) - (a.frenchVotes + a.notFrenchVotes + a.statusCount))
+    const removeCandidates = Array.from(notFrenchCounts.entries())
+      .filter(([name]) => dictionarySet.has(name))
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
 
-    return NextResponse.json({ items, dictionaryError })
+    return NextResponse.json({ addCandidates, removeCandidates, dictionaryError })
   } catch (err: any) {
     console.error("Dictionary feedback fetch error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -1063,23 +1063,20 @@ function OtmPanel() {
 // leave in the main app, cross-references the live dictionary on GitHub, and
 // lets the admin apply add/remove changes as a direct commit.
 
-type NameFeedbackItem = {
-  name: string
-  frenchVotes: number
-  notFrenchVotes: number
-  statusCount: number
-  voterCount: number
-  inDictionary: boolean
-  suggestedAction: "add" | "remove" | null
+type NameCandidate = { name: string; count: number }
+
+function forebearsUrlFor(name: string) {
+  return `https://forebears.io/surnames/${encodeURIComponent(name)}`
 }
 
 function DictionaryFeedbackPanel() {
-  const [items, setItems] = useState<NameFeedbackItem[]>([])
+  const [activeSubTab, setActiveSubTab] = useState<"add" | "remove">("add")
+  const [addCandidates, setAddCandidates] = useState<NameCandidate[]>([])
+  const [removeCandidates, setRemoveCandidates] = useState<NameCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dictionaryError, setDictionaryError] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
-  const [onlySuggested, setOnlySuggested] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1092,7 +1089,8 @@ function DictionaryFeedbackPanel() {
         setLoading(false)
         return
       }
-      setItems(data.items ?? [])
+      setAddCandidates(data.addCandidates ?? [])
+      setRemoveCandidates(data.removeCandidates ?? [])
       setDictionaryError(data.dictionaryError ?? null)
     } catch {
       setError("Network error — could not reach the server.")
@@ -1102,59 +1100,65 @@ function DictionaryFeedbackPanel() {
 
   useEffect(() => { load() }, [load])
 
-  const apply = async (item: NameFeedbackItem, action: "add" | "remove") => {
-    setBusy((b) => ({ ...b, [item.name]: true }))
+  const apply = async (name: string, action: "add" | "remove") => {
+    setBusy((b) => ({ ...b, [name]: true }))
     try {
       const res = await fetch("/api/admin/dictionary-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: item.name, action }),
+        body: JSON.stringify({ name, action }),
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(`Failed to ${action} "${item.name}": ${data?.error ?? "Unknown error"}`)
+        alert(`Failed to ${action} "${name}": ${data?.error ?? "Unknown error"}`)
+      } else if (action === "add") {
+        setAddCandidates((prev) => prev.filter((c) => c.name !== name))
       } else {
-        setItems((prev) =>
-          prev.map((it) =>
-            it.name === item.name
-              ? { ...it, inDictionary: action === "add", suggestedAction: null }
-              : it,
-          ),
-        )
+        setRemoveCandidates((prev) => prev.filter((c) => c.name !== name))
       }
     } catch {
       alert("Network error — could not reach the server.")
     } finally {
-      setBusy((b) => ({ ...b, [item.name]: false }))
+      setBusy((b) => ({ ...b, [name]: false }))
     }
   }
 
-  const visible = onlySuggested ? items.filter((i) => i.suggestedAction) : items
-
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Name Feedback</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Surnames users flagged with 👍/👎, or marked "Potentially French" in the main app, compared against the live dictionary file.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={onlySuggested}
-            onChange={(e) => setOnlySuggested(e.target.checked)}
-          />
-          Only show suggested changes
-        </label>
+      <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Name Feedback</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Last names from "Potentially French" contacts missing from the dictionary, and names marked "Not French" that are still in it.
+        </p>
+      </div>
+
+      <div className="flex gap-1 p-3 border-b border-gray-100 dark:border-gray-800">
+        <button
+          onClick={() => setActiveSubTab("add")}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeSubTab === "add"
+              ? "bg-green-600 text-white"
+              : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          Add to Dictionary{addCandidates.length > 0 ? ` (${addCandidates.length})` : ""}
+        </button>
+        <button
+          onClick={() => setActiveSubTab("remove")}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeSubTab === "remove"
+              ? "bg-red-600 text-white"
+              : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          Remove from Dictionary{removeCandidates.length > 0 ? ` (${removeCandidates.length})` : ""}
+        </button>
       </div>
 
       {dictionaryError && (
         <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
           <p className="text-sm text-amber-700 dark:text-amber-400">
-            Couldn't reach the dictionary file on GitHub ({dictionaryError}). Votes are still shown below, but
-            "in dictionary" status and Apply actions are unavailable until GITHUB_TOKEN is configured.
+            Couldn't reach the dictionary file on GitHub ({dictionaryError}). Apply actions are unavailable until GITHUB_TOKEN is configured.
           </p>
         </div>
       )}
@@ -1163,60 +1167,94 @@ function DictionaryFeedbackPanel() {
         <p className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</p>
       ) : error ? (
         <p className="px-6 py-12 text-center text-red-500 text-sm">{error}</p>
-      ) : visible.length === 0 ? (
-        <p className="px-6 py-12 text-center text-gray-400 text-sm">
-          {onlySuggested ? "No pending suggestions — every flagged name already matches the dictionary." : "No name feedback yet."}
-        </p>
+      ) : activeSubTab === "add" ? (
+        <NameCandidateList
+          candidates={addCandidates}
+          action="add"
+          buttonLabel="Add to dictionary"
+          buttonClass="bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+          busy={busy}
+          onApply={apply}
+          disabled={!!dictionaryError}
+          emptyText="No missing names flagged."
+          showForebearsLink
+        />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-green-600 uppercase tracking-wide">👍 French</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-red-500 uppercase tracking-wide">👎 Not French</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-purple-500 uppercase tracking-wide">Marked Pot. French</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">In dictionary?</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((item) => (
-                <tr key={item.name} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{item.name}</td>
-                  <td className="px-4 py-3 text-right text-green-600 font-semibold">{item.frenchVotes}</td>
-                  <td className="px-4 py-3 text-right text-red-500 font-semibold">{item.notFrenchVotes}</td>
-                  <td className="px-4 py-3 text-right text-purple-500 font-semibold">{item.statusCount}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      item.inDictionary
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                    }`}>
-                      {item.inDictionary ? "Yes" : "No"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {item.suggestedAction && !dictionaryError && (
-                      <button
-                        disabled={!!busy[item.name]}
-                        onClick={() => apply(item, item.suggestedAction!)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${
-                          item.suggestedAction === "add"
-                            ? "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
-                            : "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
-                        }`}
-                      >
-                        {busy[item.name] ? "Applying…" : item.suggestedAction === "add" ? "Add to dictionary" : "Remove from dictionary"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <NameCandidateList
+          candidates={removeCandidates}
+          action="remove"
+          buttonLabel="Remove from dictionary"
+          buttonClass="bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+          busy={busy}
+          onApply={apply}
+          disabled={!!dictionaryError}
+          emptyText="No names flagged for removal."
+        />
       )}
     </div>
+  )
+}
+
+function NameCandidateList({
+  candidates,
+  action,
+  buttonLabel,
+  buttonClass,
+  busy,
+  onApply,
+  disabled,
+  emptyText,
+  showForebearsLink,
+}: {
+  candidates: NameCandidate[]
+  action: "add" | "remove"
+  buttonLabel: string
+  buttonClass: string
+  busy: Record<string, boolean>
+  onApply: (name: string, action: "add" | "remove") => void
+  disabled: boolean
+  emptyText: string
+  showForebearsLink?: boolean
+}) {
+  if (candidates.length === 0) {
+    return <p className="text-sm text-gray-400 px-6 py-12 text-center">{emptyText}</p>
+  }
+
+  return (
+    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+      {candidates.map((c) => (
+        <li key={c.name} className="flex items-center justify-between px-6 py-3">
+          <span className="text-sm font-medium text-gray-900 dark:text-white">
+            {c.name}{" "}
+            <span className="text-xs text-gray-400 font-normal">
+              ({c.count} contact{c.count !== 1 ? "s" : ""})
+            </span>
+          </span>
+          <div className="flex items-center gap-2">
+            {showForebearsLink && (
+              <a
+                href={forebearsUrlFor(c.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Search on Forebears.io"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+                </svg>
+              </a>
+            )}
+            <button
+              disabled={disabled || !!busy[c.name]}
+              onClick={() => onApply(c.name, action)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${buttonClass}`}
+            >
+              {busy[c.name] ? "Applying…" : buttonLabel}
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
