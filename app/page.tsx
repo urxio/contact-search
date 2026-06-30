@@ -776,8 +776,11 @@ export default function Home() {
   // User correction of the automated French-name detection, kept separate
   // from the workflow `status` field so it survives status changes and can
   // later be mined (via the submissions JSONB) to improve the dictionary.
-  // Only available in bulk via the batch action bar. (Positive feedback is
-  // implied by marking a contact's status "Potentially French" instead.)
+  // Only available in bulk via the batch action bar, and only for contacts
+  // currently "Detected" — since that status was the detector's call being
+  // corrected, it's reset to "Not checked" rather than left as a stale
+  // "Detected" label. (Positive feedback is implied by marking a contact's
+  // status "Potentially French" instead.)
   const markSelectedAsNotFrenchName = useCallback(() => {
     if (selectedContacts.length === 0) {
       toast.error("Please select contacts to update")
@@ -786,7 +789,9 @@ export default function Home() {
 
     setContacts((prevContacts) =>
       prevContacts.map((contact) =>
-        selectedContacts.includes(contact.id) ? { ...contact, nameFeedback: "not-french" } : contact,
+        selectedContacts.includes(contact.id)
+          ? { ...contact, nameFeedback: "not-french", status: "Not checked" }
+          : contact,
       ),
     )
 
