@@ -1378,7 +1378,6 @@ jean
 jean-baptiste
 jeanne
 jeannin
-jimenez
 jolivet
 jolly
 joly
@@ -1411,7 +1410,6 @@ kakou
 kalda
 kali
 kamagate
-kamal
 kamba
 kambire
 kambou
