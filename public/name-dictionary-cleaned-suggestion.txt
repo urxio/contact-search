@@ -1509,7 +1509,6 @@ klein
 koa
 koagne
 kobenan
-koch
 koda
 kodia
 kodji
