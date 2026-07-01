@@ -28,35 +28,47 @@ export async function GET() {
 
     const [potentiallyFrenchResult, notFrenchResult, dismissedResult] = await Promise.all([
       pool.query(`
-        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name
+        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name, s.submitted_at
         FROM submissions s, jsonb_array_elements(s.contacts) c
         WHERE c->>'status' = 'Potentially French' AND s.archived = FALSE
       `),
       pool.query(`
-        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name
+        SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name, s.submitted_at
         FROM submissions s, jsonb_array_elements(s.contacts) c
         WHERE c->>'nameFeedback' = 'not-french' AND s.archived = FALSE
       `),
-      pool.query(`SELECT name, list FROM dismissed_name_feedback`),
+      pool.query(`SELECT name, list, dismissed_at FROM dismissed_name_feedback`),
     ])
 
-    const dismissed = { add: new Set<string>(), remove: new Set<string>() }
+    // A name is dismissed only until a fresh vote arrives after the
+    // dismissal — so it resurfaces if someone flags it again later.
+    const dismissed = {
+      add: new Map<string, Date>(),
+      remove: new Map<string, Date>(),
+    }
     for (const row of dismissedResult.rows) {
-      dismissed[row.list as "add" | "remove"].add(row.name)
+      dismissed[row.list as "add" | "remove"].set(row.name, new Date(row.dismissed_at))
     }
 
-    const tallyNames = (rows: { last_name: string | null; full_name: string | null }[]) => {
-      const counts = new Map<string, number>()
+    const tallyNames = (rows: { last_name: string | null; full_name: string | null; submitted_at: string }[]) => {
+      const tally = new Map<string, { count: number; latestVoteAt: Date }>()
       for (const row of rows) {
         const name = normalizeName(row.last_name || row.full_name || "")
         if (!name) continue
-        counts.set(name, (counts.get(name) ?? 0) + 1)
+        const votedAt = new Date(row.submitted_at)
+        const existing = tally.get(name)
+        if (existing) {
+          existing.count++
+          if (votedAt > existing.latestVoteAt) existing.latestVoteAt = votedAt
+        } else {
+          tally.set(name, { count: 1, latestVoteAt: votedAt })
+        }
       }
-      return counts
+      return tally
     }
 
-    const potentiallyFrenchCounts = tallyNames(potentiallyFrenchResult.rows)
-    const notFrenchCounts = tallyNames(notFrenchResult.rows)
+    const potentiallyFrenchTally = tallyNames(potentiallyFrenchResult.rows)
+    const notFrenchTally = tallyNames(notFrenchResult.rows)
 
     let dictionaryLines: string[] = []
     let dictionaryError: string | null = null
@@ -68,14 +80,19 @@ export async function GET() {
     }
     const dictionarySet = new Set(dictionaryLines)
 
-    const addCandidates = Array.from(potentiallyFrenchCounts.entries())
-      .filter(([name]) => !dictionarySet.has(name) && !dismissed.add.has(name))
-      .map(([name, count]) => ({ name, count }))
+    const isSuppressed = (list: "add" | "remove", name: string, latestVoteAt: Date) => {
+      const dismissedAt = dismissed[list].get(name)
+      return dismissedAt !== undefined && latestVoteAt <= dismissedAt
+    }
+
+    const addCandidates = Array.from(potentiallyFrenchTally.entries())
+      .filter(([name, { latestVoteAt }]) => !dictionarySet.has(name) && !isSuppressed("add", name, latestVoteAt))
+      .map(([name, { count }]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
 
-    const removeCandidates = Array.from(notFrenchCounts.entries())
-      .filter(([name]) => dictionarySet.has(name) && !dismissed.remove.has(name))
-      .map(([name, count]) => ({ name, count }))
+    const removeCandidates = Array.from(notFrenchTally.entries())
+      .filter(([name, { latestVoteAt }]) => dictionarySet.has(name) && !isSuppressed("remove", name, latestVoteAt))
+      .map(([name, { count }]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
 
     return NextResponse.json({ addCandidates, removeCandidates, dictionaryError })
@@ -114,8 +131,12 @@ export async function POST(req: NextRequest) {
       await ensureSchema()
       await Promise.all(
         names.map((name) =>
+          // Re-dismissing an already-dismissed (and since resurfaced) name
+          // refreshes dismissed_at, so it takes new votes since THIS
+          // dismissal to bring it back again.
           pool.query(
-            `INSERT INTO dismissed_name_feedback (name, list) VALUES ($1, $2) ON CONFLICT (name, list) DO NOTHING`,
+            `INSERT INTO dismissed_name_feedback (name, list, dismissed_at) VALUES ($1, $2, NOW())
+             ON CONFLICT (name, list) DO UPDATE SET dismissed_at = NOW()`,
             [name, list],
           ),
         ),
