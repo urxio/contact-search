@@ -1077,6 +1077,11 @@ function DictionaryFeedbackPanel() {
   const [error, setError] = useState<string | null>(null)
   const [dictionaryError, setDictionaryError] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [batchBusy, setBatchBusy] = useState(false)
+  const [selected, setSelected] = useState<{ add: Set<string>; remove: Set<string> }>({
+    add: new Set(),
+    remove: new Set(),
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1100,6 +1105,22 @@ function DictionaryFeedbackPanel() {
 
   useEffect(() => { load() }, [load])
 
+  const toggleSelected = (list: "add" | "remove", name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev[list])
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return { ...prev, [list]: next }
+    })
+  }
+
+  const toggleSelectAll = (list: "add" | "remove", candidates: NameCandidate[]) => {
+    setSelected((prev) => {
+      const allSelected = candidates.length > 0 && candidates.every((c) => prev[list].has(c.name))
+      return { ...prev, [list]: allSelected ? new Set() : new Set(candidates.map((c) => c.name)) }
+    })
+  }
+
   const apply = async (name: string, action: "add" | "remove") => {
     setBusy((b) => ({ ...b, [name]: true }))
     try {
@@ -1120,6 +1141,64 @@ function DictionaryFeedbackPanel() {
       alert("Network error — could not reach the server.")
     } finally {
       setBusy((b) => ({ ...b, [name]: false }))
+    }
+  }
+
+  // Apply every selected name in one shot — a single GitHub commit covers
+  // the whole batch instead of one commit per name.
+  const applySelected = async (list: "add" | "remove") => {
+    const names = Array.from(selected[list])
+    if (names.length === 0) return
+    setBatchBusy(true)
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names, action: list }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to apply selected names: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      const applied = new Set(data.applied ?? names)
+      if (list === "add") {
+        setAddCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
+      } else {
+        setRemoveCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
+      }
+      setSelected((prev) => ({ ...prev, [list]: new Set() }))
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  // Permanently hide a name from a suggestion list without touching the
+  // dictionary — for junk/false-positive entries. Doesn't need GitHub, so
+  // it stays enabled even when dictionaryError is set.
+  const dismiss = async (name: string, list: "add" | "remove") => {
+    const key = `dismiss:${name}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, action: "dismiss", list }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to dismiss "${name}": ${data?.error ?? "Unknown error"}`)
+      } else if (list === "add") {
+        setAddCandidates((prev) => prev.filter((c) => c.name !== name))
+      } else {
+        setRemoveCandidates((prev) => prev.filter((c) => c.name !== name))
+      }
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => ({ ...b, [key]: false }))
     }
   }
 
@@ -1173,10 +1252,17 @@ function DictionaryFeedbackPanel() {
           action="add"
           buttonLabel="Add to dictionary"
           buttonClass="bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+          batchButtonClass="bg-green-600 hover:bg-green-700"
           busy={busy}
+          batchBusy={batchBusy}
           onApply={apply}
+          onDismiss={dismiss}
           disabled={!!dictionaryError}
           emptyText="No missing names flagged."
+          selected={selected.add}
+          onToggleSelected={(name) => toggleSelected("add", name)}
+          onToggleSelectAll={() => toggleSelectAll("add", addCandidates)}
+          onApplySelected={() => applySelected("add")}
         />
       ) : (
         <NameCandidateList
@@ -1184,10 +1270,17 @@ function DictionaryFeedbackPanel() {
           action="remove"
           buttonLabel="Remove from dictionary"
           buttonClass="bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+          batchButtonClass="bg-red-600 hover:bg-red-700"
           busy={busy}
+          batchBusy={batchBusy}
           onApply={apply}
+          onDismiss={dismiss}
           disabled={!!dictionaryError}
           emptyText="No names flagged for removal."
+          selected={selected.remove}
+          onToggleSelected={(name) => toggleSelected("remove", name)}
+          onToggleSelectAll={() => toggleSelectAll("remove", removeCandidates)}
+          onApplySelected={() => applySelected("remove")}
         />
       )}
     </div>
@@ -1199,57 +1292,108 @@ function NameCandidateList({
   action,
   buttonLabel,
   buttonClass,
+  batchButtonClass,
   busy,
+  batchBusy,
   onApply,
+  onDismiss,
   disabled,
   emptyText,
+  selected,
+  onToggleSelected,
+  onToggleSelectAll,
+  onApplySelected,
 }: {
   candidates: NameCandidate[]
   action: "add" | "remove"
   buttonLabel: string
   buttonClass: string
+  batchButtonClass: string
   busy: Record<string, boolean>
+  batchBusy: boolean
   onApply: (name: string, action: "add" | "remove") => void
+  onDismiss: (name: string, list: "add" | "remove") => void
   disabled: boolean
   emptyText: string
+  selected: Set<string>
+  onToggleSelected: (name: string) => void
+  onToggleSelectAll: () => void
+  onApplySelected: () => void
 }) {
   if (candidates.length === 0) {
     return <p className="text-sm text-gray-400 px-6 py-12 text-center">{emptyText}</p>
   }
 
+  const allSelected = candidates.every((c) => selected.has(c.name))
+
   return (
-    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-      {candidates.map((c) => (
-        <li key={c.name} className="flex items-center justify-between px-6 py-3">
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
-            {c.name}{" "}
-            <span className="text-xs text-gray-400 font-normal">
-              ({c.count} contact{c.count !== 1 ? "s" : ""})
-            </span>
-          </span>
-          <div className="flex items-center gap-2">
-            <a
-              href={forebearsUrlFor(c.name)}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Search on Forebears.io"
-              className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 transition-colors"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="12" cy="12" r="10" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
-              </svg>
-            </a>
-            <button
-              disabled={disabled || !!busy[c.name]}
-              onClick={() => onApply(c.name, action)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${buttonClass}`}
-            >
-              {busy[c.name] ? "Applying…" : buttonLabel}
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <div className="flex items-center justify-between px-6 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
+        <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
+          <input type="checkbox" checked={allSelected} onChange={onToggleSelectAll} />
+          {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+        </label>
+        {selected.size > 0 && (
+          <button
+            disabled={disabled || batchBusy}
+            onClick={onApplySelected}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50 ${batchButtonClass}`}
+          >
+            {batchBusy ? "Applying…" : `${buttonLabel} (${selected.size})`}
+          </button>
+        )}
+      </div>
+
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {candidates.map((c) => (
+          <li key={c.name} className="flex items-center justify-between px-6 py-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(c.name)}
+                onChange={() => onToggleSelected(c.name)}
+              />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {c.name}{" "}
+                <span className="text-xs text-gray-400 font-normal">
+                  ({c.count} contact{c.count !== 1 ? "s" : ""})
+                </span>
+              </span>
+            </label>
+            <div className="flex items-center gap-2">
+              <a
+                href={forebearsUrlFor(c.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Search on Forebears.io"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+                </svg>
+              </a>
+              <button
+                disabled={disabled || !!busy[c.name]}
+                onClick={() => onApply(c.name, action)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${buttonClass}`}
+              >
+                {busy[c.name] ? "Applying…" : buttonLabel}
+              </button>
+              <button
+                disabled={!!busy[`dismiss:${c.name}`]}
+                onClick={() => onDismiss(c.name, action)}
+                title="Dismiss — hide this name permanently without changing the dictionary"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

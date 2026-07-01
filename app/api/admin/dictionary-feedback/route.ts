@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { pool } from "@/lib/db"
+import { pool, ensureSchema } from "@/lib/db"
 import { getDictionaryFile, updateDictionaryFile } from "@/lib/github"
 import { normalizeName } from "@/utils/french-name-detection"
 
@@ -24,7 +24,9 @@ export async function GET() {
   if (unauthorized) return unauthorized
 
   try {
-    const [potentiallyFrenchResult, notFrenchResult] = await Promise.all([
+    await ensureSchema()
+
+    const [potentiallyFrenchResult, notFrenchResult, dismissedResult] = await Promise.all([
       pool.query(`
         SELECT c->>'lastName' AS last_name, c->>'fullName' AS full_name
         FROM submissions s, jsonb_array_elements(s.contacts) c
@@ -35,7 +37,13 @@ export async function GET() {
         FROM submissions s, jsonb_array_elements(s.contacts) c
         WHERE c->>'nameFeedback' = 'not-french' AND s.archived = FALSE
       `),
+      pool.query(`SELECT name, list FROM dismissed_name_feedback`),
     ])
+
+    const dismissed = { add: new Set<string>(), remove: new Set<string>() }
+    for (const row of dismissedResult.rows) {
+      dismissed[row.list as "add" | "remove"].add(row.name)
+    }
 
     const tallyNames = (rows: { last_name: string | null; full_name: string | null }[]) => {
       const counts = new Map<string, number>()
@@ -61,12 +69,12 @@ export async function GET() {
     const dictionarySet = new Set(dictionaryLines)
 
     const addCandidates = Array.from(potentiallyFrenchCounts.entries())
-      .filter(([name]) => !dictionarySet.has(name))
+      .filter(([name]) => !dictionarySet.has(name) && !dismissed.add.has(name))
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
 
     const removeCandidates = Array.from(notFrenchCounts.entries())
-      .filter(([name]) => dictionarySet.has(name))
+      .filter(([name]) => dictionarySet.has(name) && !dismissed.remove.has(name))
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
 
@@ -77,8 +85,11 @@ export async function GET() {
   }
 }
 
-// POST — apply a single add/remove to the dictionary file via a direct
-// commit to GitHub. Body: { name: string, action: "add" | "remove" }
+// POST — apply one or more add/remove changes to the dictionary file as a
+// SINGLE commit to GitHub, or permanently dismiss name(s) from one of the
+// suggestion lists without touching the dictionary.
+// Body: { name?: string, names?: string[], action: "add" | "remove" | "dismiss", list?: "add" | "remove" }
+// `list` is required when action is "dismiss" — it says which list to hide the name(s) from.
 export async function POST(req: NextRequest) {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
@@ -86,37 +97,63 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const action = body?.action
-    const name = normalizeName(body?.name ?? "")
 
-    if (!name || !/^[a-z'-]+$/.test(name)) {
-      return NextResponse.json({ error: "Invalid name" }, { status: 400 })
+    const rawNames: unknown[] = Array.isArray(body?.names) ? body.names : [body?.name]
+    const names = Array.from(new Set(rawNames.map((n) => normalizeName(String(n ?? "")))))
+      .filter((n) => n && /^[a-z'-]+$/.test(n))
+
+    if (names.length === 0) {
+      return NextResponse.json({ error: "No valid names provided" }, { status: 400 })
     }
+
+    if (action === "dismiss") {
+      const list = body?.list
+      if (list !== "add" && list !== "remove") {
+        return NextResponse.json({ error: "Invalid list" }, { status: 400 })
+      }
+      await ensureSchema()
+      await Promise.all(
+        names.map((name) =>
+          pool.query(
+            `INSERT INTO dismissed_name_feedback (name, list) VALUES ($1, $2) ON CONFLICT (name, list) DO NOTHING`,
+            [name, list],
+          ),
+        ),
+      )
+      return NextResponse.json({ success: true, applied: names })
+    }
+
     if (action !== "add" && action !== "remove") {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 })
     }
 
     const { lines, sha } = await getDictionaryFile()
-    const exists = lines.includes(name)
+    const lineSet = new Set(lines)
 
-    if (action === "add" && exists) {
-      return NextResponse.json({ success: true, note: "Already in dictionary" })
-    }
-    if (action === "remove" && !exists) {
-      return NextResponse.json({ success: true, note: "Already absent from dictionary" })
+    const changedNames =
+      action === "add"
+        ? names.filter((n) => !lineSet.has(n))
+        : names.filter((n) => lineSet.has(n))
+
+    if (changedNames.length === 0) {
+      return NextResponse.json({ success: true, note: "No changes needed", applied: [] })
     }
 
     const updatedLines =
       action === "add"
-        ? [...lines, name].sort()
-        : lines.filter((l) => l !== name)
+        ? [...lines, ...changedNames].sort()
+        : lines.filter((l) => !changedNames.includes(l))
 
-    await updateDictionaryFile(
-      updatedLines,
-      sha,
-      `chore: ${action === "add" ? "add" : "remove"} "${name}" ${action === "add" ? "to" : "from"} name dictionary (admin feedback)`,
-    )
+    const verb = action === "add" ? "add" : "remove"
+    const preposition = action === "add" ? "to" : "from"
+    const commitMessage =
+      changedNames.length === 1
+        ? `chore: ${verb} "${changedNames[0]}" ${preposition} name dictionary (admin feedback)`
+        : `chore: ${verb} ${changedNames.length} names ${preposition} name dictionary (admin feedback)\n\n${changedNames.join(", ")}`
 
-    return NextResponse.json({ success: true })
+    await updateDictionaryFile(updatedLines, sha, commitMessage)
+
+    return NextResponse.json({ success: true, applied: changedNames })
   } catch (err: any) {
     console.error("Dictionary feedback apply error:", err)
     return NextResponse.json({ error: err?.message ?? "Internal server error" }, { status: 500 })

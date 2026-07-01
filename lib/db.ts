@@ -57,4 +57,16 @@ export async function ensureSchema() {
       uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+
+  // Names an admin has permanently dismissed from the "Name Feedback"
+  // add/remove suggestion lists, so they don't keep reappearing.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dismissed_name_feedback (
+      id            SERIAL PRIMARY KEY,
+      name          TEXT NOT NULL,
+      list          TEXT NOT NULL CHECK (list IN ('add', 'remove')),
+      dismissed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(name, list)
+    )
+  `)
 }
