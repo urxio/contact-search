@@ -312,6 +312,7 @@ barre
 barreau
 barret
 barrier
+barry
 barthe
 barthelemy
 bassafoula
@@ -378,6 +379,7 @@ belle
 bellec
 bello
 bemba
+benaissa
 benali
 benamar
 benani
@@ -1009,6 +1011,7 @@ enyegue
 epie
 epiko
 erraji
+errami
 es
 escalier
 esnault
@@ -1089,6 +1092,7 @@ flamant
 flament
 fleury
 floch
+flourance
 foe
 fofana
 fogang
@@ -1134,6 +1138,8 @@ fuh
 ful
 gabriel
 gadji
+gagnier
+gagnon
 gaillard
 gakosso
 gall
@@ -1511,6 +1517,7 @@ koda
 kodia
 kodji
 kodjo
+koehle
 koffi
 kogne
 koi
