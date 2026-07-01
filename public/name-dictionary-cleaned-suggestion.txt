@@ -11,12 +11,14 @@ abali
 abalo
 abanda
 abang
+abange
 abba
 abbassi
 abbo
 abboud
 abdallah
 abdel
+abdeljabbar
 abdellaoui
 abdelouahabi
 abderrahmane
@@ -381,6 +383,7 @@ bello
 bemba
 benaissa
 benali
+benallal
 benamar
 benani
 benard
@@ -554,6 +557,7 @@ bouchard
 boucher
 bouchet
 boudet
+boudi
 boudzoumou
 boue
 bouesso
@@ -621,6 +625,7 @@ brisset
 brochard
 brossard
 brou
+broussard
 brousse
 bru
 brun
@@ -1193,6 +1198,7 @@ girardot
 giraud
 girault
 giroud
+giroux
 gladys
 gnahore
 gnamien
@@ -1216,6 +1222,7 @@ goue
 goujon
 goupil
 gourdon
+goyette
 goze
 grand
 grandjean
@@ -1643,6 +1650,7 @@ langlois
 lapeyre
 lapierre
 laplace
+lapointe
 laporte
 larcher
 lare
@@ -2807,6 +2815,7 @@ ouamba
 ouardi
 ouattara
 ouazzani
+ouellette
 oula
 oulai
 oum
@@ -3133,6 +3142,7 @@ taku
 talbi
 taleb
 talia
+tallec
 tamba
 tambe
 tamfu
@@ -3200,6 +3210,7 @@ thiebaut
 thierry
 thiery
 thomas
+thorin
 thuillier
 tia
 tie
@@ -3233,6 +3244,7 @@ tonye
 touil
 toukam
 toukour
+toulouse
 toumba
 toumi
 toure
@@ -3244,6 +3256,7 @@ towo
 tra
 tran
 traore
+tron
 tsafack
 tsague
 tsakala
