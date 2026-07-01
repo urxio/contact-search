@@ -127,11 +127,13 @@ allard
 allou
 almeida
 alouna
+alphonse
 amadou
 amah
 amal
 amana
 amani
+amans
 amara
 amarir
 amba
@@ -174,6 +176,7 @@ angue
 anne
 anoh
 anouar
+antenne
 antoine
 antunes
 aoudou
@@ -848,6 +851,7 @@ djanabou
 djaoudi
 djara
 dje
+djebbour
 djedje
 djembo
 djibrilla
@@ -940,6 +944,8 @@ ebong
 ebongue
 ebot
 eboutou
+eddine
+eddkiouch
 edima
 edimo
 edoa
@@ -994,10 +1000,14 @@ elharrate
 elidrissi
 elion
 ella
+elmahmoudi
+elmaiss
+elmehdi
 elo
 elong
 elongo
 elota
+eloutmani
 elyaagoubi
 embolo
 emery
