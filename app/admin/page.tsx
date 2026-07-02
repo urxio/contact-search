@@ -200,7 +200,7 @@ export default function AdminDashboard() {
 
         {/* ── Tab switcher ── */}
         <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-8 w-fit">
-          {(["submissions", "otm", "names", "potentiallyFrench", "dictionaryScan"] as const).map((tab) => (
+          {(["submissions", "dictionaryScan", "names", "potentiallyFrench", "otm"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setVisitedTabs((v) => new Set(v).add(tab)) }}
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
 
         {/* ── Potentially French list panel ── */}
         {visitedTabs.has("potentiallyFrench") && (
-          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><PotentiallyFrenchPanel /></div>
+          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><PotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} /></div>
         )}
 
         {/* ── Dictionary Scan panel ── */}
@@ -1512,7 +1512,7 @@ function exportPotentiallyFrenchToCSV(contacts: PotentiallyFrenchContact[], stat
   URL.revokeObjectURL(url)
 }
 
-function PotentiallyFrenchPanel() {
+function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
   const [contacts, setContacts] = useState<PotentiallyFrenchContact[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [duplicateCount, setDuplicateCount] = useState(0)
@@ -1520,6 +1520,7 @@ function PotentiallyFrenchPanel() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [duplicatesOnly, setDuplicatesOnly] = useState(false)
+  const [busy, setBusy] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     fetch("/api/admin/potentially-french")
@@ -1549,6 +1550,33 @@ function PotentiallyFrenchPanel() {
     if (stateValue === null) return // cancelled
     exportPotentiallyFrenchToCSV(contacts, stateValue)
   }
+
+  // Removes a contact from this list by flipping its status to "Not French".
+  const markNotFrench = useCallback(async (c: PotentiallyFrenchContact) => {
+    const key = `${c.submissionId}:${c.contactId}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/potentially-french", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: c.submissionId, contactId: c.contactId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to mark "${c.fullName}" as Not French: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setContacts((prev) => prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId)))
+      setTotalCount((n) => Math.max(0, n - 1))
+      // Cached submission counts changed server-side — refresh so the rest
+      // of the dashboard reflects it immediately.
+      onSubmissionsChanged?.()
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => { const next = { ...b }; delete next[key]; return next })
+    }
+  }, [onSubmissionsChanged])
 
   const filtered = contacts.filter((c) => {
     if (duplicatesOnly && c.duplicateAddressCount <= 1 && c.duplicateNameCount <= 1) return false
@@ -1624,6 +1652,7 @@ function PotentiallyFrenchPanel() {
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">User</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Submitted</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Duplicate</th>
+                <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -1666,6 +1695,23 @@ function PotentiallyFrenchPanel() {
                       ) : (
                         <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => markNotFrench(c)}
+                        disabled={!!busy[`${c.submissionId}:${c.contactId}`]}
+                        title="Remove from this list — sets the contact's status to Not French"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {busy[`${c.submissionId}:${c.contactId}`] ? "…" : (
+                          <>
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Not French
+                          </>
+                        )}
+                      </button>
                     </td>
                   </tr>
                 )
