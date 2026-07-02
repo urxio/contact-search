@@ -69,4 +69,17 @@ export async function ensureSchema() {
       UNIQUE(name, list)
     )
   `)
+
+  // Individual contacts an admin has dismissed from the "Dictionary Scan"
+  // results — hides that one row from future scans without touching the
+  // dictionary or the contact's actual status.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dismissed_dictionary_scan_matches (
+      id            SERIAL PRIMARY KEY,
+      submission_id INT NOT NULL,
+      contact_id    TEXT NOT NULL,
+      dismissed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(submission_id, contact_id)
+    )
+  `)
 }

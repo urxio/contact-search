@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { pool } from "@/lib/db"
+import { pool, ensureSchema } from "@/lib/db"
 import { getDictionaryFile } from "@/lib/github"
 import { normalizeName } from "@/utils/french-name-detection"
 
@@ -41,7 +41,9 @@ function resolveLastName(row: ContactRow): string {
 // classified) before their surname was added to the dictionary, or the
 // status was overridden manually.
 async function runScan() {
-  const [contactsResult, dictionary] = await Promise.all([
+  await ensureSchema()
+
+  const [contactsResult, dictionary, dismissedResult] = await Promise.all([
     pool.query(`
       SELECT
         s.id AS submission_id,
@@ -61,9 +63,13 @@ async function runScan() {
     getDictionaryFile().catch((err: any) => {
       throw new Error(err?.message ?? "Failed to load dictionary from GitHub")
     }),
+    pool.query(`SELECT submission_id, contact_id FROM dismissed_dictionary_scan_matches`),
   ])
 
   const dictionarySet = new Set(dictionary.lines)
+  const dismissedSet = new Set(
+    dismissedResult.rows.map((r: { submission_id: number; contact_id: string }) => `${r.submission_id}:${r.contact_id}`),
+  )
 
   const matches = (contactsResult.rows as ContactRow[])
     .map((row) => {
@@ -71,7 +77,7 @@ async function runScan() {
       const normalized = normalizeName(lastName)
       return { row, lastName, normalized }
     })
-    .filter(({ normalized }) => normalized && dictionarySet.has(normalized))
+    .filter(({ normalized, row }) => normalized && dictionarySet.has(normalized) && !dismissedSet.has(`${row.submission_id}:${row.contact_id}`))
     .map(({ row, lastName, normalized }) => ({
       submissionId: row.submission_id,
       contactId: row.contact_id,
@@ -134,16 +140,17 @@ export async function POST() {
   }
 }
 
-// PATCH — marks a single contact's status as "Potentially French". Used per
-// row in the panel to resolve a missed match directly, without leaving the
-// admin dashboard.
+// PATCH — either marks a contact's status as "Potentially French", or
+// dismisses it from future scan results without touching its status or the
+// dictionary. Used per row in the panel to resolve a missed match directly,
+// without leaving the admin dashboard.
 //
 // `submissions.potentially_french/not_french/duplicate/not_checked` are
 // plain cached integer columns, written once at submit time and never
-// recomputed from the `contacts` JSONB — so this also nudges them here,
-// otherwise the dashboard's summary counts would silently drift out of sync
-// with the JSONB the moment this runs.
-// Body: { submissionId: number, contactId: string }
+// recomputed from the `contacts` JSONB — so the markFrench path also nudges
+// them here, otherwise the dashboard's summary counts would silently drift
+// out of sync with the JSONB the moment this runs.
+// Body: { submissionId: number, contactId: string, action?: "markFrench" | "dismiss" }
 export async function PATCH(req: NextRequest) {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
@@ -152,9 +159,21 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const submissionId = Number(body?.submissionId)
     const contactId = String(body?.contactId ?? "")
+    const action = body?.action === "dismiss" ? "dismiss" : "markFrench"
 
     if (!Number.isFinite(submissionId) || !contactId) {
       return NextResponse.json({ error: "Missing submissionId or contactId" }, { status: 400 })
+    }
+
+    if (action === "dismiss") {
+      await ensureSchema()
+      await pool.query(
+        `INSERT INTO dismissed_dictionary_scan_matches (submission_id, contact_id, dismissed_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (submission_id, contact_id) DO UPDATE SET dismissed_at = NOW()`,
+        [submissionId, contactId],
+      )
+      return NextResponse.json({ success: true })
     }
 
     const client = await pool.connect()
@@ -218,7 +237,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    console.error("Name dictionary scan mark-as-French error:", err)
+    console.error("Name dictionary scan PATCH error:", err)
     return NextResponse.json({ error: err?.message ?? "Internal server error" }, { status: 500 })
   }
 }

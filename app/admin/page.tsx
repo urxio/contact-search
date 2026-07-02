@@ -1831,6 +1831,30 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     }
   }, [onSubmissionsChanged])
 
+  // Hides just this contact from future scans — doesn't touch its status or
+  // the dictionary, for cases where the match is a known/accepted exception.
+  const dismissMatch = useCallback(async (m: DictionaryScanMatch) => {
+    const key = `${m.submissionId}:${m.contactId}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/name-dictionary-scan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId, action: "dismiss" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to remove "${m.fullName}" from the list: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setMatches((prev) => prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId)))
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => { const next = { ...b }; delete next[key]; return next })
+    }
+  }, [])
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
@@ -1956,6 +1980,16 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                                 Mark French
                               </>
                             )}
+                          </button>
+                          <button
+                            onClick={() => dismissMatch(m)}
+                            disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
+                            title="Remove from this list — doesn't change the contact's status or the dictionary"
+                            className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                           </button>
                         </div>
                       </td>
