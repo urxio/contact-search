@@ -46,7 +46,7 @@ function pct(a: number, total: number) {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names">("submissions")
+  const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names" | "potentiallyFrench" | "dictionaryScan">("submissions")
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
 
         {/* ── Tab switcher ── */}
         <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-8 w-fit">
-          {(["submissions", "otm", "names"] as const).map((tab) => (
+          {(["submissions", "otm", "names", "potentiallyFrench", "dictionaryScan"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -206,7 +206,15 @@ export default function AdminDashboard() {
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
-              {tab === "submissions" ? "Submissions" : tab === "otm" ? "OTM Dups Check" : "Name Feedback"}
+              {tab === "submissions"
+                ? "Submissions"
+                : tab === "otm"
+                  ? "OTM Dups Check"
+                  : tab === "names"
+                    ? "Name Feedback"
+                    : tab === "potentiallyFrench"
+                      ? "Potentially French"
+                      : "Dictionary Scan"}
             </button>
           ))}
         </div>
@@ -216,6 +224,12 @@ export default function AdminDashboard() {
 
         {/* ── Name Feedback panel ── */}
         {activeTab === "names" && <DictionaryFeedbackPanel />}
+
+        {/* ── Potentially French list panel ── */}
+        {activeTab === "potentiallyFrench" && <PotentiallyFrenchPanel />}
+
+        {/* ── Dictionary Scan panel ── */}
+        {activeTab === "dictionaryScan" && <DictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />}
 
         {/* ── Submissions tab ── */}
         {activeTab === "submissions" && <>
@@ -1394,6 +1408,518 @@ function NameCandidateList({
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+// ── Potentially French list panel ─────────────────────────────────────────────
+// Every contact currently marked "Potentially French" across all users, with
+// duplicate detection by address and by name — catches the same contact
+// appearing in more than one person's submission, which no single user's
+// local "Duplicate" status check can see.
+
+type PotentiallyFrenchContact = {
+  submissionId: number
+  contactId: string
+  userId: string
+  submittedAt: string
+  fullName: string
+  address: string
+  city: string
+  zipcode: string
+  phone: string
+  notes: string
+  duplicateAddressCount: number
+  duplicateNameCount: number
+}
+
+// Same address-splitting logic as the main app's exportPotentiallyFrenchToCSV
+// (app/page.tsx) — kept in lockstep so admin- and user-exported CSVs match.
+function parseAddress(address: string) {
+  let houseNumber = ""
+  let direction = ""
+  let streetName = ""
+  let aptNum = ""
+
+  if (address) {
+    const aptMatch = address.match(/(?:apt|unit|#|suite)\s*([a-z0-9-]+)/i)
+    if (aptMatch) {
+      aptNum = aptMatch[1]
+      address = address.replace(aptMatch[0], "").trim()
+    }
+
+    const addressMatch = address.match(/^(\d+)\s+(?:(N|S|E|W|NE|NW|SE|SW)\s+)?(.+?)$/i)
+    if (addressMatch) {
+      houseNumber = addressMatch[1] || ""
+      direction = addressMatch[2] || ""
+      streetName = addressMatch[3] || ""
+    } else {
+      streetName = address
+    }
+  }
+
+  return { houseNumber, direction, streetName, aptNum }
+}
+
+function escapeCSV(field: string) {
+  if (field === null || field === undefined) return ""
+  const stringField = String(field)
+  if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+    return `"${stringField.replace(/"/g, '""')}"`
+  }
+  return stringField
+}
+
+// Same column set, escaping, and filename pattern as the main app's
+// exportPotentiallyFrenchToCSV — this is the admin-wide equivalent (every
+// user's Potentially French contacts, not just the current session's).
+function exportPotentiallyFrenchToCSV(contacts: PotentiallyFrenchContact[], stateValue: string) {
+  const headers = [
+    "Contact Name", "House Number", "Direction", "Street Name",
+    "Apt Num", "City", "ZIP Code", "Phone Number", "State",
+  ]
+
+  const rows = contacts.map((c) => {
+    const { houseNumber, direction, streetName, aptNum } = parseAddress(c.address)
+    return [c.fullName, houseNumber, direction, streetName, aptNum, c.city, c.zipcode, c.phone, stateValue]
+      .map(escapeCSV)
+      .join(",")
+  })
+
+  const csvContent = [headers.map(escapeCSV).join(","), ...rows].join("\n")
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function PotentiallyFrenchPanel() {
+  const [contacts, setContacts] = useState<PotentiallyFrenchContact[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [duplicateCount, setDuplicateCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/admin/potentially-french")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.error) {
+          setError(data.error)
+        } else {
+          setContacts(data.contacts ?? [])
+          setTotalCount(data.totalCount ?? 0)
+          setDuplicateCount(data.duplicateCount ?? 0)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        setError("Network error — could not reach the server.")
+        setLoading(false)
+      })
+  }, [])
+
+  const handleExport = () => {
+    if (contacts.length === 0) {
+      alert("No Potentially French contacts to export.")
+      return
+    }
+    const stateValue = window.prompt("State abbreviation to stamp on every exported row (optional):", "")
+    if (stateValue === null) return // cancelled
+    exportPotentiallyFrenchToCSV(contacts, stateValue)
+  }
+
+  const filtered = contacts.filter((c) => {
+    if (duplicatesOnly && c.duplicateAddressCount <= 1 && c.duplicateNameCount <= 1) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        c.fullName.toLowerCase().includes(q) ||
+        c.address.toLowerCase().includes(q) ||
+        c.city.toLowerCase().includes(q) ||
+        c.zipcode.toLowerCase().includes(q) ||
+        c.userId.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Potentially French</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {totalCount} contact{totalCount !== 1 ? "s" : ""} across all users
+            {duplicateCount > 0 && (
+              <span className="text-amber-600 dark:text-amber-400 font-medium"> · {duplicateCount} possible duplicate{duplicateCount !== 1 ? "s" : ""}</span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search name, address, user…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-56"
+          />
+          <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer whitespace-nowrap">
+            <input type="checkbox" checked={duplicatesOnly} onChange={(e) => setDuplicatesOnly(e.target.checked)} />
+            Duplicates only
+          </label>
+          <button
+            onClick={handleExport}
+            disabled={contacts.length === 0}
+            title="Export all Potentially French contacts to CSV — same format as the main app's Export CSV"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors whitespace-nowrap"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2-8H8a2 2 0 00-2 2v14a2 2 0 002 2h8a2 2 0 002-2V8l-6-6z" />
+            </svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</p>
+      ) : error ? (
+        <p className="px-6 py-12 text-center text-red-500 text-sm">{error}</p>
+      ) : filtered.length === 0 ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">
+          {duplicatesOnly ? "No duplicates found." : "No contacts marked Potentially French yet."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Zip</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Phone</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">User</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Submitted</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Duplicate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => {
+                const isDup = c.duplicateAddressCount > 1 || c.duplicateNameCount > 1
+                return (
+                  <tr
+                    key={`${c.submissionId}:${c.contactId}`}
+                    className={`border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30 ${
+                      isDup ? "bg-amber-50/50 dark:bg-amber-900/10" : ""
+                    }`}
+                  >
+                    <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{c.fullName || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{c.address || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{c.city || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{c.zipcode || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{c.phone || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{c.userId}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{new Date(c.submittedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      {isDup ? (
+                        <div className="flex flex-wrap gap-1">
+                          {c.duplicateAddressCount > 1 && (
+                            <span
+                              title="Same address as another Potentially French contact"
+                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            >
+                              {c.duplicateAddressCount}× address
+                            </span>
+                          )}
+                          {c.duplicateNameCount > 1 && (
+                            <span
+                              title="Same name as another Potentially French contact"
+                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                            >
+                              {c.duplicateNameCount}× name
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Dictionary Scan panel ─────────────────────────────────────────────────────
+// Scans every non-archived submission's contacts, skips anything already
+// marked "Potentially French", and flags whichever remaining contacts have a
+// last name that's actually in the live dictionary — catches names that were
+// submitted (or manually reclassified) before the dictionary caught up, or
+// whose status was overridden by hand. Same Forebears/TruePeopleSearch URL
+// scheme as the main app's per-contact search buttons.
+
+type DictionaryScanMatch = {
+  submissionId: number
+  contactId: string
+  userId: string
+  submittedAt: string
+  fullName: string
+  lastName: string
+  matchedName: string
+  address: string
+  city: string
+  zipcode: string
+  phone: string
+  status: string
+}
+
+function forebearsUrlForSurname(lastName: string) {
+  const surname = String(lastName || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[\u0300-\u036f]/g, "")
+  return `https://forebears.io/surnames/${encodeURIComponent(surname)}`
+}
+
+function truePeopleSearchUrlFor(fullName: string, zipcode: string) {
+  return `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(fullName)}&citystatezip=${encodeURIComponent(zipcode)}`
+}
+
+function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
+  const [matches, setMatches] = useState<DictionaryScanMatch[]>([])
+  const [totalScanned, setTotalScanned] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [reviewedNotice, setReviewedNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState<Record<string, boolean>>({})
+
+  // Read-only — used for the panel's automatic initial load only. Never
+  // touches review status, so opening the tab has no side effects.
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    fetch("/api/admin/name-dictionary-scan")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.error) {
+          setError(data.error)
+        } else {
+          setMatches(data.matches ?? [])
+          setTotalScanned(data.totalScanned ?? 0)
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        setError("Network error — could not reach the server.")
+        setLoading(false)
+      })
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Explicit admin action — re-runs the scan AND marks every non-archived
+  // submission it covers as "reviewed", since this scan is itself a review
+  // pass over those submissions' name classifications.
+  const rescanAndMarkReviewed = useCallback(() => {
+    if (!window.confirm("Rescan and mark all active submissions as reviewed?")) return
+    setLoading(true)
+    setError(null)
+    setReviewedNotice(null)
+    fetch("/api/admin/name-dictionary-scan", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.error) {
+          setError(data.error)
+        } else {
+          setMatches(data.matches ?? [])
+          setTotalScanned(data.totalScanned ?? 0)
+          setReviewedNotice(`✓ Marked ${data.reviewedCount ?? 0} submission${data.reviewedCount === 1 ? "" : "s"} as reviewed.`)
+          onSubmissionsChanged?.()
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        setError("Network error — could not reach the server.")
+        setLoading(false)
+      })
+  }, [onSubmissionsChanged])
+
+  const filtered = matches.filter((m) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      m.fullName.toLowerCase().includes(q) ||
+      m.lastName.toLowerCase().includes(q) ||
+      m.city.toLowerCase().includes(q) ||
+      m.zipcode.toLowerCase().includes(q) ||
+      m.userId.toLowerCase().includes(q)
+    )
+  })
+
+  // Resolves the row directly: sets the contact's status to "Potentially
+  // French" and drops it from the list, since it's now correctly flagged.
+  const markAsFrench = useCallback(async (m: DictionaryScanMatch) => {
+    const key = `${m.submissionId}:${m.contactId}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/name-dictionary-scan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to mark "${m.fullName}" as Potentially French: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setMatches((prev) => prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId)))
+      // Cached submission counts and the Potentially French list both just
+      // changed server-side — refresh so the rest of the dashboard reflects
+      // it immediately instead of only on next tab switch.
+      onSubmissionsChanged?.()
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => { const next = { ...b }; delete next[key]; return next })
+    }
+  }, [onSubmissionsChanged])
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Dictionary Scan</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Contacts not marked "Potentially French" whose last name is already in the dictionary — likely missed or
+            outdated classifications. Scanned {totalScanned} contact{totalScanned !== 1 ? "s" : ""}.
+          </p>
+          {reviewedNotice && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">{reviewedNotice}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search name, city, user…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-56"
+          />
+          <button
+            onClick={rescanAndMarkReviewed}
+            disabled={loading}
+            title="Re-run the scan and mark all active submissions as reviewed"
+            className="h-9 px-3 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Scanning…" : "Rescan & Mark Reviewed"}
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">Scanning submissions…</p>
+      ) : error ? (
+        <p className="px-6 py-12 text-center text-red-500 text-sm">{error}</p>
+      ) : filtered.length === 0 ? (
+        <p className="px-6 py-12 text-center text-gray-400 text-sm">
+          {matches.length === 0 ? "No missed matches — every dictionary name is already flagged correctly." : "No matches for current search."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Matched surname</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City / Zip</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">User</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m) => (
+                <tr
+                  key={`${m.submissionId}:${m.contactId}`}
+                  className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30"
+                >
+                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{m.fullName || "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{m.matchedName}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{[m.city, m.zipcode].filter(Boolean).join(", ") || "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                      {m.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{m.userId}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={forebearsUrlForSurname(m.lastName)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Search on Forebears.io"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="10" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+                        </svg>
+                        Forebears
+                      </a>
+                      <a
+                        href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Search on TruePeopleSearch"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                        </svg>
+                        TPS
+                      </a>
+                      <button
+                        onClick={() => markAsFrench(m)}
+                        disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
+                        title="Mark this contact's status as Potentially French"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                      >
+                        {busy[`${m.submissionId}:${m.contactId}`] ? "…" : (
+                          <>
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Mark French
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
