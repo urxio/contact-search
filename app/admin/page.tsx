@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, Fragment } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -47,6 +47,10 @@ function pct(a: number, total: number) {
 export default function AdminDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names" | "potentiallyFrench" | "dictionaryScan">("submissions")
+  // Tabs mount lazily on first visit, then stay mounted (just hidden via
+  // CSS) — switching back to an already-visited tab no longer re-runs its
+  // initial fetch.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(["submissions"]))
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -199,7 +203,7 @@ export default function AdminDashboard() {
           {(["submissions", "otm", "names", "potentiallyFrench", "dictionaryScan"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); setVisitedTabs((v) => new Set(v).add(tab)) }}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 activeTab === tab
                   ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]"
@@ -220,19 +224,29 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── OTM Dups Check panel ── */}
-        {activeTab === "otm" && <OtmPanel />}
+        {visitedTabs.has("otm") && (
+          <div className={activeTab === "otm" ? "" : "hidden"}><OtmPanel /></div>
+        )}
 
         {/* ── Name Feedback panel ── */}
-        {activeTab === "names" && <DictionaryFeedbackPanel />}
+        {visitedTabs.has("names") && (
+          <div className={activeTab === "names" ? "" : "hidden"}><DictionaryFeedbackPanel /></div>
+        )}
 
         {/* ── Potentially French list panel ── */}
-        {activeTab === "potentiallyFrench" && <PotentiallyFrenchPanel />}
+        {visitedTabs.has("potentiallyFrench") && (
+          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><PotentiallyFrenchPanel /></div>
+        )}
 
         {/* ── Dictionary Scan panel ── */}
-        {activeTab === "dictionaryScan" && <DictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />}
+        {visitedTabs.has("dictionaryScan") && (
+          <div className={activeTab === "dictionaryScan" ? "" : "hidden"}>
+            <DictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />
+          </div>
+        )}
 
         {/* ── Submissions tab ── */}
-        {activeTab === "submissions" && <>
+        <div className={activeTab === "submissions" ? "" : "hidden"}>
 
         {/* ── Summary cards ── */}
         {visible.length > 0 && (
@@ -448,7 +462,7 @@ export default function AdminDashboard() {
             )
           })}
         </div>
-        </>}
+        </div>
       </div>
     </div>
   )
@@ -1773,6 +1787,22 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     )
   })
 
+  // Grouped by submission — easier to scan than one flat alphabetical list
+  // when a handful of submissions account for most of the missed matches.
+  const groups: { submissionId: number; userId: string; submittedAt: string; items: DictionaryScanMatch[] }[] = []
+  {
+    const bySubmission = new Map<number, { submissionId: number; userId: string; submittedAt: string; items: DictionaryScanMatch[] }>()
+    for (const m of filtered) {
+      let g = bySubmission.get(m.submissionId)
+      if (!g) {
+        g = { submissionId: m.submissionId, userId: m.userId, submittedAt: m.submittedAt, items: [] }
+        bySubmission.set(m.submissionId, g)
+      }
+      g.items.push(m)
+    }
+    groups.push(...Array.from(bySubmission.values()).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()))
+  }
+
   // Resolves the row directly: sets the contact's status to "Potentially
   // French" and drops it from the list, since it's now correctly flagged.
   const markAsFrench = useCallback(async (m: DictionaryScanMatch) => {
@@ -1850,71 +1880,88 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Matched surname</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City / Zip</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">User</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m) => (
-                <tr
-                  key={`${m.submissionId}:${m.contactId}`}
-                  className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30"
-                >
-                  <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{m.fullName || "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{m.matchedName}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{[m.city, m.zipcode].filter(Boolean).join(", ") || "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                      {m.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{m.userId}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <a
-                        href={forebearsUrlForSurname(m.lastName)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Search on Forebears.io"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
-                      >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <circle cx="12" cy="12" r="10" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
-                        </svg>
-                        Forebears
-                      </a>
-                      <a
-                        href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Search on TruePeopleSearch"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
-                      >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <circle cx="12" cy="12" r="9" strokeWidth={2} />
-                        </svg>
-                        TPS
-                      </a>
-                      <button
-                        onClick={() => markAsFrench(m)}
-                        disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
-                        title="Mark this contact's status as Potentially French"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
-                      >
-                        {busy[`${m.submissionId}:${m.contactId}`] ? "…" : (
-                          <>
+              {groups.map((g) => (
+                <Fragment key={g.submissionId}>
+                  <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
+                    <td colSpan={5} className="px-5 py-2">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">{g.userId}</span>
+                        <span className="text-gray-400">· {new Date(g.submittedAt).toLocaleDateString()}</span>
+                        <span className="text-gray-400">· {g.items.length} missed name{g.items.length !== 1 ? "s" : ""}</span>
+                        <Link
+                          href={`/admin/user/${encodeURIComponent(g.userId)}?submissionId=${g.submissionId}`}
+                          className="ml-auto text-blue-600 hover:underline font-semibold"
+                        >
+                          View submission →
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                  {g.items.map((m) => (
+                    <tr
+                      key={`${m.submissionId}:${m.contactId}`}
+                      className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30"
+                    >
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{m.fullName || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{m.matchedName}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{[m.city, m.zipcode].filter(Boolean).join(", ") || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                          {m.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={forebearsUrlForSurname(m.lastName)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Search on Forebears.io"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
+                          >
                             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              <circle cx="12" cy="12" r="10" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
                             </svg>
-                            Mark French
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                            Forebears
+                          </a>
+                          <a
+                            href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Search on TruePeopleSearch"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                            </svg>
+                            TPS
+                          </a>
+                          <button
+                            onClick={() => markAsFrench(m)}
+                            disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
+                            title="Mark this contact's status as Potentially French"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                          >
+                            {busy[`${m.submissionId}:${m.contactId}`] ? "…" : (
+                              <>
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Mark French
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
