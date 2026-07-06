@@ -1225,6 +1225,7 @@ gilbert
 gilles
 gillet
 gillot
+gilson
 gioux
 girard
 girardot
@@ -1721,6 +1722,7 @@ larue
 lassalle
 lasserre
 lata
+lataille
 latour
 latrand
 laudier
@@ -1799,6 +1801,7 @@ lenormand
 leonard
 lepage
 leray
+leriche
 leroux
 leroy
 lesage
@@ -1808,6 +1811,7 @@ levasseur
 leveque
 levert
 levy
+leymat
 lherisse
 lhimbru
 lhomme
@@ -1821,6 +1825,7 @@ lilongo
 liman
 limingui
 lipema
+lizotte
 lobe
 lobela
 locko
