@@ -2245,6 +2245,7 @@ meyer
 meyo
 meyong
 meziane
+mezouar
 mfegue
 mfouapon
 mfoumou
@@ -2408,6 +2409,7 @@ moumboko
 moumbongo
 moumen
 moumni
+moumnine
 moumpoto
 mounchili
 moundanga
@@ -2720,6 +2722,7 @@ niend
 nimi
 nitou
 njang
+njanga
 njapndounke
 njei
 nji
@@ -2941,6 +2944,7 @@ pandi
 pandzou
 pangou
 papin
+paquette
 parent
 paris
 parisot
@@ -2983,13 +2987,16 @@ pichon
 picot
 pierre
 pierron
+pierrot
 pika
+pinault
 pineau
 piquet
 pires
 poaty
 poba
 poirier
+poirot
 poisson
 pokam
 pollet
@@ -3029,6 +3036,7 @@ ramat
 rambaud
 rami
 ramzi
+rassam
 rault
 raymond
 raynal
@@ -3102,6 +3110,7 @@ sah
 saha
 saibou
 said
+saidessalam
 saidi
 saidou
 sako
@@ -3148,6 +3157,7 @@ sbayti
 schaeffer
 sea
 sebti
+seche
 seguin
 sehi
 seini
