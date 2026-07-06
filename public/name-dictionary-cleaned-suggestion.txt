@@ -23,7 +23,11 @@ abdel
 abdeljabbar
 abdellaoui
 abdelouahabi
+abdelouahd
+abdennasser
 abderrahmane
+abdessalam
+abdessalem
 abdo
 abdou
 abdoul
@@ -40,6 +44,7 @@ abeng
 abessa
 abessolo
 abia
+abidar
 abira
 abo
 aboh
@@ -48,10 +53,12 @@ abossolo
 abou
 aboubakar
 aboubakari
+abouelouafa
 abouhiha
 aboukar
 abouna
 about
+abrach
 acha
 achard
 achi
@@ -1378,7 +1385,9 @@ haoua
 happi
 hapsatou
 hardy
+hariss
 harouna
+harroun
 hasnaoui
 hassan
 hassana
@@ -3392,6 +3401,7 @@ tume
 tuo
 turpin
 umaru
+ustun
 vacher
 vaillant
 valentin
@@ -3417,6 +3427,7 @@ vignon
 vigouroux
 viguier
 villain
+villane
 villard
 villette
 vincent
