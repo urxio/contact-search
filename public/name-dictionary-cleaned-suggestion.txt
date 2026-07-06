@@ -1,6 +1,7 @@
 ... (file truncated in this viewer for brevity)
 Clemence
 Collette
+aamrani
 aarab
 aba
 abada
@@ -692,6 +693,7 @@ carton
 casanova
 castel
 catherine
+cavalier
 cazenave
 celestine
 cellier
@@ -719,12 +721,16 @@ charrier
 charron
 chartier
 charvin
+chassagneux
 chateau
 chatelain
+chaudoir
 chauveau
+chauvenet
 chauvet
 chauvin
 chemin
+cherchari
 cherif
 cherkaoui
 chetima
@@ -763,6 +769,7 @@ constant
 constantin
 cordier
 cormier
+corneille
 cornet
 cornu
 corre
@@ -780,6 +787,7 @@ coutant
 couturier
 cros
 crouzet
+cruche
 cuny
 d'almeida
 dadda
@@ -3158,6 +3166,8 @@ schaeffer
 sea
 sebti
 seche
+seck
+secula
 seguin
 sehi
 seini
