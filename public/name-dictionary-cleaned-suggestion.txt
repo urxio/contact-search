@@ -581,12 +581,14 @@ bouchette
 boudaga
 boudet
 boudi
+boudreaux
 boudzoumou
 boue
 bouesso
 bouetoumoussa
 boueya
 bougard
+bouicher
 bouiti
 bouity
 bouka
@@ -606,8 +608,10 @@ boulingui
 boulou
 boum
 boumba
+boumediane
 boumpoutou
 bounda
+bounet
 bounga
 boungou
 bounzeki
@@ -636,10 +640,13 @@ bouvier
 bouya
 bouyer
 bouyou
+bouzaiene
+bouzaroual
 bouziane
 bouzid
 bouzidi
 brahim
+branche
 bras
 braud
 brault
@@ -649,6 +656,7 @@ briand
 bris
 brisset
 brochard
+brodeur
 brossard
 brou
 broussard
@@ -666,6 +674,7 @@ burel
 cadet
 caillaud
 caillet
+cajuste
 calvet
 camara
 camus
@@ -2092,6 +2101,7 @@ maurel
 maurice
 maurin
 maury
+mauvernay
 mavanga
 mavinga
 mavoungou
