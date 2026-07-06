@@ -391,17 +391,21 @@ bella
 bellanger
 belle
 bellec
+bellevue
 bello
 bemba
+benabbou
 benaissa
 benali
 benallal
 benamar
 benani
+benaouina
 benard
 benazo
 benbouchta
 benbrahim
+benchaouch
 benchekroun
 benchekroun pale
 beng
@@ -417,6 +421,7 @@ bennouna
 benoist
 benoit
 benomar
+benouraida
 bensaid
 benslimane
 benslimane kossonou
@@ -436,6 +441,7 @@ berthier
 bertin
 berton
 bertrand
+bertresse
 besnard
 besnier
 besong
@@ -504,6 +510,7 @@ blin
 blondeau
 blondel
 blot
+blouin
 bobbo
 bobo
 bobolo
@@ -567,8 +574,10 @@ bouba
 boubakari
 boubakary
 bouchard
+bouchelle
 boucher
 bouchet
+bouchette
 boudaga
 boudet
 boudi
@@ -1686,6 +1695,7 @@ lafon
 lafond
 lafont
 laforce
+lafourcade
 lagarde
 lago
 lagrange
