@@ -1741,6 +1741,7 @@ lebbar
 lebeau
 leblanc
 leblond
+leboeuf
 lebon
 lebreton
 lebrun
