@@ -1177,6 +1177,7 @@ gagnier
 gagnon
 gaillard
 gakosso
+galipeau
 gall
 galland
 gallet
@@ -1264,7 +1265,9 @@ goupil
 gourdon
 goyette
 goze
+grace
 grand
+grand-pierre
 grandchamp
 grandjean
 grange
@@ -1426,6 +1429,7 @@ issanga
 isseini
 issombo
 itali
+itamba
 itoba
 itoua
 iwandza
@@ -1450,6 +1454,8 @@ jean
 jean-baptiste
 jeanne
 jeannin
+jeannotte
+jennette
 jerome
 jolivet
 jolly
