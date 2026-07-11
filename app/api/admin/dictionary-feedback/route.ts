@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     const rawNames: unknown[] = Array.isArray(body?.names) ? body.names : [body?.name]
     const names = Array.from(new Set(rawNames.map((n) => normalizeName(String(n ?? "")))))
-      .filter((n) => n && /^[a-z'-]+$/.test(n))
+      .filter((n) => n && /^[a-z'-]+(\s[a-z'-]+)*$/.test(n))
 
     if (names.length === 0) {
       return NextResponse.json({ error: "No valid names provided" }, { status: 400 })
