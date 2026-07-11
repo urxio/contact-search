@@ -13,6 +13,10 @@ function requireAdmin(): NextResponse | null {
   return null
 }
 
+function normalizeAddress(address: string | null, city: string | null, zipcode: string | null) {
+  return `${address || ""} ${city || ""} ${zipcode || ""}`.toLowerCase().replace(/\s+/g, " ").trim()
+}
+
 type ContactRow = {
   submission_id: number
   user_id: string
@@ -43,7 +47,7 @@ function resolveLastName(row: ContactRow): string {
 async function runScan() {
   await ensureSchema()
 
-  const [contactsResult, dictionary, dismissedResult] = await Promise.all([
+  const [contactsResult, dictionary, dismissedResult, frenchAddressesResult] = await Promise.all([
     pool.query(`
       SELECT
         s.id AS submission_id,
@@ -64,11 +68,24 @@ async function runScan() {
       throw new Error(err?.message ?? "Failed to load dictionary from GitHub")
     }),
     pool.query(`SELECT submission_id, contact_id FROM dismissed_dictionary_scan_matches`),
+    // Addresses already covered by a contact marked "Potentially French" —
+    // a scan match at one of these addresses is the same household as
+    // someone already flagged, so it isn't a new find.
+    pool.query(`
+      SELECT c->>'address' AS address, c->>'city' AS city, c->>'zipcode' AS zipcode
+      FROM submissions s, jsonb_array_elements(s.contacts) c
+      WHERE c->>'status' = 'Potentially French' AND s.archived = FALSE
+    `),
   ])
 
   const dictionarySet = new Set(dictionary.lines)
   const dismissedSet = new Set(
     dismissedResult.rows.map((r: { submission_id: number; contact_id: string }) => `${r.submission_id}:${r.contact_id}`),
+  )
+  const frenchAddressSet = new Set(
+    (frenchAddressesResult.rows as { address: string | null; city: string | null; zipcode: string | null }[])
+      .map((r) => normalizeAddress(r.address, r.city, r.zipcode))
+      .filter(Boolean),
   )
 
   const matches = (contactsResult.rows as ContactRow[])
@@ -77,7 +94,12 @@ async function runScan() {
       const normalized = normalizeName(lastName)
       return { row, lastName, normalized }
     })
-    .filter(({ normalized, row }) => normalized && dictionarySet.has(normalized) && !dismissedSet.has(`${row.submission_id}:${row.contact_id}`))
+    .filter(({ normalized, row }) =>
+      normalized &&
+      dictionarySet.has(normalized) &&
+      !dismissedSet.has(`${row.submission_id}:${row.contact_id}`) &&
+      !frenchAddressSet.has(normalizeAddress(row.address, row.city, row.zipcode)),
+    )
     .map(({ row, lastName, normalized }) => ({
       submissionId: row.submission_id,
       contactId: row.contact_id,
