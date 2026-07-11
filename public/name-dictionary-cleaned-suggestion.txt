@@ -1617,6 +1617,7 @@ koa
 koagne
 kobenan
 koda
+kodad
 kodia
 kodji
 kodjo
