@@ -95,12 +95,85 @@ export async function GET() {
   }
 }
 
-// PATCH — sets a contact's status to "Not French", removing it from this
-// list. Keeps the cached submissions.potentially_french/not_french/etc.
-// count columns in sync (same reasoning as the Dictionary Scan PATCH: those
-// are plain integers written once at submit time and never recomputed from
-// the contacts JSONB, so they'd silently drift otherwise).
-// Body: { submissionId: number, contactId: string }
+const TARGET_STATUS = {
+  notFrench: "Not French",
+  duplicate: "Duplicate",
+} as const
+
+// Reclassifies a contact, removing it from this list. Keeps the cached
+// submissions.potentially_french/not_french/duplicate/not_checked count
+// columns in sync — those are plain integers written once at submit time
+// and never recomputed from the contacts JSONB, so they'd silently drift
+// out of sync with the dashboard otherwise.
+async function setContactStatus(submissionId: number, contactId: string, newStatus: string, incrementColumn: string) {
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+
+    const statusResult = await client.query(
+      `SELECT c->>'status' AS status
+       FROM submissions s, jsonb_array_elements(s.contacts) c
+       WHERE s.id = $1 AND c->>'id' = $2`,
+      [submissionId, contactId],
+    )
+    if (statusResult.rowCount === 0) {
+      await client.query("ROLLBACK")
+      return { notFound: true as const }
+    }
+    const previousStatus = statusResult.rows[0].status as string | null
+
+    await client.query(
+      `UPDATE submissions
+       SET contacts = (
+         SELECT COALESCE(
+           jsonb_agg(
+             CASE WHEN elem->>'id' = $2
+               THEN elem || jsonb_build_object('status', $3::text)
+               ELSE elem
+             END
+           ),
+           '[]'::jsonb
+         )
+         FROM jsonb_array_elements(contacts) AS elem
+       )
+       WHERE id = $1`,
+      [submissionId, contactId, newStatus],
+    )
+
+    // Only these three statuses were ever counted into a column at submit
+    // time (see app/api/submissions/route.ts) — anything else (e.g.
+    // "Detected") wasn't in any bucket, so there's nothing to decrement.
+    const decrementColumn =
+      previousStatus === "Potentially French" ? "potentially_french" :
+      previousStatus === "Not French" ? "not_french" :
+      previousStatus === "Duplicate" ? "duplicate" :
+      previousStatus === "Not checked" ? "not_checked" :
+      null
+
+    const setClauses = [
+      // Already the target status (e.g. a race with another admin action) —
+      // don't double-count it.
+      ...(previousStatus === newStatus ? [] : [`${incrementColumn} = ${incrementColumn} + 1`]),
+      ...(decrementColumn && decrementColumn !== incrementColumn ? [`${decrementColumn} = GREATEST(${decrementColumn} - 1, 0)`] : []),
+    ]
+    if (setClauses.length > 0) {
+      await client.query(`UPDATE submissions SET ${setClauses.join(", ")} WHERE id = $1`, [submissionId])
+    }
+
+    await client.query("COMMIT")
+    return { notFound: false as const }
+  } catch (err) {
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+// PATCH — reclassifies a contact, removing it from this list: "Not French"
+// for a genuine misclassification, or "Duplicate" for a contact that's
+// really the same household/person as another entry already on the list.
+// Body: { submissionId: number, contactId: string, action?: "notFrench" | "duplicate" }
 export async function PATCH(req: NextRequest) {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
@@ -109,75 +182,21 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const submissionId = Number(body?.submissionId)
     const contactId = String(body?.contactId ?? "")
+    const action = body?.action === "duplicate" ? "duplicate" : "notFrench"
 
     if (!Number.isFinite(submissionId) || !contactId) {
       return NextResponse.json({ error: "Missing submissionId or contactId" }, { status: 400 })
     }
 
-    const client = await pool.connect()
-    try {
-      await client.query("BEGIN")
-
-      const statusResult = await client.query(
-        `SELECT c->>'status' AS status
-         FROM submissions s, jsonb_array_elements(s.contacts) c
-         WHERE s.id = $1 AND c->>'id' = $2`,
-        [submissionId, contactId],
-      )
-      if (statusResult.rowCount === 0) {
-        await client.query("ROLLBACK")
-        return NextResponse.json({ error: "Contact not found" }, { status: 404 })
-      }
-      const previousStatus = statusResult.rows[0].status as string | null
-
-      await client.query(
-        `UPDATE submissions
-         SET contacts = (
-           SELECT COALESCE(
-             jsonb_agg(
-               CASE WHEN elem->>'id' = $2
-                 THEN elem || '{"status":"Not French"}'::jsonb
-                 ELSE elem
-               END
-             ),
-             '[]'::jsonb
-           )
-           FROM jsonb_array_elements(contacts) AS elem
-         )
-         WHERE id = $1`,
-        [submissionId, contactId],
-      )
-
-      // Only these three statuses were ever counted into a column at submit
-      // time (see app/api/submissions/route.ts) — anything else (e.g.
-      // "Detected") wasn't in any bucket, so there's nothing to decrement.
-      const decrementColumn =
-        previousStatus === "Potentially French" ? "potentially_french" :
-        previousStatus === "Duplicate" ? "duplicate" :
-        previousStatus === "Not checked" ? "not_checked" :
-        null
-
-      const setClauses = [
-        // Already "Not French" (e.g. a race with another admin action) —
-        // don't double-count it.
-        ...(previousStatus === "Not French" ? [] : ["not_french = not_french + 1"]),
-        ...(decrementColumn ? [`${decrementColumn} = GREATEST(${decrementColumn} - 1, 0)`] : []),
-      ]
-      if (setClauses.length > 0) {
-        await client.query(`UPDATE submissions SET ${setClauses.join(", ")} WHERE id = $1`, [submissionId])
-      }
-
-      await client.query("COMMIT")
-    } catch (err) {
-      await client.query("ROLLBACK")
-      throw err
-    } finally {
-      client.release()
+    const incrementColumn = action === "duplicate" ? "duplicate" : "not_french"
+    const { notFound } = await setContactStatus(submissionId, contactId, TARGET_STATUS[action], incrementColumn)
+    if (notFound) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 })
     }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    console.error("Potentially French mark-as-Not-French error:", err)
+    console.error("Potentially French reclassify error:", err)
     return NextResponse.json({ error: err?.message ?? "Internal server error" }, { status: 500 })
   }
 }

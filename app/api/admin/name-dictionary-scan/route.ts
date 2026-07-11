@@ -88,7 +88,7 @@ async function runScan() {
       .filter(Boolean),
   )
 
-  const matches = (contactsResult.rows as ContactRow[])
+  const filteredRows = (contactsResult.rows as ContactRow[])
     .map((row) => {
       const lastName = resolveLastName(row)
       const normalized = normalizeName(lastName)
@@ -100,6 +100,19 @@ async function runScan() {
       !dismissedSet.has(`${row.submission_id}:${row.contact_id}`) &&
       !frenchAddressSet.has(normalizeAddress(row.address, row.city, row.zipcode)),
     )
+
+  // Duplicate-address count within this result set itself — separate from
+  // frenchAddressSet above, which only excludes addresses already covered
+  // by a "Potentially French" contact. This instead flags when two or more
+  // matches here share an address (e.g. a household with several members
+  // all missed), so the admin can spot and resolve them together.
+  const addressCounts = new Map<string, number>()
+  for (const { row } of filteredRows) {
+    const key = normalizeAddress(row.address, row.city, row.zipcode)
+    if (key) addressCounts.set(key, (addressCounts.get(key) ?? 0) + 1)
+  }
+
+  const matches = filteredRows
     .map(({ row, lastName, normalized }) => ({
       submissionId: row.submission_id,
       contactId: row.contact_id,
@@ -113,6 +126,7 @@ async function runScan() {
       zipcode: row.zipcode || "",
       phone: row.phone || "",
       status: row.status || "Not checked",
+      duplicateAddressCount: addressCounts.get(normalizeAddress(row.address, row.city, row.zipcode)) ?? 1,
     }))
     .sort((a, b) => a.lastName.localeCompare(b.lastName))
 

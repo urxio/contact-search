@@ -1623,6 +1623,35 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     }
   }, [onSubmissionsChanged])
 
+  // Removes a contact from this list by flipping its status to "Duplicate"
+  // — for a row that's really the same household/person as another entry
+  // already on the list, which is the most common reason to dismiss one.
+  const markDuplicate = useCallback(async (c: PotentiallyFrenchContact) => {
+    const key = `${c.submissionId}:${c.contactId}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/potentially-french", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: c.submissionId, contactId: c.contactId, action: "duplicate" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to mark "${c.fullName}" as Duplicate: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setContacts((prev) => prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId)))
+      setTotalCount((n) => Math.max(0, n - 1))
+      // Cached submission counts changed server-side — refresh so the rest
+      // of the dashboard reflects it immediately.
+      onSubmissionsChanged?.()
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => { const next = { ...b }; delete next[key]; return next })
+    }
+  }, [onSubmissionsChanged])
+
   const filtered = contacts.filter((c) => {
     if (duplicatesOnly && c.duplicateAddressCount <= 1 && c.duplicateNameCount <= 1) return false
     if (search) {
@@ -1742,21 +1771,38 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => markNotFrench(c)}
-                        disabled={!!busy[`${c.submissionId}:${c.contactId}`]}
-                        title="Remove from this list — sets the contact's status to Not French"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {busy[`${c.submissionId}:${c.contactId}`] ? "…" : (
-                          <>
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Not French
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => markNotFrench(c)}
+                          disabled={!!busy[`${c.submissionId}:${c.contactId}`]}
+                          title="Remove from this list — sets the contact's status to Not French"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {busy[`${c.submissionId}:${c.contactId}`] ? "…" : (
+                            <>
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Not French
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => markDuplicate(c)}
+                          disabled={!!busy[`${c.submissionId}:${c.contactId}`]}
+                          title="Remove from this list — sets the contact's status to Duplicate"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-xs font-medium border border-amber-200 dark:border-amber-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {busy[`${c.submissionId}:${c.contactId}`] ? "…" : (
+                            <>
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Duplicate
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -1790,6 +1836,7 @@ type DictionaryScanMatch = {
   zipcode: string
   phone: string
   status: string
+  duplicateAddressCount: number
 }
 
 function forebearsUrlForSurname(lastName: string) {
@@ -1922,6 +1969,32 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     }
   }, [onSubmissionsChanged])
 
+  // Removes the matched surname from the live dictionary entirely — for a
+  // false-positive dictionary entry, not just this one contact. Since every
+  // contact sharing that surname was only on this list because of the
+  // dictionary entry, they all drop off the list together once it's gone.
+  const removeFromDictionary = useCallback(async (m: DictionaryScanMatch) => {
+    const key = `remove:${m.matchedName}`
+    setBusy((b) => ({ ...b, [key]: true }))
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: m.matchedName, action: "remove" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to remove "${m.matchedName}" from the dictionary: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setMatches((prev) => prev.filter((x) => x.matchedName !== m.matchedName))
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBusy((b) => { const next = { ...b }; delete next[key]; return next })
+    }
+  }, [])
+
   // Hides just this contact from future scans — doesn't touch its status or
   // the dictionary, for cases where the match is a known/accepted exception.
   const dismissMatch = useCallback(async (m: DictionaryScanMatch) => {
@@ -1995,6 +2068,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Matched surname</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City / Zip</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Duplicate</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -2002,7 +2076,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
               {groups.map((g) => (
                 <Fragment key={g.submissionId}>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                    <td colSpan={5} className="px-5 py-2">
+                    <td colSpan={6} className="px-5 py-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="font-semibold text-gray-700 dark:text-gray-300">{g.userId}</span>
                         <span className="text-gray-400">· {new Date(g.submittedAt).toLocaleDateString()}</span>
@@ -2028,6 +2102,18 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                           {m.status}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {m.duplicateAddressCount > 1 ? (
+                          <span
+                            title="Same address as another match in this list"
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                          >
+                            {m.duplicateAddressCount}× address
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
@@ -2069,6 +2155,21 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
                                 Mark French
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => removeFromDictionary(m)}
+                            disabled={!!busy[`remove:${m.matchedName}`]}
+                            title={`Not French — remove "${m.matchedName}" from the dictionary entirely (affects every contact with this surname)`}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+                          >
+                            {busy[`remove:${m.matchedName}`] ? "…" : (
+                              <>
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Not French
                               </>
                             )}
                           </button>

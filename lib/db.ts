@@ -82,4 +82,5 @@ export async function ensureSchema() {
       UNIQUE(submission_id, contact_id)
     )
   `)
+
 }
