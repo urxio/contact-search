@@ -1230,6 +1230,37 @@ function DictionaryFeedbackPanel() {
     }
   }
 
+  // Dismiss every selected name in one shot. Doesn't need GitHub, so it
+  // stays enabled even when dictionaryError is set.
+  const dismissSelected = async (list: "add" | "remove") => {
+    const names = Array.from(selected[list])
+    if (names.length === 0) return
+    setBatchBusy(true)
+    try {
+      const res = await fetch("/api/admin/dictionary-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names, action: "dismiss", list }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to dismiss selected names: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      const applied = new Set(data.applied ?? names)
+      if (list === "add") {
+        setAddCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
+      } else {
+        setRemoveCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
+      }
+      setSelected((prev) => ({ ...prev, [list]: new Set() }))
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
@@ -1291,6 +1322,7 @@ function DictionaryFeedbackPanel() {
           onToggleSelected={(name) => toggleSelected("add", name)}
           onToggleSelectAll={() => toggleSelectAll("add", addCandidates)}
           onApplySelected={() => applySelected("add")}
+          onDismissSelected={() => dismissSelected("add")}
         />
       ) : (
         <NameCandidateList
@@ -1309,6 +1341,7 @@ function DictionaryFeedbackPanel() {
           onToggleSelected={(name) => toggleSelected("remove", name)}
           onToggleSelectAll={() => toggleSelectAll("remove", removeCandidates)}
           onApplySelected={() => applySelected("remove")}
+          onDismissSelected={() => dismissSelected("remove")}
         />
       )}
     </div>
@@ -1331,6 +1364,7 @@ function NameCandidateList({
   onToggleSelected,
   onToggleSelectAll,
   onApplySelected,
+  onDismissSelected,
 }: {
   candidates: NameCandidate[]
   action: "add" | "remove"
@@ -1347,6 +1381,7 @@ function NameCandidateList({
   onToggleSelected: (name: string) => void
   onToggleSelectAll: () => void
   onApplySelected: () => void
+  onDismissSelected: () => void
 }) {
   if (candidates.length === 0) {
     return <p className="text-sm text-gray-400 px-6 py-12 text-center">{emptyText}</p>
@@ -1362,13 +1397,23 @@ function NameCandidateList({
           {selected.size > 0 ? `${selected.size} selected` : "Select all"}
         </label>
         {selected.size > 0 && (
-          <button
-            disabled={disabled || batchBusy}
-            onClick={onApplySelected}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50 ${batchButtonClass}`}
-          >
-            {batchBusy ? "Applying…" : `${buttonLabel} (${selected.size})`}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={batchBusy}
+              onClick={onDismissSelected}
+              title="Dismiss — hide these names permanently without changing the dictionary"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-gray-700 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300 transition-colors disabled:opacity-50"
+            >
+              {batchBusy ? "Applying…" : `Dismiss (${selected.size})`}
+            </button>
+            <button
+              disabled={disabled || batchBusy}
+              onClick={onApplySelected}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50 ${batchButtonClass}`}
+            >
+              {batchBusy ? "Applying…" : `${buttonLabel} (${selected.size})`}
+            </button>
+          </div>
         )}
       </div>
 
