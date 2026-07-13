@@ -176,17 +176,21 @@ export async function POST() {
   }
 }
 
-// PATCH — either marks a contact's status as "Potentially French", or
-// dismisses it from future scan results without touching its status or the
-// dictionary. Used per row in the panel to resolve a missed match directly,
-// without leaving the admin dashboard.
+// Fields an admin may edit inline from the scan panel — matches the
+// Contact shape used elsewhere in the app (see app/admin/user/[userId]/page.tsx).
+const EDITABLE_CONTACT_FIELDS = ["fullName", "lastName", "address", "city", "zipcode", "phone"] as const
+
+// PATCH — marks a contact's status as "Potentially French", dismisses it
+// from future scan results without touching its status or the dictionary,
+// or updates its editable fields directly. Used per row in the panel to
+// resolve a missed match without leaving the admin dashboard.
 //
 // `submissions.potentially_french/not_french/duplicate/not_checked` are
 // plain cached integer columns, written once at submit time and never
 // recomputed from the `contacts` JSONB — so the markFrench path also nudges
 // them here, otherwise the dashboard's summary counts would silently drift
 // out of sync with the JSONB the moment this runs.
-// Body: { submissionId: number, contactId: string, action?: "markFrench" | "dismiss" }
+// Body: { submissionId: number, contactId: string, action?: "markFrench" | "dismiss" | "update", fields?: Partial<Record<typeof EDITABLE_CONTACT_FIELDS[number], string>> }
 export async function PATCH(req: NextRequest) {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
@@ -195,7 +199,7 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const submissionId = Number(body?.submissionId)
     const contactId = String(body?.contactId ?? "")
-    const action = body?.action === "dismiss" ? "dismiss" : "markFrench"
+    const action = body?.action === "dismiss" ? "dismiss" : body?.action === "update" ? "update" : "markFrench"
 
     if (!Number.isFinite(submissionId) || !contactId) {
       return NextResponse.json({ error: "Missing submissionId or contactId" }, { status: 400 })
@@ -209,6 +213,40 @@ export async function PATCH(req: NextRequest) {
          ON CONFLICT (submission_id, contact_id) DO UPDATE SET dismissed_at = NOW()`,
         [submissionId, contactId],
       )
+      return NextResponse.json({ success: true })
+    }
+
+    if (action === "update") {
+      const fields = body?.fields ?? {}
+      const updates: Record<string, string> = {}
+      for (const key of EDITABLE_CONTACT_FIELDS) {
+        if (typeof fields[key] === "string") updates[key] = fields[key].trim()
+      }
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json({ error: "No fields to update" }, { status: 400 })
+      }
+
+      const result = await pool.query(
+        `UPDATE submissions
+         SET contacts = (
+           SELECT COALESCE(
+             jsonb_agg(
+               CASE WHEN elem->>'id' = $2
+                 THEN elem || $3::jsonb
+                 ELSE elem
+               END
+             ),
+             '[]'::jsonb
+           )
+           FROM jsonb_array_elements(contacts) AS elem
+         )
+         WHERE id = $1
+         RETURNING id`,
+        [submissionId, contactId, JSON.stringify(updates)],
+      )
+      if (result.rowCount === 0) {
+        return NextResponse.json({ error: "Submission not found" }, { status: 404 })
+      }
       return NextResponse.json({ success: true })
     }
 

@@ -1861,6 +1861,9 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
   const [search, setSearch] = useState("")
   const [reviewedNotice, setReviewedNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState({ fullName: "", lastName: "", address: "", city: "", zipcode: "", phone: "" })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // Read-only — used for the panel's automatic initial load only. Never
   // touches review status, so opening the tab has no side effects.
@@ -2019,6 +2022,40 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     }
   }, [])
 
+  const startEdit = useCallback((m: DictionaryScanMatch) => {
+    setEditingKey(`${m.submissionId}:${m.contactId}`)
+    setEditDraft({ fullName: m.fullName, lastName: m.lastName, address: m.address, city: m.city, zipcode: m.zipcode, phone: m.phone })
+  }, [])
+
+  const cancelEdit = useCallback(() => {
+    setEditingKey(null)
+  }, [])
+
+  // Persists the edited fields, then re-runs the read-only scan so the row
+  // reflects reality afterward — an edited last name or address can change
+  // whether this contact still belongs on the list at all.
+  const saveEdit = useCallback(async (m: DictionaryScanMatch) => {
+    setSavingEdit(true)
+    try {
+      const res = await fetch("/api/admin/name-dictionary-scan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId, action: "update", fields: editDraft }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to save changes for "${m.fullName}": ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      setEditingKey(null)
+      load()
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setSavingEdit(false)
+    }
+  }, [editDraft, load])
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
@@ -2066,7 +2103,9 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
               <tr className="border-b border-gray-100 dark:border-gray-800">
                 <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Matched surname</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City / Zip</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Phone</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Duplicate</th>
                 <th className="px-4 py-2"></th>
@@ -2076,7 +2115,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
               {groups.map((g) => (
                 <Fragment key={g.submissionId}>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                    <td colSpan={6} className="px-5 py-2">
+                    <td colSpan={8} className="px-5 py-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="font-semibold text-gray-700 dark:text-gray-300">{g.userId}</span>
                         <span className="text-gray-400">· {new Date(g.submittedAt).toLocaleDateString()}</span>
@@ -2090,14 +2129,86 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                       </div>
                     </td>
                   </tr>
-                  {g.items.map((m) => (
+                  {g.items.map((m) => {
+                    const key = `${m.submissionId}:${m.contactId}`
+                    const isEditing = editingKey === key
+                    const inputClass =
+                      "w-full h-7 px-2 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    return (
                     <tr
-                      key={`${m.submissionId}:${m.contactId}`}
+                      key={key}
                       className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30"
                     >
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{m.fullName || "—"}</td>
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                        {isEditing ? (
+                          <div className="flex flex-col gap-1">
+                            <input
+                              type="text"
+                              placeholder="Full name"
+                              value={editDraft.fullName}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
+                              className={inputClass}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Last name"
+                              title="Last name — drives the dictionary surname match"
+                              value={editDraft.lastName}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, lastName: e.target.value }))}
+                              className={inputClass}
+                            />
+                          </div>
+                        ) : (
+                          m.fullName || "—"
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{m.matchedName}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{[m.city, m.zipcode].filter(Boolean).join(", ") || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editDraft.address}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, address: e.target.value }))}
+                            className={inputClass}
+                          />
+                        ) : (
+                          m.address || "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {isEditing ? (
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="City"
+                              value={editDraft.city}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, city: e.target.value }))}
+                              className={inputClass}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Zip"
+                              value={editDraft.zipcode}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, zipcode: e.target.value }))}
+                              className={`${inputClass} w-20 flex-none`}
+                            />
+                          </div>
+                        ) : (
+                          [m.city, m.zipcode].filter(Boolean).join(", ") || "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editDraft.phone}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
+                            className={inputClass}
+                          />
+                        ) : (
+                          m.phone || "—"
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                           {m.status}
@@ -2116,77 +2227,108 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <a
-                            href={forebearsUrlForSurname(m.lastName)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Search on Forebears.io"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
-                          >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <circle cx="12" cy="12" r="10" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
-                            </svg>
-                            Forebears
-                          </a>
-                          <a
-                            href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Search on TruePeopleSearch"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
-                          >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <circle cx="12" cy="12" r="9" strokeWidth={2} />
-                            </svg>
-                            TPS
-                          </a>
-                          <button
-                            onClick={() => markAsFrench(m)}
-                            disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
-                            title="Mark this contact's status as Potentially French"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
-                          >
-                            {busy[`${m.submissionId}:${m.contactId}`] ? "…" : (
-                              <>
-                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Mark French
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => removeFromDictionary(m)}
-                            disabled={!!busy[`remove:${m.matchedName}`]}
-                            title={`Not French — remove "${m.matchedName}" from the dictionary entirely (affects every contact with this surname)`}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
-                          >
-                            {busy[`remove:${m.matchedName}`] ? "…" : (
-                              <>
-                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                Not French
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => dismissMatch(m)}
-                            disabled={!!busy[`${m.submissionId}:${m.contactId}`]}
-                            title="Remove from this list — doesn't change the contact's status or the dictionary"
-                            className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50"
-                          >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => saveEdit(m)}
+                              disabled={savingEdit}
+                              title="Save changes"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                            >
+                              {savingEdit ? "…" : "Save"}
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              disabled={savingEdit}
+                              title="Discard changes"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium border border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href={forebearsUrlForSurname(m.lastName)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Search on Forebears.io"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="12" cy="12" r="10" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+                              </svg>
+                              Forebears
+                            </a>
+                            <a
+                              href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Search on TruePeopleSearch"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <circle cx="12" cy="12" r="9" strokeWidth={2} />
+                              </svg>
+                              TPS
+                            </a>
+                            <button
+                              onClick={() => markAsFrench(m)}
+                              disabled={!!busy[key]}
+                              title="Mark this contact's status as Potentially French"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                            >
+                              {busy[key] ? "…" : (
+                                <>
+                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Mark French
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => removeFromDictionary(m)}
+                              disabled={!!busy[`remove:${m.matchedName}`]}
+                              title={`Not French — remove "${m.matchedName}" from the dictionary entirely (affects every contact with this surname)`}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+                            >
+                              {busy[`remove:${m.matchedName}`] ? "…" : (
+                                <>
+                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  Not French
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => startEdit(m)}
+                              title="Edit this contact's information"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 transition-colors"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => dismissMatch(m)}
+                              disabled={!!busy[key]}
+                              title="Remove from this list — doesn't change the contact's status or the dictionary"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-700 transition-colors disabled:opacity-50"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </Fragment>
               ))}
             </tbody>
