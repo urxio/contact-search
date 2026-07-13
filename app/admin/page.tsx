@@ -2102,9 +2102,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800">
                 <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Matched surname</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Address</th>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">City / Zip</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Phone</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Duplicate</th>
@@ -2115,7 +2113,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
               {groups.map((g) => (
                 <Fragment key={g.submissionId}>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                    <td colSpan={8} className="px-5 py-2">
+                    <td colSpan={6} className="px-5 py-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="font-semibold text-gray-700 dark:text-gray-300">{g.userId}</span>
                         <span className="text-gray-400">· {new Date(g.submittedAt).toLocaleDateString()}</span>
@@ -2133,13 +2131,13 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                     const key = `${m.submissionId}:${m.contactId}`
                     const isEditing = editingKey === key
                     const inputClass =
-                      "w-full h-7 px-2 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      "h-7 px-2 text-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                     return (
                     <tr
                       key={key}
                       className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30"
                     >
-                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                      <td className="px-5 py-3">
                         {isEditing ? (
                           <div className="flex flex-col gap-1">
                             <input
@@ -2147,7 +2145,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                               placeholder="Full name"
                               value={editDraft.fullName}
                               onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
-                              className={inputClass}
+                              className={`${inputClass} w-full`}
                             />
                             <input
                               type="text"
@@ -2155,46 +2153,45 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                               title="Last name — drives the dictionary surname match"
                               value={editDraft.lastName}
                               onChange={(e) => setEditDraft((d) => ({ ...d, lastName: e.target.value }))}
-                              className={inputClass}
+                              className={`${inputClass} w-full`}
                             />
                           </div>
                         ) : (
-                          m.fullName || "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{m.matchedName}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={editDraft.address}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, address: e.target.value }))}
-                            className={inputClass}
-                          />
-                        ) : (
-                          m.address || "—"
+                          <>
+                            <div className="font-medium text-gray-900 dark:text-white">{m.fullName || "—"}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">matched: {m.matchedName}</div>
+                          </>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {isEditing ? (
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-col gap-1">
                             <input
                               type="text"
-                              placeholder="City"
-                              value={editDraft.city}
-                              onChange={(e) => setEditDraft((d) => ({ ...d, city: e.target.value }))}
-                              className={inputClass}
+                              placeholder="Street address"
+                              value={editDraft.address}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, address: e.target.value }))}
+                              className={`${inputClass} w-full`}
                             />
-                            <input
-                              type="text"
-                              placeholder="Zip"
-                              value={editDraft.zipcode}
-                              onChange={(e) => setEditDraft((d) => ({ ...d, zipcode: e.target.value }))}
-                              className={`${inputClass} w-20 flex-none`}
-                            />
+                            <div className="flex gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="City"
+                                value={editDraft.city}
+                                onChange={(e) => setEditDraft((d) => ({ ...d, city: e.target.value }))}
+                                className={`${inputClass} flex-1 min-w-0`}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Zip"
+                                value={editDraft.zipcode}
+                                onChange={(e) => setEditDraft((d) => ({ ...d, zipcode: e.target.value }))}
+                                className={`${inputClass} w-20 flex-none`}
+                              />
+                            </div>
                           </div>
                         ) : (
-                          [m.city, m.zipcode].filter(Boolean).join(", ") || "—"
+                          [m.address, m.city, m.zipcode].filter(Boolean).join(", ") || "—"
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
@@ -2203,7 +2200,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                             type="text"
                             value={editDraft.phone}
                             onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
-                            className={inputClass}
+                            className={`${inputClass} w-full`}
                           />
                         ) : (
                           m.phone || "—"
@@ -2253,55 +2250,47 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Search on Forebears.io"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 transition-colors"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 transition-colors"
                             >
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <circle cx="12" cy="12" r="10" />
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
                               </svg>
-                              Forebears
                             </a>
                             <a
                               href={truePeopleSearchUrlFor(m.fullName, m.zipcode)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Search on TruePeopleSearch"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 transition-colors"
                             >
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <circle cx="12" cy="12" r="9" strokeWidth={2} />
                               </svg>
-                              TPS
                             </a>
                             <button
                               onClick={() => markAsFrench(m)}
                               disabled={!!busy[key]}
                               title="Mark this contact's status as Potentially French"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 text-xs font-medium border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
                             >
                               {busy[key] ? "…" : (
-                                <>
-                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  Mark French
-                                </>
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
                               )}
                             </button>
                             <button
                               onClick={() => removeFromDictionary(m)}
                               disabled={!!busy[`remove:${m.matchedName}`]}
                               title={`Not French — remove "${m.matchedName}" from the dictionary entirely (affects every contact with this surname)`}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-xs font-medium border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center justify-center h-[26px] w-[26px] rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
                             >
                               {busy[`remove:${m.matchedName}`] ? "…" : (
-                                <>
-                                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                  Not French
-                                </>
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                               )}
                             </button>
                             <button
