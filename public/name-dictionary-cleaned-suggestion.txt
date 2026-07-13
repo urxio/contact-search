@@ -1766,7 +1766,6 @@ landais
 landou
 landrine
 landry
-lang
 langelier
 langlais
 langlois
