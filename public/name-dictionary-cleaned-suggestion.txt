@@ -1151,7 +1151,6 @@ felix
 ferrand
 ferre
 ferreira
-ferrer
 ferrier
 ferry
 feudjio
