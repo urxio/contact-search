@@ -1516,6 +1516,26 @@ function potentiallyFrenchDuplicateCount(contacts: PotentiallyFrenchContact[]) {
   }).length
 }
 
+function withPotentiallyFrenchDuplicateCounts(contacts: PotentiallyFrenchContact[]) {
+  const addressCounts = new Map<string, number>()
+  const nameCounts = new Map<string, number>()
+  for (const contact of contacts) {
+    const addressKey = potentiallyFrenchAddressKey(contact)
+    const nameKey = contact.fullName.trim().toLowerCase().replace(/\s+/g, " ")
+    if (addressKey) addressCounts.set(addressKey, (addressCounts.get(addressKey) ?? 0) + 1)
+    if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
+  }
+  return contacts.map((contact) => {
+    const addressKey = potentiallyFrenchAddressKey(contact)
+    const nameKey = contact.fullName.trim().toLowerCase().replace(/\s+/g, " ")
+    return {
+      ...contact,
+      duplicateAddressCount: addressKey ? addressCounts.get(addressKey) ?? 1 : 1,
+      duplicateNameCount: nameKey ? nameCounts.get(nameKey) ?? 1 : 1,
+    }
+  })
+}
+
 // Same address-splitting logic as the main app's exportPotentiallyFrenchToCSV
 // (app/page.tsx) — kept in lockstep so admin- and user-exported CSVs match.
 function parseAddress(address: string) {
@@ -1602,7 +1622,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         if (data?.error) {
           setError(data.error)
         } else {
-          setContacts(data.contacts ?? [])
+          setContacts(withPotentiallyFrenchDuplicateCounts(data.contacts ?? []))
           setTotalCount(data.totalCount ?? 0)
           setDuplicateCount(data.duplicateCount ?? 0)
         }
@@ -1639,7 +1659,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         alert(`Failed to mark "${c.fullName}" as Not French: ${data?.error ?? "Unknown error"}`)
         return
       }
-      setContacts((prev) => prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId)))
+      setContacts((prev) => withPotentiallyFrenchDuplicateCounts(prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId))))
       setTotalCount((n) => Math.max(0, n - 1))
       // Cached submission counts changed server-side — refresh so the rest
       // of the dashboard reflects it immediately.
@@ -1668,7 +1688,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         alert(`Failed to mark "${c.fullName}" as Duplicate: ${data?.error ?? "Unknown error"}`)
         return
       }
-      setContacts((prev) => prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId)))
+      setContacts((prev) => withPotentiallyFrenchDuplicateCounts(prev.filter((x) => !(x.submissionId === c.submissionId && x.contactId === c.contactId))))
       setTotalCount((n) => Math.max(0, n - 1))
       // Cached submission counts changed server-side — refresh so the rest
       // of the dashboard reflects it immediately.
@@ -1754,7 +1774,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         return
       }
       const removed = new Set(contactsToRemove.map((contact) => `${contact.submissionId}:${contact.contactId}`))
-      const updatedContacts = contacts.filter((contact) => !removed.has(`${contact.submissionId}:${contact.contactId}`))
+      const updatedContacts = withPotentiallyFrenchDuplicateCounts(contacts.filter((contact) => !removed.has(`${contact.submissionId}:${contact.contactId}`)))
       setContacts(updatedContacts)
       setTotalCount(updatedContacts.length)
       setDuplicateCount(potentiallyFrenchDuplicateCount(updatedContacts))
@@ -2030,6 +2050,18 @@ function dictionaryScanAddressKey(match: DictionaryScanMatch) {
     .trim()
 }
 
+function withDictionaryScanDuplicateCounts(matches: DictionaryScanMatch[]) {
+  const addressCounts = new Map<string, number>()
+  for (const match of matches) {
+    const addressKey = dictionaryScanAddressKey(match)
+    if (addressKey) addressCounts.set(addressKey, (addressCounts.get(addressKey) ?? 0) + 1)
+  }
+  return matches.map((match) => {
+    const addressKey = dictionaryScanAddressKey(match)
+    return { ...match, duplicateAddressCount: addressKey ? addressCounts.get(addressKey) ?? 1 : 1 }
+  })
+}
+
 function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
   const [matches, setMatches] = useState<DictionaryScanMatch[]>([])
   const [totalScanned, setTotalScanned] = useState(0)
@@ -2057,7 +2089,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         if (data?.error) {
           setError(data.error)
         } else {
-          setMatches(data.matches ?? [])
+          setMatches(withDictionaryScanDuplicateCounts(data.matches ?? []))
           setTotalScanned(data.totalScanned ?? 0)
         }
         setLoading(false)
@@ -2084,7 +2116,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         if (data?.error) {
           setError(data.error)
         } else {
-          setMatches(data.matches ?? [])
+          setMatches(withDictionaryScanDuplicateCounts(data.matches ?? []))
           setTotalScanned(data.totalScanned ?? 0)
           setReviewedNotice(`✓ Marked ${data.reviewedCount ?? 0} submission${data.reviewedCount === 1 ? "" : "s"} as reviewed.`)
           onSubmissionsChanged?.()
@@ -2168,7 +2200,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         return
       }
       const removed = new Set(contacts.map((match) => `${match.submissionId}:${match.contactId}`))
-      setMatches((previous) => previous.filter((match) => !removed.has(`${match.submissionId}:${match.contactId}`)))
+      setMatches((previous) => withDictionaryScanDuplicateCounts(previous.filter((match) => !removed.has(`${match.submissionId}:${match.contactId}`))))
       onSubmissionsChanged?.()
       setReviewedNotice(`✓ Removed ${data.removedCount ?? contacts.length} duplicate contact${contacts.length === 1 ? "" : "s"}; one contact remains at each reviewed address.`)
       setDuplicateReviewAddress(null)
@@ -2213,7 +2245,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         alert(`Failed to mark "${m.fullName}" as Potentially French: ${data?.error ?? "Unknown error"}`)
         return
       }
-      setMatches((prev) => prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId)))
+      setMatches((prev) => withDictionaryScanDuplicateCounts(prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId))))
       // Cached submission counts and the Potentially French list both just
       // changed server-side — refresh so the rest of the dashboard reflects
       // it immediately instead of only on next tab switch.
@@ -2243,7 +2275,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         alert(`Failed to remove "${m.matchedName}" from the dictionary: ${data?.error ?? "Unknown error"}`)
         return
       }
-      setMatches((prev) => prev.filter((x) => x.matchedName !== m.matchedName))
+      setMatches((prev) => withDictionaryScanDuplicateCounts(prev.filter((x) => x.matchedName !== m.matchedName)))
     } catch {
       alert("Network error — could not reach the server.")
     } finally {
@@ -2267,7 +2299,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         alert(`Failed to remove "${m.fullName}" from the list: ${data?.error ?? "Unknown error"}`)
         return
       }
-      setMatches((prev) => prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId)))
+      setMatches((prev) => withDictionaryScanDuplicateCounts(prev.filter((x) => !(x.submissionId === m.submissionId && x.contactId === m.contactId))))
     } catch {
       alert("Network error — could not reach the server.")
     } finally {
