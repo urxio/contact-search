@@ -100,6 +100,74 @@ const TARGET_STATUS = {
   duplicate: "Duplicate",
 } as const
 
+// Marks a reviewed set of duplicate-address contacts as Duplicate while
+// retaining their records. Rebuilding the cached counters from JSONB keeps
+// the dashboard totals accurate for a multi-submission batch.
+async function markContactsDuplicate(contacts: { submissionId: number; contactId: string }[]) {
+  const unique = Array.from(
+    new Map(contacts.map((contact) => [`${contact.submissionId}:${contact.contactId}`, contact])).values(),
+  )
+  if (unique.length === 0) return 0
+
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+    const changedSubmissionIds = new Set<number>()
+    let removedCount = 0
+    for (const contact of unique) {
+      const result = await client.query(
+        `UPDATE submissions
+         SET contacts = (
+           SELECT COALESCE(jsonb_agg(
+             CASE WHEN elem->>'id' = $2 THEN elem || '{"status":"Duplicate"}'::jsonb ELSE elem END
+           ), '[]'::jsonb)
+           FROM jsonb_array_elements(contacts) elem
+         )
+         WHERE id = $1
+           AND EXISTS (
+             SELECT 1 FROM jsonb_array_elements(contacts) elem
+             WHERE elem->>'id' = $2 AND elem->>'status' = 'Potentially French'
+           )
+         RETURNING id`,
+        [contact.submissionId, contact.contactId],
+      )
+      if (result.rowCount) {
+        changedSubmissionIds.add(contact.submissionId)
+        removedCount += 1
+      }
+    }
+
+    for (const submissionId of changedSubmissionIds) {
+      await client.query(
+        `UPDATE submissions s SET
+           contact_count = jsonb_array_length(s.contacts),
+           potentially_french = counts.potentially_french,
+           not_french = counts.not_french,
+           duplicate = counts.duplicate,
+           not_checked = counts.not_checked
+         FROM (
+           SELECT
+             COUNT(*) FILTER (WHERE c->>'status' = 'Potentially French')::int AS potentially_french,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Not French')::int AS not_french,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Duplicate')::int AS duplicate,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Not checked')::int AS not_checked
+           FROM submissions source, jsonb_array_elements(source.contacts) c
+           WHERE source.id = $1
+         ) counts
+         WHERE s.id = $1`,
+        [submissionId],
+      )
+    }
+    await client.query("COMMIT")
+    return removedCount
+  } catch (err) {
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 // Reclassifies a contact, removing it from this list. Keeps the cached
 // submissions.potentially_french/not_french/duplicate/not_checked count
 // columns in sync — those are plain integers written once at submit time
@@ -180,6 +248,22 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
+
+    if (body?.action === "removeDuplicates") {
+      const contacts = Array.isArray(body?.contacts)
+        ? body.contacts
+          .map((contact: unknown) => {
+            const item = contact as { submissionId?: unknown; contactId?: unknown }
+            return { submissionId: Number(item?.submissionId), contactId: String(item?.contactId ?? "") }
+          })
+          .filter((contact: { submissionId: number; contactId: string }) => Number.isFinite(contact.submissionId) && !!contact.contactId)
+        : []
+      if (contacts.length === 0) {
+        return NextResponse.json({ error: "Choose at least one duplicate contact" }, { status: 400 })
+      }
+      const removedCount = await markContactsDuplicate(contacts)
+      return NextResponse.json({ success: true, removedCount })
+    }
     const submissionId = Number(body?.submissionId)
     const contactId = String(body?.contactId ?? "")
     const action = body?.action === "duplicate" ? "duplicate" : "notFrench"

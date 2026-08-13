@@ -1492,6 +1492,30 @@ type PotentiallyFrenchContact = {
   duplicateNameCount: number
 }
 
+function potentiallyFrenchAddressKey(contact: PotentiallyFrenchContact) {
+  return [contact.address, contact.city, contact.zipcode]
+    .map((value) => value.trim().toLowerCase())
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function potentiallyFrenchDuplicateCount(contacts: PotentiallyFrenchContact[]) {
+  const addressCounts = new Map<string, number>()
+  const nameCounts = new Map<string, number>()
+  for (const contact of contacts) {
+    const addressKey = potentiallyFrenchAddressKey(contact)
+    const nameKey = contact.fullName.trim().toLowerCase().replace(/\s+/g, " ")
+    if (addressKey) addressCounts.set(addressKey, (addressCounts.get(addressKey) ?? 0) + 1)
+    if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
+  }
+  return contacts.filter((contact) => {
+    const addressKey = potentiallyFrenchAddressKey(contact)
+    const nameKey = contact.fullName.trim().toLowerCase().replace(/\s+/g, " ")
+    return (addressKey ? addressCounts.get(addressKey)! > 1 : false) || (nameKey ? nameCounts.get(nameKey)! > 1 : false)
+  }).length
+}
+
 // Same address-splitting logic as the main app's exportPotentiallyFrenchToCSV
 // (app/page.tsx) — kept in lockstep so admin- and user-exported CSVs match.
 function parseAddress(address: string) {
@@ -1566,6 +1590,10 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
   const [search, setSearch] = useState("")
   const [duplicatesOnly, setDuplicatesOnly] = useState(false)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [duplicateReviewAddress, setDuplicateReviewAddress] = useState<string | null>(null)
+  const [reviewAllDuplicates, setReviewAllDuplicates] = useState(false)
+  const [duplicateKeepers, setDuplicateKeepers] = useState<Record<string, string>>({})
+  const [removingDuplicates, setRemovingDuplicates] = useState(false)
 
   useEffect(() => {
     fetch("/api/admin/potentially-french")
@@ -1667,6 +1695,80 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     return true
   })
 
+  const duplicateAddressGroups = Array.from(
+    contacts.reduce((groups, contact) => {
+      const addressKey = potentiallyFrenchAddressKey(contact)
+      if (!addressKey) return groups
+      const group = groups.get(addressKey) ?? []
+      group.push(contact)
+      groups.set(addressKey, group)
+      return groups
+    }, new Map<string, PotentiallyFrenchContact[]>()),
+  )
+    .filter(([, group]) => group.length > 1)
+    .map(([addressKey, items]) => ({
+      addressKey,
+      items: [...items].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()),
+    }))
+
+  const reviewedDuplicateGroups = reviewAllDuplicates
+    ? duplicateAddressGroups
+    : duplicateAddressGroups.filter((group) => group.addressKey === duplicateReviewAddress)
+
+  const openDuplicateReview = useCallback((addressKey: string, reviewAll = false) => {
+    const groupsToReview = reviewAll
+      ? duplicateAddressGroups
+      : duplicateAddressGroups.filter((group) => group.addressKey === addressKey)
+    setDuplicateKeepers(Object.fromEntries(groupsToReview.map((group) => [
+      group.addressKey,
+      `${group.items[0].submissionId}:${group.items[0].contactId}`,
+    ])))
+    setDuplicateReviewAddress(addressKey)
+    setReviewAllDuplicates(reviewAll)
+  }, [duplicateAddressGroups])
+
+  const closeDuplicateReview = useCallback(() => {
+    if (removingDuplicates) return
+    setDuplicateReviewAddress(null)
+    setReviewAllDuplicates(false)
+    setDuplicateKeepers({})
+  }, [removingDuplicates])
+
+  const removeReviewedDuplicates = useCallback(async () => {
+    const contactsToRemove = reviewedDuplicateGroups.flatMap((group) =>
+      group.items
+        .filter((contact) => `${contact.submissionId}:${contact.contactId}` !== duplicateKeepers[group.addressKey])
+        .map((contact) => ({ submissionId: contact.submissionId, contactId: contact.contactId })),
+    )
+    if (contactsToRemove.length === 0) return
+    setRemovingDuplicates(true)
+    try {
+      const res = await fetch("/api/admin/potentially-french", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "removeDuplicates", contacts: contactsToRemove }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to remove duplicate contacts: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      const removed = new Set(contactsToRemove.map((contact) => `${contact.submissionId}:${contact.contactId}`))
+      const updatedContacts = contacts.filter((contact) => !removed.has(`${contact.submissionId}:${contact.contactId}`))
+      setContacts(updatedContacts)
+      setTotalCount(updatedContacts.length)
+      setDuplicateCount(potentiallyFrenchDuplicateCount(updatedContacts))
+      onSubmissionsChanged?.()
+      setDuplicateReviewAddress(null)
+      setReviewAllDuplicates(false)
+      setDuplicateKeepers({})
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setRemovingDuplicates(false)
+    }
+  }, [duplicateKeepers, onSubmissionsChanged, reviewedDuplicateGroups])
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
@@ -1691,6 +1793,14 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
             <input type="checkbox" checked={duplicatesOnly} onChange={(e) => setDuplicatesOnly(e.target.checked)} />
             Duplicates only
           </label>
+          <button
+            onClick={() => openDuplicateReview("", true)}
+            disabled={duplicateAddressGroups.length === 0}
+            title="Review each duplicate-address group, then remove all but one contact from each"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors whitespace-nowrap"
+          >
+            Auto-remove duplicates
+          </button>
           <button
             onClick={handleExport}
             disabled={contacts.length === 0}
@@ -1750,12 +1860,13 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
                       {isDup ? (
                         <div className="flex flex-wrap gap-1">
                           {c.duplicateAddressCount > 1 && (
-                            <span
-                              title="Same address as another Potentially French contact"
-                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            <button
+                              onClick={() => openDuplicateReview(potentiallyFrenchAddressKey(c))}
+                              title="View every Potentially French contact at this address and choose which one to keep"
+                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 dark:text-amber-300 transition-colors"
                             >
                               {c.duplicateAddressCount}× address
-                            </span>
+                            </button>
                           )}
                           {c.duplicateNameCount > 1 && (
                             <span
@@ -1811,6 +1922,64 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
           </table>
         </div>
       )}
+      {duplicateReviewAddress !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="potentially-french-duplicate-review-title">
+          <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 id="potentially-french-duplicate-review-title" className="text-lg font-bold text-gray-900 dark:text-white">
+                {reviewAllDuplicates ? "Review duplicate addresses" : "Duplicate address"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Select the one Potentially French contact to keep for each address. The others will be marked Duplicate and removed from this list; no contact records are deleted.
+              </p>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 space-y-5">
+              {reviewedDuplicateGroups.map((group) => (
+                <section key={group.addressKey} className="rounded-xl border border-amber-200 dark:border-amber-900/60 overflow-hidden">
+                  <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    {[group.items[0].address, group.items[0].city, group.items[0].zipcode].filter(Boolean).join(", ")}
+                    <span className="ml-2 text-xs font-normal">{group.items.length} contacts</span>
+                  </div>
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {group.items.map((contact) => {
+                      const key = `${contact.submissionId}:${contact.contactId}`
+                      return (
+                        <label key={key} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <input
+                            type="radio"
+                            name={`potentially-french-keeper-${group.addressKey}`}
+                            checked={duplicateKeepers[group.addressKey] === key}
+                            onChange={() => setDuplicateKeepers((previous) => ({ ...previous, [group.addressKey]: key }))}
+                            className="accent-indigo-600"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm text-gray-900 dark:text-white">{contact.fullName || "Unnamed contact"}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{contact.userId} · submitted {new Date(contact.submittedAt).toLocaleDateString()} · {contact.phone || "No phone"}</p>
+                          </div>
+                          <span className={duplicateKeepers[group.addressKey] === key ? "text-xs font-semibold text-green-600" : "text-xs text-amber-600 dark:text-amber-400"}>
+                            {duplicateKeepers[group.addressKey] === key ? "Keep" : "Remove"}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {reviewedDuplicateGroups.reduce((count, group) => count + group.items.length - 1, 0)} contact{reviewedDuplicateGroups.reduce((count, group) => count + group.items.length - 1, 0) === 1 ? "" : "s"} will be removed from this list.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={closeDuplicateReview} disabled={removingDuplicates} className="h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">Cancel</button>
+                <button onClick={removeReviewedDuplicates} disabled={removingDuplicates} className="h-9 px-3 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold disabled:opacity-50">
+                  {removingDuplicates ? "Removing…" : "Remove selected duplicates"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1853,6 +2022,14 @@ function truePeopleSearchUrlFor(fullName: string, zipcode: string) {
   return `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(fullName)}&citystatezip=${encodeURIComponent(zipcode)}`
 }
 
+function dictionaryScanAddressKey(match: DictionaryScanMatch) {
+  return [match.address, match.city, match.zipcode]
+    .map((value) => value.trim().toLowerCase())
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
   const [matches, setMatches] = useState<DictionaryScanMatch[]>([])
   const [totalScanned, setTotalScanned] = useState(0)
@@ -1864,6 +2041,10 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({ fullName: "", lastName: "", address: "", city: "", zipcode: "", phone: "" })
   const [savingEdit, setSavingEdit] = useState(false)
+  const [duplicateReviewAddress, setDuplicateReviewAddress] = useState<string | null>(null)
+  const [reviewAllDuplicates, setReviewAllDuplicates] = useState(false)
+  const [duplicateKeepers, setDuplicateKeepers] = useState<Record<string, string>>({})
+  const [removingDuplicates, setRemovingDuplicates] = useState(false)
 
   // Read-only — used for the panel's automatic initial load only. Never
   // touches review status, so opening the tab has no side effects.
@@ -1927,6 +2108,78 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
       m.userId.toLowerCase().includes(q)
     )
   })
+
+  const duplicateGroups = Array.from(
+    matches.reduce((groups, match) => {
+      const addressKey = dictionaryScanAddressKey(match)
+      if (!addressKey) return groups
+      const group = groups.get(addressKey) ?? []
+      group.push(match)
+      groups.set(addressKey, group)
+      return groups
+    }, new Map<string, DictionaryScanMatch[]>()),
+  )
+    .filter(([, group]) => group.length > 1)
+    .map(([addressKey, group]) => ({
+      addressKey,
+      items: [...group].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()),
+    }))
+
+  const reviewedDuplicateGroups = reviewAllDuplicates
+    ? duplicateGroups
+    : duplicateGroups.filter((group) => group.addressKey === duplicateReviewAddress)
+
+  const openDuplicateReview = useCallback((addressKey: string, reviewAll = false) => {
+    const groupsToReview = reviewAll
+      ? duplicateGroups
+      : duplicateGroups.filter((group) => group.addressKey === addressKey)
+    setDuplicateKeepers(Object.fromEntries(groupsToReview.map((group) => [
+      group.addressKey,
+      `${group.items[0].submissionId}:${group.items[0].contactId}`,
+    ])))
+    setDuplicateReviewAddress(addressKey)
+    setReviewAllDuplicates(reviewAll)
+  }, [duplicateGroups])
+
+  const closeDuplicateReview = useCallback(() => {
+    if (removingDuplicates) return
+    setDuplicateReviewAddress(null)
+    setReviewAllDuplicates(false)
+    setDuplicateKeepers({})
+  }, [removingDuplicates])
+
+  const removeReviewedDuplicates = useCallback(async () => {
+    const contacts = reviewedDuplicateGroups.flatMap((group) =>
+      group.items
+        .filter((match) => `${match.submissionId}:${match.contactId}` !== duplicateKeepers[group.addressKey])
+        .map((match) => ({ submissionId: match.submissionId, contactId: match.contactId })),
+    )
+    if (contacts.length === 0) return
+    setRemovingDuplicates(true)
+    try {
+      const res = await fetch("/api/admin/name-dictionary-scan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "removeDuplicates", contacts }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Failed to remove duplicate contacts: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      const removed = new Set(contacts.map((match) => `${match.submissionId}:${match.contactId}`))
+      setMatches((previous) => previous.filter((match) => !removed.has(`${match.submissionId}:${match.contactId}`)))
+      onSubmissionsChanged?.()
+      setReviewedNotice(`✓ Removed ${data.removedCount ?? contacts.length} duplicate contact${contacts.length === 1 ? "" : "s"}; one contact remains at each reviewed address.`)
+      setDuplicateReviewAddress(null)
+      setReviewAllDuplicates(false)
+      setDuplicateKeepers({})
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setRemovingDuplicates(false)
+    }
+  }, [duplicateKeepers, onSubmissionsChanged, reviewedDuplicateGroups])
 
   // Grouped by submission — easier to scan than one flat alphabetical list
   // when a handful of submissions account for most of the missed matches.
@@ -2078,6 +2331,14 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
             className="h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-56"
           />
           <button
+            onClick={() => openDuplicateReview("", true)}
+            disabled={loading || duplicateGroups.length === 0}
+            title="Review all duplicate-address groups, then remove all but one contact from each"
+            className="h-9 px-3 text-sm rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            Auto-remove duplicates
+          </button>
+          <button
             onClick={rescanAndMarkReviewed}
             disabled={loading}
             title="Re-run the scan and mark all active submissions as reviewed"
@@ -2213,12 +2474,13 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                       </td>
                       <td className="px-4 py-3">
                         {m.duplicateAddressCount > 1 ? (
-                          <span
-                            title="Same address as another match in this list"
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                          <button
+                            onClick={() => openDuplicateReview(dictionaryScanAddressKey(m))}
+                            title="View every Dictionary Scan contact at this address and choose which one to keep"
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 dark:text-amber-300 transition-colors"
                           >
                             {m.duplicateAddressCount}× address
-                          </span>
+                          </button>
                         ) : (
                           <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
                         )}
@@ -2322,6 +2584,65 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {duplicateReviewAddress !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="duplicate-review-title">
+          <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h3 id="duplicate-review-title" className="text-lg font-bold text-gray-900 dark:text-white">
+                {reviewAllDuplicates ? "Review duplicate addresses" : "Duplicate address"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Select the one contact to keep for each address. All others will be marked Duplicate and removed from this scan; no contact records are deleted.
+              </p>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 space-y-5">
+              {reviewedDuplicateGroups.map((group) => (
+                <section key={group.addressKey} className="rounded-xl border border-amber-200 dark:border-amber-900/60 overflow-hidden">
+                  <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    {[group.items[0].address, group.items[0].city, group.items[0].zipcode].filter(Boolean).join(", ")}
+                    <span className="ml-2 text-xs font-normal">{group.items.length} contacts</span>
+                  </div>
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {group.items.map((match) => {
+                      const key = `${match.submissionId}:${match.contactId}`
+                      return (
+                        <label key={key} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <input
+                            type="radio"
+                            name={`keeper-${group.addressKey}`}
+                            checked={duplicateKeepers[group.addressKey] === key}
+                            onChange={() => setDuplicateKeepers((previous) => ({ ...previous, [group.addressKey]: key }))}
+                            className="accent-indigo-600"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm text-gray-900 dark:text-white">{match.fullName || "Unnamed contact"}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{match.userId} · submitted {new Date(match.submittedAt).toLocaleDateString()} · {match.status}</p>
+                          </div>
+                          <span className={duplicateKeepers[group.addressKey] === key ? "text-xs font-semibold text-green-600" : "text-xs text-amber-600 dark:text-amber-400"}>
+                            {duplicateKeepers[group.addressKey] === key ? "Keep" : "Remove"}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {reviewedDuplicateGroups.reduce((count, group) => count + group.items.length - 1, 0)} contact{reviewedDuplicateGroups.reduce((count, group) => count + group.items.length - 1, 0) === 1 ? "" : "s"} will be removed from this scan.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={closeDuplicateReview} disabled={removingDuplicates} className="h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">Cancel</button>
+                <button onClick={removeReviewedDuplicates} disabled={removingDuplicates} className="h-9 px-3 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold disabled:opacity-50">
+                  {removingDuplicates ? "Removing…" : "Remove selected duplicates"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

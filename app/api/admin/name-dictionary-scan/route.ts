@@ -62,7 +62,7 @@ async function runScan() {
         c->>'phone'    AS phone,
         c->>'status'   AS status
       FROM submissions s, jsonb_array_elements(s.contacts) c
-      WHERE COALESCE(c->>'status', '') <> 'Potentially French' AND s.archived = FALSE
+      WHERE COALESCE(c->>'status', '') NOT IN ('Potentially French', 'Duplicate') AND s.archived = FALSE
     `),
     getDictionaryFile().catch((err: any) => {
       throw new Error(err?.message ?? "Failed to load dictionary from GitHub")
@@ -180,6 +180,78 @@ export async function POST() {
 // Contact shape used elsewhere in the app (see app/admin/user/[userId]/page.tsx).
 const EDITABLE_CONTACT_FIELDS = ["fullName", "lastName", "address", "city", "zipcode", "phone"] as const
 
+// Reclassify contacts that share an address as Duplicate.  They are retained
+// in the submission (rather than deleted) so the admin keeps an audit trail,
+// but are excluded from future Dictionary Scan results.
+async function markContactsDuplicate(contacts: { submissionId: number; contactId: string }[]) {
+  const unique = Array.from(
+    new Map(contacts.map((contact) => [`${contact.submissionId}:${contact.contactId}`, contact])).values(),
+  )
+  if (unique.length === 0) return 0
+
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
+    const changedSubmissionIds = new Set<number>()
+    let removedCount = 0
+
+    for (const contact of unique) {
+      const result = await client.query(
+        `UPDATE submissions
+         SET contacts = (
+           SELECT COALESCE(jsonb_agg(
+             CASE WHEN elem->>'id' = $2
+               THEN elem || '{"status":"Duplicate"}'::jsonb
+               ELSE elem
+             END
+           ), '[]'::jsonb)
+           FROM jsonb_array_elements(contacts) AS elem
+         )
+         WHERE id = $1
+           AND EXISTS (SELECT 1 FROM jsonb_array_elements(contacts) elem WHERE elem->>'id' = $2)
+         RETURNING id`,
+        [contact.submissionId, contact.contactId],
+      )
+      if (result.rowCount) {
+        changedSubmissionIds.add(contact.submissionId)
+        removedCount += 1
+      }
+    }
+
+    // Rebuild the cached status counters from the source JSON to avoid drift
+    // when a batch contains contacts from several submissions.
+    for (const submissionId of changedSubmissionIds) {
+      await client.query(
+        `UPDATE submissions s SET
+           contact_count = jsonb_array_length(s.contacts),
+           potentially_french = counts.potentially_french,
+           not_french = counts.not_french,
+           duplicate = counts.duplicate,
+           not_checked = counts.not_checked
+         FROM (
+           SELECT
+             COUNT(*) FILTER (WHERE c->>'status' = 'Potentially French')::int AS potentially_french,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Not French')::int AS not_french,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Duplicate')::int AS duplicate,
+             COUNT(*) FILTER (WHERE c->>'status' = 'Not checked')::int AS not_checked
+           FROM submissions source, jsonb_array_elements(source.contacts) c
+           WHERE source.id = $1
+         ) counts
+         WHERE s.id = $1`,
+        [submissionId],
+      )
+    }
+
+    await client.query("COMMIT")
+    return removedCount
+  } catch (err) {
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 // PATCH — marks a contact's status as "Potentially French", dismisses it
 // from future scan results without touching its status or the dictionary,
 // or updates its editable fields directly. Used per row in the panel to
@@ -199,7 +271,31 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const submissionId = Number(body?.submissionId)
     const contactId = String(body?.contactId ?? "")
-    const action = body?.action === "dismiss" ? "dismiss" : body?.action === "update" ? "update" : "markFrench"
+    const action = body?.action === "dismiss"
+      ? "dismiss"
+      : body?.action === "update"
+        ? "update"
+        : body?.action === "markDuplicate"
+          ? "markDuplicate"
+          : body?.action === "removeDuplicates"
+            ? "removeDuplicates"
+            : "markFrench"
+
+    if (action === "removeDuplicates") {
+      const contacts = Array.isArray(body?.contacts)
+        ? body.contacts
+          .map((contact: unknown) => {
+            const item = contact as { submissionId?: unknown; contactId?: unknown }
+            return { submissionId: Number(item?.submissionId), contactId: String(item?.contactId ?? "") }
+          })
+          .filter((contact: { submissionId: number; contactId: string }) => Number.isFinite(contact.submissionId) && !!contact.contactId)
+        : []
+      if (contacts.length === 0) {
+        return NextResponse.json({ error: "Choose at least one duplicate contact" }, { status: 400 })
+      }
+      const removedCount = await markContactsDuplicate(contacts)
+      return NextResponse.json({ success: true, removedCount })
+    }
 
     if (!Number.isFinite(submissionId) || !contactId) {
       return NextResponse.json({ error: "Missing submissionId or contactId" }, { status: 400 })
@@ -214,6 +310,12 @@ export async function PATCH(req: NextRequest) {
         [submissionId, contactId],
       )
       return NextResponse.json({ success: true })
+    }
+
+    if (action === "markDuplicate") {
+      const removedCount = await markContactsDuplicate([{ submissionId, contactId }])
+      if (removedCount === 0) return NextResponse.json({ error: "Contact not found" }, { status: 404 })
+      return NextResponse.json({ success: true, removedCount })
     }
 
     if (action === "update") {
