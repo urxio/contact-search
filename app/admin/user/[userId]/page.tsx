@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
 import { pool } from "@/lib/db"
-import { ArrowLeft, Download } from "lucide-react"
+import { ArrowLeft, Download, UserRound } from "lucide-react"
 
 interface Contact {
   id: string
@@ -81,31 +81,36 @@ export default async function UserDetailPage({
   const notChecked        = contacts.filter((c) => c.status === "Not checked")
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="admin-shell min-h-screen">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
         {/* Back + header */}
         <div className="mb-6">
-          <Link href="/admin" className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground">
+          <Link href="/admin" className="admin-material mb-6 inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Review queue
           </Link>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight">
-                {userId}
-                {isLatest && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
-                    Latest
-                  </span>
-                )}
-              </h1>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Submission {allSubmissions.length - submissionIndex} of {allSubmissions.length} ·{" "}
-                {new Date(submission.submitted_at).toLocaleString()}
-                {submission.territory_zipcode && ` · ZIP ${submission.territory_zipcode}`}
-                {submission.territory_page_range && ` · pages ${submission.territory_page_range}`}
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-primary">
+                <UserRound className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight tracking-tight">
+                  {userId}
+                  {isLatest && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                      Latest
+                    </span>
+                  )}
+                </h1>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Submission {allSubmissions.length - submissionIndex} of {allSubmissions.length} ·{" "}
+                  {new Date(submission.submitted_at).toLocaleString()}
+                  {submission.territory_zipcode && ` · ZIP ${submission.territory_zipcode}`}
+                  {submission.territory_page_range && ` · pages ${submission.territory_page_range}`}
+                </p>
+              </div>
             </div>
 
             {/* Submission switcher — shown when user has multiple */}
@@ -117,10 +122,10 @@ export default async function UserDetailPage({
                     <Link
                       key={s.id}
                       href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${s.id}`}
-                      className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors duration-150 ease-out ${
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-150 ease-out ${
                         s.id === targetId
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                          ? "admin-primary-button border-transparent text-primary-foreground"
+                          : "border-white/70 bg-background/75 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground dark:border-white/10"
                       }`}
                     >
                       {i === 0 ? "Latest" : new Date(s.submitted_at).toLocaleDateString()}
@@ -133,7 +138,7 @@ export default async function UserDetailPage({
         </div>
 
         {/* Compact submission summary */}
-        <div className="mb-6 grid grid-cols-2 divide-x divide-y overflow-hidden rounded-lg border bg-card shadow-sm sm:grid-cols-5 sm:divide-y-0">
+        <div className="admin-material mb-6 grid grid-cols-2 divide-x divide-y overflow-hidden rounded-2xl sm:grid-cols-5 sm:divide-y-0">
           <DetailMetric label="Total" value={contacts.length} />
           <DetailMetric label="Potential" value={potentiallyFrench.length} />
           <DetailMetric label="Not French" value={notFrench.length} />
@@ -143,7 +148,7 @@ export default async function UserDetailPage({
 
         {/* Global notes */}
         {submission.global_notes && (
-          <div className="mb-6 rounded-lg border bg-card p-4 shadow-sm">
+          <div className="admin-material mb-6 rounded-2xl p-5">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
               {submission.global_notes}
@@ -156,7 +161,7 @@ export default async function UserDetailPage({
           <a
             href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&submissionId=${targetId}&format=json`}
             download={`${userId}-submission-${targetId}.json`}
-            className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium transition-colors duration-150 ease-out hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all duration-150 ease-out hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Download JSON
@@ -164,10 +169,10 @@ export default async function UserDetailPage({
         </div>
 
         {/* Contact table */}
-        <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+        <div className="admin-card overflow-x-auto rounded-2xl">
           <table className="w-full min-w-[840px] text-sm">
             <thead>
-              <tr className="border-b bg-muted/30">
+              <tr className="border-b border-white/60 bg-white/25 dark:border-white/10 dark:bg-white/[0.03]">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Location</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</th>
@@ -180,7 +185,7 @@ export default async function UserDetailPage({
               {contacts.map((contact, i) => (
                 <tr
                   key={contact.id ?? i}
-                  className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30"
+                  className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-primary/[0.035]"
                 >
                   <td className="px-4 py-3 font-medium">
                     {contact.fullName}
@@ -216,8 +221,8 @@ export default async function UserDetailPage({
 
 function DetailMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="px-4 py-3">
-      <p className="text-base font-semibold">{value}</p>
+    <div className="px-4 py-4">
+      <p className="text-base font-semibold tabular-nums">{value}</p>
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   )

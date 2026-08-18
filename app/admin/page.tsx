@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Inbox,
+  LayoutDashboard,
   LogOut,
   MoreHorizontal,
   Trash2,
@@ -161,7 +162,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+      <div className="admin-shell flex min-h-screen items-center justify-center">
         <p className="animate-pulse text-sm text-muted-foreground">Loading admin…</p>
       </div>
     )
@@ -169,13 +170,13 @@ export default function AdminDashboard() {
 
   if (fetchError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-        <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center shadow-sm">
+      <div className="admin-shell flex min-h-screen items-center justify-center px-4">
+        <div className="admin-material w-full max-w-sm rounded-2xl p-6 text-center">
           <p className="mb-2 text-base font-semibold text-destructive">Could not load admin</p>
           <p className="mb-4 text-sm text-muted-foreground">{fetchError}</p>
           <button
             onClick={() => { setLoading(true); setFetchError(null); fetchSubmissions() }}
-            className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/90"
+            className="admin-primary-button h-9 rounded-xl px-4 text-sm font-medium text-primary-foreground transition-all duration-150 ease-out"
           >
             Try again
           </button>
@@ -185,23 +186,28 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="admin-shell min-h-screen">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
         {/* ── Header ── */}
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold leading-tight">Admin</h1>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Review submissions and manage contact checks.
-            </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="admin-icon-well flex h-11 w-11 items-center justify-center rounded-2xl text-primary">
+              <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold leading-tight tracking-tight">Admin</h1>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Review submissions and manage contact checks.
+              </p>
+            </div>
           </div>
           <button
             onClick={async () => {
               await fetch("/api/admin/logout", { method: "POST" })
               window.location.href = "/"
             }}
-            className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Sign out</span>
@@ -209,13 +215,13 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Primary navigation ── */}
-        <div className="mb-6 flex items-center gap-2 border-b">
+        <div className="admin-material mb-6 inline-flex items-center gap-1 rounded-full p-1">
           <button
             onClick={() => setActiveTab("submissions")}
-            className={`border-b-2 px-3 py-3 text-sm font-medium transition-colors duration-150 ease-out ${
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out ${
               activeTab === "submissions"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
             Review queue
@@ -223,10 +229,10 @@ export default function AdminDashboard() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className={`inline-flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   activeTab !== "submissions"
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
                 }`}
               >
                 <Wrench className="h-4 w-4" aria-hidden="true" />
@@ -234,7 +240,7 @@ export default function AdminDashboard() {
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuContent align="start" className="admin-material w-56 rounded-2xl p-2">
               <DropdownMenuLabel>Contact tools</DropdownMenuLabel>
               {([
                 ["dictionaryScan", "Dictionary scan"],
@@ -278,22 +284,22 @@ export default function AdminDashboard() {
 
         {/* ── Review queue ── */}
         <div className={activeTab === "submissions" ? "" : "hidden"}>
-          <div className="mb-6 flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="admin-material mb-6 flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid grid-cols-3 divide-x">
               <QueueMetric icon={Inbox} label="Pending" value={totalPending} />
               <QueueMetric icon={Users} label="Contacts" value={totalContacts} />
               <QueueMetric icon={CheckCircle2} label="Reviewed" value={totalReviewed} />
             </div>
-            <div className="inline-flex w-fit rounded-md bg-muted p-1">
+            <div className="inline-flex w-fit rounded-full bg-muted/70 p-1 shadow-inner">
               <button
                 onClick={() => setShowArchived(false)}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Active
               </button>
               <button
                 onClick={() => setShowArchived(true)}
-                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out ${showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Archived{archivedCount > 0 ? ` (${archivedCount})` : ""}
               </button>
@@ -301,7 +307,7 @@ export default function AdminDashboard() {
           </div>
 
           {userGroups.length === 0 && (
-            <div className="rounded-lg border bg-card px-6 py-12 text-center shadow-sm">
+            <div className="admin-material rounded-2xl px-6 py-12 text-center">
               <p className="text-base font-semibold">{showArchived ? "No archived submissions" : "No submissions yet"}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {showArchived ? "Archived work will appear here." : "New work appears here after a user sends it for review."}
@@ -316,8 +322,8 @@ export default function AdminDashboard() {
               const latest = userSubs[0]
 
               return (
-                <section key={userId} className="overflow-hidden rounded-lg border bg-card shadow-sm">
-                  <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <section key={userId} className="admin-card overflow-hidden rounded-2xl">
+                  <div className="flex flex-col gap-2 border-b border-white/60 bg-white/25 px-5 py-4 dark:border-white/10 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-base font-semibold">{userId}</h2>
@@ -355,11 +361,11 @@ export default function AdminDashboard() {
                           const zip = sub.top_zipcode || sub.territory_zipcode
 
                           return (
-                            <tr key={sub.id} className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
+                            <tr key={sub.id} className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-primary/[0.035]">
                               <td className="px-4 py-3 text-muted-foreground">
                                 <div className="flex items-center gap-2">
                                   <span>{new Date(sub.submitted_at).toLocaleString()}</span>
-                                  {index === 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">Latest</span>}
+                                  {index === 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Latest</span>}
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-muted-foreground">
@@ -389,7 +395,7 @@ export default function AdminDashboard() {
                                 <div className="flex items-center justify-end gap-2">
                                   <Link
                                     href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
-                                    className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="admin-primary-button inline-flex h-8 items-center rounded-full px-4 text-xs font-semibold text-primary-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   >
                                     Review
                                   </Link>
@@ -398,12 +404,12 @@ export default function AdminDashboard() {
                                       <button
                                         disabled={isBusy}
                                         aria-label={`More actions for submission ${sub.id}`}
-                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-background/75 text-muted-foreground shadow-sm backdrop-blur transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 dark:border-white/10"
                                       >
                                         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                                       </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuContent align="end" className="admin-material rounded-xl p-2">
                                       <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
                                         {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
                                         {sub.archived ? "Restore" : "Archive"}
@@ -441,9 +447,11 @@ export default function AdminDashboard() {
 function QueueMetric({ icon: Icon, label, value }: { icon: typeof Inbox; label: string; value: number }) {
   return (
     <div className="flex min-w-0 items-center gap-3 px-3 sm:px-5">
-      <Icon className="hidden h-4 w-4 text-muted-foreground sm:block" aria-hidden="true" />
+      <span className="admin-icon-well hidden h-9 w-9 items-center justify-center rounded-xl text-primary sm:flex">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
       <div>
-        <p className="text-base font-semibold">{value}</p>
+        <p className="text-base font-semibold tabular-nums">{value}</p>
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
       </div>
     </div>
