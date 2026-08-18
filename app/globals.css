@@ -43,9 +43,10 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --admin-blue: 211 100% 55%;
-    --admin-violet: 262 83% 70%;
-    --admin-mint: 157 66% 68%;
     --admin-shadow: 220 35% 15%;
+    --admin-canvas: 0 0% 100%;
+    --admin-surface: 0 0% 100%;
+    --admin-border: 220 13% 91%;
   }
   .dark {
     --background: 222.2 84% 4.9%;
@@ -76,9 +77,10 @@ body {
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     --admin-blue: 211 100% 62%;
-    --admin-violet: 262 83% 72%;
-    --admin-mint: 157 55% 56%;
     --admin-shadow: 220 60% 2%;
+    --admin-canvas: 225 10% 7%;
+    --admin-surface: 225 8% 10%;
+    --admin-border: 225 7% 21%;
   }
 
   * {
@@ -115,50 +117,53 @@ body {
 
 @layer components {
   .admin-shell {
-    background-color: hsl(var(--muted) / 0.28);
-    background-image:
-      radial-gradient(circle at 8% 2%, hsl(var(--admin-blue) / 0.14), transparent 28rem),
-      radial-gradient(circle at 92% 0%, hsl(var(--admin-violet) / 0.12), transparent 24rem),
-      radial-gradient(circle at 50% 100%, hsl(var(--admin-mint) / 0.08), transparent 30rem);
-    background-attachment: fixed;
+    background-color: hsl(var(--admin-canvas));
   }
 
   .admin-material {
-    @apply border border-white/70 bg-card/75 backdrop-blur-xl dark:border-white/10 dark:bg-card/70;
+    border: 1px solid hsl(var(--admin-border));
+    background-color: hsl(var(--admin-surface));
     box-shadow:
       0 1px 2px hsl(var(--admin-shadow) / 0.04),
-      0 16px 40px hsl(var(--admin-shadow) / 0.07);
+      0 12px 32px hsl(var(--admin-shadow) / 0.06);
   }
 
   .admin-card {
-    @apply border border-white/80 bg-card/85 backdrop-blur-lg transition-all duration-150 ease-out dark:border-white/10 dark:bg-card/80;
+    @apply transition-all duration-150 ease-out;
+    border: 1px solid hsl(var(--admin-border));
+    background-color: hsl(var(--admin-surface));
     box-shadow:
       0 1px 2px hsl(var(--admin-shadow) / 0.04),
-      0 10px 30px hsl(var(--admin-shadow) / 0.06);
+      0 8px 24px hsl(var(--admin-shadow) / 0.05);
   }
 
   .admin-card:hover {
     box-shadow:
       0 1px 2px hsl(var(--admin-shadow) / 0.05),
-      0 18px 44px hsl(var(--admin-shadow) / 0.09);
+      0 12px 32px hsl(var(--admin-shadow) / 0.08);
   }
 
   .admin-icon-well {
-    background: linear-gradient(145deg, hsl(var(--admin-blue) / 0.16), hsl(var(--admin-violet) / 0.10));
+    background-color: hsl(var(--admin-blue) / 0.10);
     box-shadow: inset 0 0 0 1px hsl(var(--admin-blue) / 0.10);
   }
 
+  .admin-field {
+    border: 1px solid hsl(var(--admin-border));
+    background-color: hsl(var(--admin-canvas));
+  }
+
   .admin-primary-button {
-    background: linear-gradient(180deg, hsl(var(--admin-blue)), hsl(var(--primary)));
+    background-color: hsl(var(--admin-blue));
     box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.24),
-      0 4px 12px hsl(var(--admin-blue) / 0.22);
+      inset 0 1px 0 hsl(0 0% 100% / 0.18),
+      0 3px 10px hsl(var(--admin-blue) / 0.18);
   }
 
   .admin-primary-button:hover {
-    filter: brightness(1.04);
+    filter: brightness(0.96);
     box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.28),
-      0 6px 16px hsl(var(--admin-blue) / 0.28);
+      inset 0 1px 0 hsl(0 0% 100% / 0.18),
+      0 4px 12px hsl(var(--admin-blue) / 0.22);
   }
 }

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { LockKeyhole } from "lucide-react"
+import { ThemeSwitcher } from "@/components/theme-switcher"
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState("")
@@ -30,7 +31,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="admin-shell flex min-h-screen items-center justify-center px-4">
+    <div className="admin-shell relative flex min-h-screen items-center justify-center px-4">
+      <ThemeSwitcher className="admin-material absolute right-4 top-4 sm:right-6 sm:top-6" />
       <div className="admin-material w-full max-w-sm rounded-3xl p-8">
         <div className="admin-icon-well mb-6 flex h-12 w-12 items-center justify-center rounded-2xl text-primary">
           <LockKeyhole className="h-5 w-5" aria-hidden="true" />
@@ -48,14 +50,14 @@ export default function AdminLoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-11 rounded-xl border border-white/70 bg-background/75 px-4 text-sm shadow-inner outline-none backdrop-blur transition-all duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring dark:border-white/10"
+            className="admin-field h-11 rounded-xl px-4 text-sm shadow-inner outline-none transition-all duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring"
             required
           />
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="admin-primary-button h-11 rounded-xl px-4 text-sm font-medium text-primary-foreground transition-all duration-150 ease-out disabled:opacity-50"
+            className="admin-primary-button h-11 rounded-xl px-4 text-sm font-medium text-white transition-all duration-150 ease-out disabled:opacity-50"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>

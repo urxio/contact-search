@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ThemeSwitcher } from "@/components/theme-switcher"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,9 @@ interface UserGroup {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<ReviewStatus, string> = {
-  pending:   "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
-  in_review: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
-  reviewed:  "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700",
+  pending:   "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  in_review: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+  reviewed:  "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300",
 }
 
 function pct(a: number, total: number) {
@@ -176,7 +177,7 @@ export default function AdminDashboard() {
           <p className="mb-4 text-sm text-muted-foreground">{fetchError}</p>
           <button
             onClick={() => { setLoading(true); setFetchError(null); fetchSubmissions() }}
-            className="admin-primary-button h-9 rounded-xl px-4 text-sm font-medium text-primary-foreground transition-all duration-150 ease-out"
+            className="admin-primary-button h-9 rounded-xl px-4 text-sm font-medium text-white transition-all duration-150 ease-out"
           >
             Try again
           </button>
@@ -202,16 +203,19 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-          <button
-            onClick={async () => {
-              await fetch("/api/admin/logout", { method: "POST" })
-              window.location.href = "/"
-            }}
-            className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Sign out</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher className="admin-material" />
+            <button
+              onClick={async () => {
+                await fetch("/api/admin/logout", { method: "POST" })
+                window.location.href = "/"
+              }}
+              className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
 
         {/* ── Primary navigation ── */}
@@ -220,7 +224,7 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab("submissions")}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out ${
               activeTab === "submissions"
-                ? "bg-background text-foreground shadow-sm"
+                ? "bg-muted/70 text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
@@ -231,7 +235,7 @@ export default function AdminDashboard() {
               <button
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   activeTab !== "submissions"
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-muted/70 text-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
                 }`}
               >
@@ -293,13 +297,13 @@ export default function AdminDashboard() {
             <div className="inline-flex w-fit rounded-full bg-muted/70 p-1 shadow-inner">
               <button
                 onClick={() => setShowArchived(false)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Active
               </button>
               <button
                 onClick={() => setShowArchived(true)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${showArchived ? "bg-background text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Archived{archivedCount > 0 ? ` (${archivedCount})` : ""}
               </button>
@@ -323,7 +327,7 @@ export default function AdminDashboard() {
 
               return (
                 <section key={userId} className="admin-card overflow-hidden rounded-2xl">
-                  <div className="flex flex-col gap-2 border-b border-white/60 bg-white/25 px-5 py-4 dark:border-white/10 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-2 border-b bg-muted/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-base font-semibold">{userId}</h2>
@@ -395,7 +399,7 @@ export default function AdminDashboard() {
                                 <div className="flex items-center justify-end gap-2">
                                   <Link
                                     href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
-                                    className="admin-primary-button inline-flex h-8 items-center rounded-full px-4 text-xs font-semibold text-primary-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="admin-primary-button inline-flex h-8 items-center rounded-full px-4 text-xs font-semibold text-white transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   >
                                     Review
                                   </Link>
@@ -404,7 +408,7 @@ export default function AdminDashboard() {
                                       <button
                                         disabled={isBusy}
                                         aria-label={`More actions for submission ${sub.id}`}
-                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-background/75 text-muted-foreground shadow-sm backdrop-blur transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 dark:border-white/10"
+                                        className="admin-material inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                                       >
                                         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                                       </button>

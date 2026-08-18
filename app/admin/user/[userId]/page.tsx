@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
 import { pool } from "@/lib/db"
 import { ArrowLeft, Download, UserRound } from "lucide-react"
+import { ThemeSwitcher } from "@/components/theme-switcher"
 
 interface Contact {
   id: string
@@ -30,11 +31,11 @@ interface SubmissionSummary {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  "Potentially French": "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  "Not French":         "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  "Duplicate":          "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  "Not checked":        "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  "Detected":           "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  "Potentially French": "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300",
+  "Not French":         "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300",
+  "Duplicate":          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  "Not checked":        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+  "Detected":           "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300",
 }
 
 export default async function UserDetailPage({
@@ -86,10 +87,13 @@ export default async function UserDetailPage({
 
         {/* Back + header */}
         <div className="mb-6">
-          <Link href="/admin" className="admin-material mb-6 inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Review queue
-          </Link>
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <Link href="/admin" className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Review queue
+            </Link>
+            <ThemeSwitcher className="admin-material" />
+          </div>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-primary">
@@ -124,8 +128,8 @@ export default async function UserDetailPage({
                       href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${s.id}`}
                       className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-150 ease-out ${
                         s.id === targetId
-                          ? "admin-primary-button border-transparent text-primary-foreground"
-                          : "border-white/70 bg-background/75 text-muted-foreground shadow-sm backdrop-blur hover:text-foreground dark:border-white/10"
+                          ? "admin-primary-button border-transparent text-white"
+                          : "admin-material text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {i === 0 ? "Latest" : new Date(s.submitted_at).toLocaleDateString()}
@@ -172,7 +176,7 @@ export default async function UserDetailPage({
         <div className="admin-card overflow-x-auto rounded-2xl">
           <table className="w-full min-w-[840px] text-sm">
             <thead>
-              <tr className="border-b border-white/60 bg-white/25 dark:border-white/10 dark:bg-white/[0.03]">
+              <tr className="border-b bg-muted/30">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Location</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</th>
@@ -199,7 +203,7 @@ export default async function UserDetailPage({
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{contact.phone || "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[contact.status] ?? "bg-gray-100 text-gray-700"}`}>
+                    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[contact.status] ?? "border-border bg-muted text-muted-foreground"}`}>
                       {contact.status}
                     </span>
                   </td>
