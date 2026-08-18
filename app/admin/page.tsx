@@ -3,6 +3,26 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import {
+  Archive,
+  ArchiveRestore,
+  CheckCircle2,
+  ChevronDown,
+  Inbox,
+  LogOut,
+  MoreHorizontal,
+  Trash2,
+  Users,
+  Wrench,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,9 +153,6 @@ export default function AdminDashboard() {
   const userGroups: UserGroup[] = Object.entries(grouped).map(([userId, subs]) => ({ userId, submissions: subs }))
 
   const totalContacts  = visible.reduce((s, r) => s + r.contact_count, 0)
-  const totalFrench    = visible.reduce((s, r) => s + r.potentially_french, 0)
-  const totalNotFrench = visible.reduce((s, r) => s + r.not_french, 0)
-  const totalUnchecked = visible.reduce((s, r) => s + r.not_checked, 0)
   const totalPending   = visible.filter(s => s.review_status === "pending").length
   const totalReviewed  = visible.filter(s => s.review_status === "reviewed").length
   const archivedCount  = submissions.filter(s => s.archived).length
@@ -144,21 +161,21 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm animate-pulse">Loading…</p>
+      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+        <p className="animate-pulse text-sm text-muted-foreground">Loading admin…</p>
       </div>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 font-semibold mb-2">Error loading dashboard</p>
-          <p className="text-gray-400 text-sm mb-4">{fetchError}</p>
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+        <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center shadow-sm">
+          <p className="mb-2 text-base font-semibold text-destructive">Could not load admin</p>
+          <p className="mb-4 text-sm text-muted-foreground">{fetchError}</p>
           <button
             onClick={() => { setLoading(true); setFetchError(null); fetchSubmissions() }}
-            className="text-sm text-blue-600 hover:underline"
+            className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/90"
           >
             Try again
           </button>
@@ -168,23 +185,15 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
         {/* ── Header ── */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {userGroups.length} user{userGroups.length !== 1 ? "s" : ""} · {visible.length} submission{visible.length !== 1 ? "s" : ""}
-              {archivedCount > 0 && (
-                <button
-                  onClick={() => setShowArchived(v => !v)}
-                  className="ml-3 text-xs underline text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  {showArchived ? "← Back to active" : `${archivedCount} archived`}
-                </button>
-              )}
+            <h1 className="text-2xl font-bold leading-tight">Admin</h1>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Review submissions and manage contact checks.
             </p>
           </div>
           <button
@@ -192,276 +201,235 @@ export default function AdminDashboard() {
               await fetch("/api/admin/logout", { method: "POST" })
               window.location.href = "/"
             }}
-            className="text-sm text-gray-500 hover:text-red-500 transition-colors"
+            className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Sign out
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Sign out</span>
           </button>
         </div>
 
-        {/* ── Tab switcher ── */}
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-8 w-fit">
-          {(["submissions", "dictionaryScan", "names", "potentiallyFrench", "otm"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); setVisitedTabs((v) => new Set(v).add(tab)) }}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                activeTab === tab
-                  ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab === "submissions"
-                ? "Submissions"
-                : tab === "otm"
-                  ? "OTM Dups Check"
-                  : tab === "names"
-                    ? "Name Feedback"
-                    : tab === "potentiallyFrench"
-                      ? "Potentially French"
-                      : "Dictionary Scan"}
-            </button>
-          ))}
+        {/* ── Primary navigation ── */}
+        <div className="mb-6 flex items-center gap-2 border-b">
+          <button
+            onClick={() => setActiveTab("submissions")}
+            className={`border-b-2 px-3 py-3 text-sm font-medium transition-colors duration-150 ease-out ${
+              activeTab === "submissions"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Review queue
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`inline-flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  activeTab !== "submissions"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Wrench className="h-4 w-4" aria-hidden="true" />
+                Tools
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Contact tools</DropdownMenuLabel>
+              {([
+                ["dictionaryScan", "Dictionary scan"],
+                ["names", "Name feedback"],
+                ["potentiallyFrench", "Potentially French"],
+                ["otm", "OTM duplicate check"],
+              ] as const).map(([tab, label]) => (
+                <DropdownMenuItem
+                  key={tab}
+                  onSelect={() => {
+                    setActiveTab(tab)
+                    setVisitedTabs((visited) => new Set(visited).add(tab))
+                  }}
+                  className={activeTab === tab ? "bg-accent" : ""}
+                >
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* ── OTM Dups Check panel ── */}
+        {/* Keep tools mounted after their first visit so switching does not refetch. */}
         {visitedTabs.has("otm") && (
           <div className={activeTab === "otm" ? "" : "hidden"}><OtmPanel /></div>
         )}
 
-        {/* ── Name Feedback panel ── */}
         {visitedTabs.has("names") && (
           <div className={activeTab === "names" ? "" : "hidden"}><DictionaryFeedbackPanel /></div>
         )}
 
-        {/* ── Potentially French list panel ── */}
         {visitedTabs.has("potentiallyFrench") && (
           <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><PotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} /></div>
         )}
 
-        {/* ── Dictionary Scan panel ── */}
         {visitedTabs.has("dictionaryScan") && (
           <div className={activeTab === "dictionaryScan" ? "" : "hidden"}>
             <DictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />
           </div>
         )}
 
-        {/* ── Submissions tab ── */}
+        {/* ── Review queue ── */}
         <div className={activeTab === "submissions" ? "" : "hidden"}>
-
-        {/* ── Summary cards ── */}
-        {visible.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-            <SummaryCard label="Total Contacts"     value={totalContacts}  color="text-gray-900 dark:text-white" />
-            <SummaryCard label="Potentially French" value={totalFrench}    color="text-green-600" />
-            <SummaryCard label="Not French"         value={totalNotFrench} color="text-red-500" />
-            <SummaryCard label="Not Checked"        value={totalUnchecked} color="text-blue-500" />
-            <SummaryCard label="Pending Review"     value={totalPending}   color="text-amber-500" />
-            <SummaryCard label="Reviewed"           value={totalReviewed}  color="text-green-600" />
-          </div>
-        )}
-
-        {/* ── No submissions ── */}
-        {userGroups.length === 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-12 text-center">
-            <p className="text-gray-400 text-lg">
-              {showArchived ? "No archived submissions." : "No submissions yet."}
-            </p>
-            {!showArchived && (
-              <p className="text-gray-400 text-sm mt-1">
-                Users submit their work via the "Send for Review" button on the main app.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ── User groups ── */}
-        <div className="flex flex-col gap-6">
-          {userGroups.map(({ userId, submissions: userSubs }) => {
-            const totalC        = userSubs.reduce((s, r) => s + r.contact_count, 0)
-            const totalF        = userSubs.reduce((s, r) => s + r.potentially_french, 0)
-            const totalNF       = userSubs.reduce((s, r) => s + r.not_french, 0)
-            const totalD        = userSubs.reduce((s, r) => s + r.duplicate, 0)
-            const totalNC       = userSubs.reduce((s, r) => s + r.not_checked, 0)
-            const totalChecked  = totalF + totalNF + totalD
-            const checkedPctAll = pct(totalChecked, totalC)
-            const frenchPctAll  = pct(totalF, totalC)
-            const pendingCount  = userSubs.filter(s => s.review_status === "pending").length
-            const reviewedCount = userSubs.filter(s => s.review_status === "reviewed").length
-            const latest        = userSubs[0]
-
-            return (
-              <div
-                key={userId}
-                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
+          <div className="mb-6 flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid grid-cols-3 divide-x">
+              <QueueMetric icon={Inbox} label="Pending" value={totalPending} />
+              <QueueMetric icon={Users} label="Contacts" value={totalContacts} />
+              <QueueMetric icon={CheckCircle2} label="Reviewed" value={totalReviewed} />
+            </div>
+            <div className="inline-flex w-fit rounded-md bg-muted p-1">
+              <button
+                onClick={() => setShowArchived(false)}
+                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
-                {/* User header */}
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-base font-bold text-gray-900 dark:text-white">{userId}</span>
-                      <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full px-2 py-0.5 font-medium">
-                        {userSubs.length} submission{userSubs.length !== 1 ? "s" : ""}
-                      </span>
-                      {pendingCount > 0 && (
-                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full px-2 py-0.5 font-medium">
-                          {pendingCount} pending
-                        </span>
-                      )}
-                      {reviewedCount > 0 && (
-                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full px-2 py-0.5 font-medium">
-                          {reviewedCount} reviewed
-                        </span>
-                      )}
+                Active
+              </button>
+              <button
+                onClick={() => setShowArchived(true)}
+                className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out ${showArchived ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Archived{archivedCount > 0 ? ` (${archivedCount})` : ""}
+              </button>
+            </div>
+          </div>
+
+          {userGroups.length === 0 && (
+            <div className="rounded-lg border bg-card px-6 py-12 text-center shadow-sm">
+              <p className="text-base font-semibold">{showArchived ? "No archived submissions" : "No submissions yet"}</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {showArchived ? "Archived work will appear here." : "New work appears here after a user sends it for review."}
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4">
+            {userGroups.map(({ userId, submissions: userSubs }) => {
+              const totalC = userSubs.reduce((sum, submission) => sum + submission.contact_count, 0)
+              const pendingCount = userSubs.filter((submission) => submission.review_status === "pending").length
+              const latest = userSubs[0]
+
+              return (
+                <section key={userId} className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                  <div className="flex flex-col gap-2 border-b bg-muted/30 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-base font-semibold">{userId}</h2>
+                        {pendingCount > 0 && (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                            {pendingCount} pending
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {userSubs.length} submission{userSubs.length !== 1 ? "s" : ""} · {totalC} contacts
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400">Last: {new Date(latest.submitted_at).toLocaleString()}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Last submitted {new Date(latest.submitted_at).toLocaleString()}
+                    </p>
                   </div>
 
-                  {/* Per-user incremental stats */}
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs">
-                    <StatRow label="Total contacts"     value={totalC} />
-                    <StatRow label="Potentially French" value={`${totalF} (${frenchPctAll}%)`}     color="text-green-600" />
-                    <StatRow label="Not French"         value={totalNF}                             color="text-red-500" />
-                    <StatRow label="Duplicate"          value={totalD}                              color="text-amber-500" />
-                    <StatRow label="Not checked"        value={totalNC}                             color="text-blue-500" />
-                    <StatRow label="Checked %"          value={`${checkedPctAll}%`}                 color={checkedPctAll === 100 ? "text-green-600" : "text-gray-600 dark:text-gray-400"} />
-                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Submitted</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contacts</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Classification</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                          <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {userSubs.map((sub, index) => {
+                          const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
+                          const isBusy = !!busy[sub.id]
+                          const zip = sub.top_zipcode || sub.territory_zipcode
 
-                  {/* Color progress bar */}
-                  {totalC > 0 && (
-                    <div className="mt-3 flex gap-0.5 h-1.5 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-                      <div className="bg-green-500 h-full transition-all" style={{ width: `${pct(totalF, totalC)}%` }} title="Potentially French" />
-                      <div className="bg-red-400 h-full transition-all"   style={{ width: `${pct(totalNF, totalC)}%` }} title="Not French" />
-                      <div className="bg-amber-400 h-full transition-all" style={{ width: `${pct(totalD, totalC)}%` }} title="Duplicate" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Submissions table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 dark:border-gray-800">
-                        <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Submitted</th>
-                        <th className="text-left px-5 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Territory</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Total</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-green-600 uppercase tracking-wide">French</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-red-500 uppercase tracking-wide">Not Fr.</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-amber-500 uppercase tracking-wide">Dup.</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-blue-500 uppercase tracking-wide">Unchk.</th>
-                        <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
-                        <th className="px-4 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {userSubs.map((sub, idx) => {
-                        const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
-                        const isBusy     = !!busy[sub.id]
-
-                        return (
-                          <tr
-                            key={sub.id}
-                            className={`border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors ${
-                              sub.archived ? "opacity-50" : "hover:bg-gray-50 dark:hover:bg-gray-800/30"
-                            }`}
-                          >
-                            <td className="px-5 py-3 text-gray-500">
-                              <span className="flex items-center gap-2 flex-wrap">
-                                {new Date(sub.submitted_at).toLocaleString()}
-                                {idx === 0 && (
-                                  <span className="text-[10px] bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-full px-1.5 py-0.5 font-semibold">
-                                    latest
-                                  </span>
-                                )}
-                              </span>
-                            </td>
-
-                            <td className="px-5 py-3 text-gray-500 text-xs">
-                              {(() => {
-                                const zip = sub.top_zipcode || sub.territory_zipcode
-                                if (!zip) return "—"
-                                const pages = sub.territory_page_range ? ` · Pages: ${sub.territory_page_range}` : ""
-                                const label = sub.top_zipcode ? "Most used: " : "ZIP: "
-                                return `${label}${zip}${pages}`
-                              })()}
-                            </td>
-
-                            <td className="px-4 py-3 text-right font-medium">{sub.contact_count}</td>
-                            <td className="px-4 py-3 text-right text-green-600 font-medium">{sub.potentially_french}</td>
-                            <td className="px-4 py-3 text-right text-red-500 font-medium">{sub.not_french}</td>
-                            <td className="px-4 py-3 text-right text-amber-500 font-medium">{sub.duplicate}</td>
-                            <td className="px-4 py-3 text-right text-blue-500 font-medium">{sub.not_checked}</td>
-
-                            {/* Review status dropdown */}
-                            <td className="px-4 py-3">
-                              <select
-                                value={sub.review_status ?? "pending"}
-                                disabled={isBusy}
-                                onChange={(e) => setStatus(sub.id, e.target.value as ReviewStatus)}
-                                className={`text-xs font-semibold border rounded-full px-2.5 py-1 cursor-pointer focus:outline-none transition-colors ${STATUS_CLASSES[sub.review_status ?? "pending"]} disabled:opacity-50`}
-                              >
-                                <option value="pending">Pending Review</option>
-                                <option value="in_review">In Review</option>
-                                <option value="reviewed">Reviewed</option>
-                              </select>
-                            </td>
-
-                            {/* Actions */}
-                            <td className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1.5">
-                                <span className="text-xs text-gray-400">{checkedPct}%</span>
-
-                                {/* View button */}
-                                <span className="relative group/tip">
+                          return (
+                            <tr key={sub.id} className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
+                              <td className="px-4 py-3 text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <span>{new Date(sub.submitted_at).toLocaleString()}</span>
+                                  {index === 0 && <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">Latest</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium">{sub.contact_count}</td>
+                              <td className="px-4 py-3">
+                                <p className="font-medium">{checkedPct}% checked</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {sub.potentially_french} possible · {sub.duplicate} duplicate · {sub.not_checked} unchecked
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={sub.review_status ?? "pending"}
+                                  disabled={isBusy}
+                                  onChange={(event) => setStatus(sub.id, event.target.value as ReviewStatus)}
+                                  aria-label={`Review status for submission ${sub.id}`}
+                                  className={`rounded-full border px-3 py-1 text-xs font-semibold outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${STATUS_CLASSES[sub.review_status ?? "pending"]}`}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="in_review">In review</option>
+                                  <option value="reviewed">Reviewed</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-2">
                                   <Link
                                     href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
-                                    className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1 transition-colors"
+                                    className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   >
-                                    View
+                                    Review
                                   </Link>
-                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
-                                    View full submission
-                                  </span>
-                                </span>
-
-                                {/* Archive / Unarchive button */}
-                                <span className="relative group/tip">
-                                  <button
-                                    disabled={isBusy}
-                                    onClick={() => toggleArchive(sub.id, !sub.archived)}
-                                    className="text-xs text-gray-400 hover:text-amber-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
-                                  >
-                                    {sub.archived ? "↩" : "⊟"}
-                                  </button>
-                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
-                                    {sub.archived ? "Restore submission" : "Archive submission"}
-                                  </span>
-                                </span>
-
-                                {/* Delete button */}
-                                <span className="relative group/tip">
-                                  <button
-                                    disabled={isBusy}
-                                    onClick={() => deleteSubmission(sub.id)}
-                                    className="text-xs text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 transition-colors disabled:opacity-40"
-                                  >
-                                    🗑
-                                  </button>
-                                  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover/tip:opacity-100 transition-opacity z-50">
-                                    Permanently delete
-                                  </span>
-                                </span>
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        disabled={isBusy}
+                                        aria-label={`More actions for submission ${sub.id}`}
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                                      >
+                                        <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
+                                        {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+                                        {sub.archived ? "Restore" : "Archive"}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onSelect={() => deleteSubmission(sub.id)}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 aria-hidden="true" />
+                                        Delete permanently
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -470,20 +438,14 @@ export default function AdminDashboard() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value, color }: { label: string; value: number | string; color: string }) {
+function QueueMetric({ icon: Icon, label, value }: { icon: typeof Inbox; label: string; value: number }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-gray-500 mt-1">{label}</div>
-    </div>
-  )
-}
-
-function StatRow({ label, value, color = "text-gray-600 dark:text-gray-400" }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-gray-500">{label}</span>
-      <span className={`font-semibold ${color}`}>{value}</span>
+    <div className="flex min-w-0 items-center gap-3 px-3 sm:px-5">
+      <Icon className="hidden h-4 w-4 text-muted-foreground sm:block" aria-hidden="true" />
+      <div>
+        <p className="text-base font-semibold">{value}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      </div>
     </div>
   )
 }
