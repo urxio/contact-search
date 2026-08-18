@@ -29,27 +29,31 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Admin Login</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Enter your admin password to continue.</p>
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+      <div className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-sm">
+        <h1 className="text-2xl font-bold leading-tight">Admin</h1>
+        <p className="mb-6 mt-1 text-sm leading-relaxed text-muted-foreground">Sign in to review submissions.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label htmlFor="admin-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Password
+          </label>
           <input
+            id="admin-password"
             type="password"
-            placeholder="Password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="h-10 rounded-md border bg-background px-3 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring"
             required
           />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+            className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-150 ease-out hover:bg-primary/90 disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </div>
