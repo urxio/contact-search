@@ -6,6 +6,7 @@ import Link from "next/link"
 import {
   Archive,
   ArchiveRestore,
+  ArrowUpDown,
   CheckCircle2,
   ChevronDown,
   Filter as FilterIcon,
@@ -24,6 +25,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -33,6 +36,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher"
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type ReviewStatus = "pending" | "in_review" | "reviewed"
+type SubmissionSort = "newest" | "oldest" | "user" | "contacts" | "progress"
 
 interface Submission {
   id: number
@@ -59,8 +63,35 @@ const STATUS_CLASSES: Record<ReviewStatus, string> = {
   reviewed:  "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300",
 }
 
+const SUBMISSION_SORT_OPTIONS: Array<{ value: SubmissionSort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "user", label: "User A–Z" },
+  { value: "contacts", label: "Most contacts" },
+  { value: "progress", label: "Needs review" },
+]
+
+const USER_ICON_CLASSES = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/70 dark:text-cyan-300",
+  "bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300",
+  "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950/70 dark:text-fuchsia-300",
+] as const
+
 function pct(a: number, total: number) {
   return total > 0 ? Math.round((a / total) * 100) : 0
+}
+
+function userIconClass(userId: string) {
+  let hash = 0
+  for (let index = 0; index < userId.length; index += 1) {
+    hash = ((hash << 5) - hash + userId.charCodeAt(index)) | 0
+  }
+  return USER_ICON_CLASSES[Math.abs(hash) % USER_ICON_CLASSES.length]
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -81,6 +112,7 @@ export default function AdminDashboard() {
   const [submissionUser, setSubmissionUser] = useState("all")
   const [submissionStatus, setSubmissionStatus] = useState<"all" | ReviewStatus>("all")
   const [submissionProgress, setSubmissionProgress] = useState<"all" | "complete" | "incomplete" | "unchecked">("all")
+  const [submissionSort, setSubmissionSort] = useState<SubmissionSort>("newest")
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -169,6 +201,26 @@ export default function AdminDashboard() {
     if (submissionProgress === "incomplete" && checkedCount >= submission.contact_count) return false
     if (submissionProgress === "unchecked" && submission.not_checked === 0) return false
     return true
+  })
+  const sortedFilteredVisible = [...filteredVisible].sort((a, b) => {
+    const newestFirst = new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+
+    switch (submissionSort) {
+      case "oldest":
+        return -newestFirst
+      case "user":
+        return a.user_id.localeCompare(b.user_id) || newestFirst
+      case "contacts":
+        return b.contact_count - a.contact_count || newestFirst
+      case "progress": {
+        const aProgress = pct(a.potentially_french + a.not_french + a.duplicate, a.contact_count)
+        const bProgress = pct(b.potentially_french + b.not_french + b.duplicate, b.contact_count)
+        return aProgress - bProgress || newestFirst
+      }
+      case "newest":
+      default:
+        return newestFirst
+    }
   })
   const activeFilterCount = [
     submissionUser !== "all",
@@ -389,6 +441,33 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">
+                          {SUBMISSION_SORT_OPTIONS.find((option) => option.value === submissionSort)?.label}
+                        </span>
+                        <span className="sm:hidden">Sort</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="admin-material w-48 rounded-xl p-2">
+                      <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">Sort submissions</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup
+                        value={submissionSort}
+                        onValueChange={(value) => setSubmissionSort(value as SubmissionSort)}
+                      >
+                        {SUBMISSION_SORT_OPTIONS.map((option) => (
+                          <DropdownMenuRadioItem key={option.value} value={option.value}>
+                            {option.label}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
@@ -502,7 +581,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     )}
-                    {filteredVisible.map((sub) => {
+                    {sortedFilteredVisible.map((sub) => {
                       const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
                       const isBusy = !!busy[sub.id]
                       const zip = sub.top_zipcode || sub.territory_zipcode
@@ -511,7 +590,7 @@ export default function AdminDashboard() {
                         <tr key={sub.id} className="group border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
-                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold uppercase text-muted-foreground" aria-hidden="true">
+                              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-semibold uppercase ${userIconClass(sub.user_id)}`} aria-hidden="true">
                                 {sub.user_id.slice(0, 1)}
                               </span>
                               <span className="max-w-[180px] truncate font-medium">{sub.user_id}</span>
