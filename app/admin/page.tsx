@@ -8,13 +8,16 @@ import {
   ArchiveRestore,
   CheckCircle2,
   ChevronDown,
+  Filter as FilterIcon,
   Inbox,
   LayoutDashboard,
   LogOut,
   MoreHorizontal,
+  Search,
   Trash2,
   Users,
   Wrench,
+  X,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -24,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -73,6 +77,10 @@ export default function AdminDashboard() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [busy, setBusy] = useState<Record<number, boolean>>({})
+  const [submissionSearch, setSubmissionSearch] = useState("")
+  const [submissionUser, setSubmissionUser] = useState("all")
+  const [submissionStatus, setSubmissionStatus] = useState<"all" | ReviewStatus>("all")
+  const [submissionProgress, setSubmissionProgress] = useState<"all" | "complete" | "incomplete" | "unchecked">("all")
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -141,6 +149,40 @@ export default function AdminDashboard() {
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const visible = submissions.filter(s => showArchived ? s.archived : !s.archived)
+  const availableUsers = Array.from(new Set(submissions.map((submission) => submission.user_id))).sort((a, b) => a.localeCompare(b))
+  const normalizedSearch = submissionSearch.trim().toLowerCase()
+  const filteredVisible = visible.filter((submission) => {
+    const reviewStatus = submission.review_status ?? "pending"
+    const checkedCount = submission.potentially_french + submission.not_french + submission.duplicate
+    const searchableText = [
+      submission.user_id,
+      submission.top_zipcode,
+      submission.territory_zipcode,
+      submission.territory_page_range,
+      new Date(submission.submitted_at).toLocaleString(),
+    ].filter(Boolean).join(" ").toLowerCase()
+
+    if (normalizedSearch && !searchableText.includes(normalizedSearch)) return false
+    if (submissionUser !== "all" && submission.user_id !== submissionUser) return false
+    if (submissionStatus !== "all" && reviewStatus !== submissionStatus) return false
+    if (submissionProgress === "complete" && checkedCount < submission.contact_count) return false
+    if (submissionProgress === "incomplete" && checkedCount >= submission.contact_count) return false
+    if (submissionProgress === "unchecked" && submission.not_checked === 0) return false
+    return true
+  })
+  const activeFilterCount = [
+    submissionUser !== "all",
+    submissionStatus !== "all",
+    submissionProgress !== "all",
+  ].filter(Boolean).length
+  const hasSubmissionFilters = normalizedSearch.length > 0 || activeFilterCount > 0
+
+  const clearSubmissionFilters = () => {
+    setSubmissionSearch("")
+    setSubmissionUser("all")
+    setSubmissionStatus("all")
+    setSubmissionProgress("all")
+  }
 
   const latestSubmissionIds = new Set<number>()
   const seenUsers = new Set<string>()
@@ -321,8 +363,115 @@ export default function AdminDashboard() {
               <div className="mb-2 flex items-center justify-between px-2">
                 <h2 id="submissions-heading" className="text-base font-semibold">Submissions</h2>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {visible.length} record{visible.length !== 1 ? "s" : ""}
+                  {hasSubmissionFilters ? `${filteredVisible.length} of ${visible.length}` : visible.length} record{visible.length !== 1 ? "s" : ""}
                 </p>
+              </div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-2">
+                <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={submissionSearch}
+                    onChange={(event) => setSubmissionSearch(event.target.value)}
+                    placeholder="Search submissions…"
+                    aria-label="Search submissions"
+                    className="admin-field h-9 w-full rounded-md pl-9 pr-9 text-sm outline-none transition-all duration-150 ease-out placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  {submissionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionSearch("")}
+                      aria-label="Clear submission search"
+                      className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors duration-150 ease-out hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeFilterCount > 0 ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                      >
+                        <FilterIcon className="h-4 w-4" aria-hidden="true" />
+                        Filter
+                        {activeFilterCount > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded bg-primary px-1 text-xs font-semibold text-white">
+                            {activeFilterCount}
+                          </span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="admin-material w-80 rounded-xl p-4">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-base font-semibold">Filter submissions</p>
+                          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Combine filters to narrow the database.</p>
+                        </div>
+                        {activeFilterCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={clearSubmissionFilters}
+                            className="text-xs font-semibold text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">User</span>
+                          <select
+                            value={submissionUser}
+                            onChange={(event) => setSubmissionUser(event.target.value)}
+                            className="admin-field h-9 w-full rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <option value="all">All users</option>
+                            {availableUsers.map((user) => <option key={user} value={user}>{user}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</span>
+                          <select
+                            value={submissionStatus}
+                            onChange={(event) => setSubmissionStatus(event.target.value as "all" | ReviewStatus)}
+                            className="admin-field h-9 w-full rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <option value="all">Any status</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_review">In review</option>
+                            <option value="reviewed">Reviewed</option>
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Review progress</span>
+                          <select
+                            value={submissionProgress}
+                            onChange={(event) => setSubmissionProgress(event.target.value as "all" | "complete" | "incomplete" | "unchecked")}
+                            className="admin-field h-9 w-full rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <option value="all">Any progress</option>
+                            <option value="complete">100% checked</option>
+                            <option value="incomplete">Still in progress</option>
+                            <option value="unchecked">Has unchecked contacts</option>
+                          </select>
+                        </label>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {hasSubmissionFilters && (
+                    <button
+                      type="button"
+                      onClick={clearSubmissionFilters}
+                      className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="overflow-x-auto border-y lg:overflow-visible">
                 <table className="w-full min-w-[960px] text-sm">
@@ -338,7 +487,22 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visible.map((sub) => {
+                    {filteredVisible.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center">
+                          <p className="text-base font-semibold">No matching submissions</p>
+                          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Adjust or clear the current search and filters.</p>
+                          <button
+                            type="button"
+                            onClick={clearSubmissionFilters}
+                            className="mt-4 inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-primary transition-colors duration-150 ease-out hover:bg-primary/10"
+                          >
+                            Clear filters
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    {filteredVisible.map((sub) => {
                       const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
                       const isBusy = !!busy[sub.id]
                       const zip = sub.top_zipcode || sub.territory_zipcode
