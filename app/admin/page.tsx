@@ -47,11 +47,6 @@ interface Submission {
   top_zipcode: string | null
 }
 
-interface UserGroup {
-  userId: string
-  submissions: Submission[]
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<ReviewStatus, string> = {
@@ -147,12 +142,14 @@ export default function AdminDashboard() {
 
   const visible = submissions.filter(s => showArchived ? s.archived : !s.archived)
 
-  const grouped = visible.reduce<Record<string, Submission[]>>((acc, sub) => {
-    if (!acc[sub.user_id]) acc[sub.user_id] = []
-    acc[sub.user_id].push(sub)
-    return acc
-  }, {})
-  const userGroups: UserGroup[] = Object.entries(grouped).map(([userId, subs]) => ({ userId, submissions: subs }))
+  const latestSubmissionIds = new Set<number>()
+  const seenUsers = new Set<string>()
+  visible.forEach((submission) => {
+    if (!seenUsers.has(submission.user_id)) {
+      seenUsers.add(submission.user_id)
+      latestSubmissionIds.add(submission.id)
+    }
+  })
 
   const totalContacts  = visible.reduce((s, r) => s + r.contact_count, 0)
   const totalPending   = visible.filter(s => s.review_status === "pending").length
@@ -245,11 +242,11 @@ export default function AdminDashboard() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="admin-material w-56 rounded-2xl p-2">
-              <DropdownMenuLabel>Contact tools</DropdownMenuLabel>
+              <DropdownMenuLabel>Review tools</DropdownMenuLabel>
               {([
-                ["dictionaryScan", "Dictionary scan"],
-                ["names", "Name feedback"],
-                ["potentiallyFrench", "Potentially French"],
+                ["dictionaryScan", "Find missed French contacts"],
+                ["names", "Manage name dictionary"],
+                ["potentiallyFrench", "Review French contacts"],
                 ["otm", "OTM duplicate check"],
               ] as const).map(([tab, label]) => (
                 <DropdownMenuItem
@@ -288,7 +285,7 @@ export default function AdminDashboard() {
 
         {/* ── Review queue ── */}
         <div className={activeTab === "submissions" ? "" : "hidden"}>
-          <div className="admin-material mb-6 flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-6 flex flex-col gap-4 border-y py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid grid-cols-3 divide-x">
               <QueueMetric icon={Inbox} label="Pending" value={totalPending} />
               <QueueMetric icon={Users} label="Contacts" value={totalContacts} />
@@ -310,8 +307,8 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {userGroups.length === 0 && (
-            <div className="admin-material rounded-2xl px-6 py-12 text-center">
+          {visible.length === 0 && (
+            <div className="border-y px-6 py-12 text-center">
               <p className="text-base font-semibold">{showArchived ? "No archived submissions" : "No submissions yet"}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {showArchived ? "Archived work will appear here." : "New work appears here after a user sends it for review."}
@@ -319,127 +316,115 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          <div className="flex flex-col gap-4">
-            {userGroups.map(({ userId, submissions: userSubs }) => {
-              const totalC = userSubs.reduce((sum, submission) => sum + submission.contact_count, 0)
-              const pendingCount = userSubs.filter((submission) => submission.review_status === "pending").length
-              const latest = userSubs[0]
+          {visible.length > 0 && (
+            <section aria-labelledby="submissions-heading">
+              <div className="mb-2 flex items-center justify-between px-2">
+                <h2 id="submissions-heading" className="text-base font-semibold">Submissions</h2>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {visible.length} record{visible.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="overflow-x-auto border-y lg:overflow-visible">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="sticky top-0 z-10 bg-[hsl(var(--admin-surface))]">
+                    <tr className="border-b">
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">User</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Submitted</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contacts</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Review progress</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                      <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((sub) => {
+                      const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
+                      const isBusy = !!busy[sub.id]
+                      const zip = sub.top_zipcode || sub.territory_zipcode
 
-              return (
-                <section key={userId} className="admin-card overflow-hidden rounded-2xl">
-                  <div className="flex flex-col gap-2 border-b bg-muted/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-semibold">{userId}</h2>
-                        {pendingCount > 0 && (
-                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-                            {pendingCount} pending
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {userSubs.length} submission{userSubs.length !== 1 ? "s" : ""} · {totalC} contacts
-                      </p>
-                    </div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Last submitted {new Date(latest.submitted_at).toLocaleString()}
-                    </p>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Submitted</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contacts</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Classification</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                          <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {userSubs.map((sub, index) => {
-                          const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
-                          const isBusy = !!busy[sub.id]
-                          const zip = sub.top_zipcode || sub.territory_zipcode
-
-                          return (
-                            <tr key={sub.id} className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-primary/[0.035]">
-                              <td className="px-4 py-3 text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <span>{new Date(sub.submitted_at).toLocaleString()}</span>
-                                  {index === 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Latest</span>}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-muted-foreground">
-                                {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
-                              </td>
-                              <td className="px-4 py-3 text-right font-medium">{sub.contact_count}</td>
-                              <td className="px-4 py-3">
-                                <p className="font-medium">{checkedPct}% checked</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {sub.potentially_french} possible · {sub.duplicate} duplicate · {sub.not_checked} unchecked
-                                </p>
-                              </td>
-                              <td className="px-4 py-3">
-                                <select
-                                  value={sub.review_status ?? "pending"}
-                                  disabled={isBusy}
-                                  onChange={(event) => setStatus(sub.id, event.target.value as ReviewStatus)}
-                                  aria-label={`Review status for submission ${sub.id}`}
-                                  className={`rounded-full border px-3 py-1 text-xs font-semibold outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${STATUS_CLASSES[sub.review_status ?? "pending"]}`}
-                                >
-                                  <option value="pending">Pending</option>
-                                  <option value="in_review">In review</option>
-                                  <option value="reviewed">Reviewed</option>
-                                </select>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Link
-                                    href={`/admin/user/${encodeURIComponent(userId)}?submissionId=${sub.id}`}
-                                    className="admin-primary-button inline-flex h-8 items-center rounded-full px-4 text-xs font-semibold text-white transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      return (
+                        <tr key={sub.id} className="group border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold uppercase text-muted-foreground" aria-hidden="true">
+                                {sub.user_id.slice(0, 1)}
+                              </span>
+                              <span className="max-w-[180px] truncate font-medium">{sub.user_id}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span>{new Date(sub.submitted_at).toLocaleString()}</span>
+                              {latestSubmissionIds.has(sub.id) && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">Latest</span>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground">
+                            {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-right font-medium tabular-nums">{sub.contact_count}</td>
+                          <td className="px-3 py-3">
+                            <p className="font-medium">{checkedPct}% checked</p>
+                            <p className="text-xs text-muted-foreground">
+                              {sub.potentially_french} possible · {sub.duplicate} duplicate · {sub.not_checked} unchecked
+                            </p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={sub.review_status ?? "pending"}
+                              disabled={isBusy}
+                              onChange={(event) => setStatus(sub.id, event.target.value as ReviewStatus)}
+                              aria-label={`Review status for submission ${sub.id}`}
+                              className={`rounded-md border px-2 py-1 text-xs font-semibold outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${STATUS_CLASSES[sub.review_status ?? "pending"]}`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="in_review">In review</option>
+                              <option value="reviewed">Reviewed</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/admin/user/${encodeURIComponent(sub.user_id)}?submissionId=${sub.id}`}
+                                className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                Open
+                              </Link>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    disabled={isBusy}
+                                    aria-label={`More actions for submission ${sub.id}`}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground opacity-60 transition-all duration-150 ease-out hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 disabled:opacity-50"
                                   >
-                                    Review
-                                  </Link>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button
-                                        disabled={isBusy}
-                                        aria-label={`More actions for submission ${sub.id}`}
-                                        className="admin-material inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                                      >
-                                        <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="admin-material rounded-xl p-2">
-                                      <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
-                                        {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-                                        {sub.archived ? "Restore" : "Archive"}
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onSelect={() => deleteSubmission(sub.id)}
-                                        className="text-destructive focus:text-destructive"
-                                      >
-                                        <Trash2 aria-hidden="true" />
-                                        Delete permanently
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )
-            })}
-          </div>
+                                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="admin-material rounded-xl p-2">
+                                  <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
+                                    {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+                                    {sub.archived ? "Restore" : "Archive"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onSelect={() => deleteSubmission(sub.id)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 aria-hidden="true" />
+                                    Delete permanently
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
@@ -702,7 +687,7 @@ function OtmPanel() {
 
       {/* Upload card */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">OTM Address Comparison</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">OTM duplicate check</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
           Upload an Excel file containing OTM addresses. The tool will scan all active user submissions
           and flag any contact whose address matches an address in the OTM file.
@@ -1238,7 +1223,7 @@ function DictionaryFeedbackPanel() {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Name Feedback</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Manage name dictionary</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
           Last names from "Potentially French" contacts missing from the dictionary, and names marked "Not French" that are still in it.
         </p>
@@ -1767,7 +1752,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Potentially French</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Review French contacts</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {totalCount} contact{totalCount !== 1 ? "s" : ""} across all users
             {duplicateCount > 0 && (
@@ -2319,7 +2304,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Dictionary Scan</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Find missed French contacts</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             Contacts not marked "Potentially French" whose last name is already in the dictionary — likely missed or
             outdated classifications. Scanned {totalScanned} contact{totalScanned !== 1 ? "s" : ""}.
