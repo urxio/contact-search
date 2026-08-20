@@ -1576,13 +1576,13 @@ export default function Home() {
                   asChild
                   className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-sm"
                 >
-                  <a href="https://zipcode-tracker-kappa.vercel.app/" target="_blank" rel="noopener noreferrer">
+                  <a href="/territories">
                     <MapPin className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline text-xs font-semibold">Zipcode Tracker</span>
                   </a>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Track your zipcode progress</TooltipContent>
+              <TooltipContent>Open the integrated territory tracker</TooltipContent>
             </Tooltip>
 
             {/* Send for Review */}
