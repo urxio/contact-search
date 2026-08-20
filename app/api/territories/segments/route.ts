@@ -52,10 +52,11 @@ export async function PATCH(req: NextRequest) {
   if (!id || pageStart < 1 || (pageEnd !== null && pageEnd < pageStart) || !VALID_STATUSES.has(status)) {
     return NextResponse.json({ error: "Invalid segment update." }, { status: 400 })
   }
+  const notes = body.notes === undefined ? null : String(body.notes)
   const result = await pool.query(
     `UPDATE zt_segments SET page_start = $2, page_end = $3, stopped_at_page = $4,
-      status = $5, notes = $6, updated_at = NOW() WHERE id = $1 RETURNING *`,
-    [id, pageStart, pageEnd, stoppedAt, status, String(body.notes ?? "")],
+      status = $5, notes = COALESCE($6, notes), updated_at = NOW() WHERE id = $1 RETURNING *`,
+    [id, pageStart, pageEnd, stoppedAt, status, notes],
   )
   if (!result.rows[0]) return NextResponse.json({ error: "Segment not found." }, { status: 404 })
   return NextResponse.json(result.rows[0])
