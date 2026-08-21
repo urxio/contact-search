@@ -321,7 +321,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                           ? Boolean(seg.is_mine)
                           : Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
                         const isAvailablePackage = Boolean(seg.package_id && !seg.owner_user_id)
-                        const canEdit      = (isOwner || canManage) && !isAvailablePackage
+                        const canEdit      = canManage && !isAvailablePackage
                         const isEditing    = !!editing[seg.id]
                         const isSaving     = saving.has(seg.id)
                         const isConfirming = confirming.has(seg.id)

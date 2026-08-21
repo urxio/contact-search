@@ -64,7 +64,7 @@ const FEATURES = [
   { icon: LayoutDashboard, title: "Territory dashboard", desc: "All zipcodes grouped by city with live segmented progress bars." },
   { icon: ClipboardList, title: "Your segments at a glance", desc: "Active and not-started segments shown front and centre after sign-in." },
   { icon: MapPin, title: "Claim a page range", desc: "Open any zipcode and claim a start–end page range in one tap." },
-  { icon: PencilLine, title: "Update your progress", desc: "Adjust the assigned page range and status right from the dashboard." },
+  { icon: PencilLine, title: "Admin progress controls", desc: "Congregation admins can adjust assigned page ranges and statuses when needed." },
   { icon: BarChart3, title: "Live progress tracking", desc: "Bars update in real time across all territories as work is logged." },
 ]
 
@@ -377,7 +377,7 @@ function DeleteZipcodeDialog({ row, apiBase, onClose, onDeleted }: { row: Zipcod
 }
 
 // ── My Segments Panel ─────────────────────────────────────────────────────────
-function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/territories" }: { userName: string; apiBase?: string; teamHref?: string }) {
+function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", teamHref = "/territories" }: { userName: string; canManage: boolean; apiBase?: string; teamHref?: string }) {
   const [segments, setSegments]           = useState<MySegment[]>([])
   const [loading, setLoading]             = useState(true)
   const [editing, setEditing]             = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
@@ -511,7 +511,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
           {timeAgo(seg.updated_at)}
         </td>
-        <td className="px-4 py-3">
+        {canManage ? <td className="px-4 py-3">
           {isEditing ? (
             <div className="flex gap-1.5">
               <button onClick={() => saveEdit(seg.id)} disabled={isSaving}
@@ -550,7 +550,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
               </button> : null}
             </div>
           )}
-        </td>
+        </td> : null}
       </tr>
     )
   }
@@ -580,7 +580,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Pages</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Updated</th>
-                <th className="px-4 py-2"></th>
+                {canManage ? <th className="px-4 py-2"><span className="sr-only">Actions</span></th> : null}
               </tr>
             </thead>
             <tbody>
@@ -797,7 +797,7 @@ export default function Home() {
         </div>
 
         {/* My segments — only shown when signed in */}
-        {hydrated && userName && <MySegmentsPanel userName={userName} apiBase={apiBase} teamHref={teamHref} />}
+        {hydrated && userName && <MySegmentsPanel userName={userName} canManage={canManage} apiBase={apiBase} teamHref={teamHref} />}
 
         {/* Loading spinner */}
         {loading && (

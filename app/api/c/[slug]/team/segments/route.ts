@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
-import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
+import { auditEvent, requireCongregationAdmin, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { assertNoSegmentConflict, SegmentConflictError } from "@/lib/team-segments"
 import { apiError, assertMultiTenantEnabled, canManageAll, integer, RouteContext } from "../../../_shared"
 
@@ -106,7 +106,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(req)
-    const auth = await requireMembership(params.slug)
+    const auth = await requireCongregationAdmin(params.slug)
     const body = await req.json()
     const id = integer(body.id)
     const pageStart = integer(body.page_start)
@@ -172,7 +172,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(req)
-    const auth = await requireMembership(params.slug)
+    const auth = await requireCongregationAdmin(params.slug)
     const id = integer(req.nextUrl.searchParams.get("id"))
     if (!id) return NextResponse.json({ error: "Segment id is required." }, { status: 400 })
     const client = await pool.connect()
