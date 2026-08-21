@@ -51,7 +51,11 @@ export function PersonalSettings({
 
   useEffect(() => {
     setTheme(initialTheme)
-  }, [initialTheme, setTheme])
+    // The server preference initializes the page once. Depending on setTheme
+    // here causes this effect to run again after a live theme change and
+    // immediately revert the member's newly saved choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTheme])
 
   async function updateProfile(event: FormEvent) {
     event.preventDefault()
