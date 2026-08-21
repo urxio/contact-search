@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MapPin } from "lucide-react"
@@ -11,6 +12,8 @@ interface TerritoryNotesProps {
   onPageRangeChange: (v: string) => void
   globalNotes: string
   onNotesChange: (v: string) => void
+  assignmentLocked?: boolean
+  teamHref?: string
 }
 
 export function TerritoryNotes({
@@ -20,12 +23,15 @@ export function TerritoryNotes({
   onPageRangeChange,
   globalNotes,
   onNotesChange,
+  assignmentLocked = false,
+  teamHref,
 }: TerritoryNotesProps) {
   return (
     <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 dark:border-gray-800">
         <MapPin className="h-4 w-4 text-indigo-500" />
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Territory & Notes</span>
+        {assignmentLocked && teamHref ? <Link href={teamHref} className="ml-auto text-xs font-semibold text-primary hover:underline">View in Team Progress</Link> : null}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-5 py-4">
         <div>
@@ -37,6 +43,7 @@ export function TerritoryNotes({
             placeholder="Enter zipcode…"
             value={territoryZipcode}
             onChange={(e) => onZipcodeChange(e.target.value)}
+            readOnly={assignmentLocked}
             className="h-9 text-sm"
           />
         </div>
@@ -49,6 +56,7 @@ export function TerritoryNotes({
             placeholder="e.g. 1–10"
             value={territoryPageRange}
             onChange={(e) => onPageRangeChange(e.target.value)}
+            readOnly={assignmentLocked}
             className="h-9 text-sm"
           />
         </div>

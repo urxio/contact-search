@@ -90,6 +90,28 @@ const migrations: Migration[] = [{
   version:5,name:"member preferences",async run(client){
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb`)
   }
+},{
+  version:6,name:"contact package library",async run(client){
+    await client.query(`ALTER TABLE zt_segments ADD CONSTRAINT zt_segments_id_congregation_unique UNIQUE(id,congregation_id)`)
+    await client.query(`CREATE TABLE contact_packages (
+      id BIGSERIAL PRIMARY KEY,
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      segment_id INT NOT NULL,
+      uploaded_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 120),
+      visibility TEXT NOT NULL CHECK(visibility IN ('shared','private')),
+      original_filename TEXT NOT NULL DEFAULT '',
+      contacts JSONB NOT NULL CHECK(jsonb_typeof(contacts)='array'),
+      contact_count INT NOT NULL CHECK(contact_count>0),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(segment_id),
+      CONSTRAINT contact_packages_segment_tenant_fk FOREIGN KEY(segment_id,congregation_id)
+        REFERENCES zt_segments(id,congregation_id) ON DELETE RESTRICT
+    )`)
+    await client.query(`CREATE INDEX contact_packages_tenant_date_idx ON contact_packages(congregation_id,created_at DESC)`)
+    await client.query(`CREATE INDEX contact_packages_uploader_idx ON contact_packages(congregation_id,uploaded_by_user_id)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

@@ -34,6 +34,7 @@ import { FloatingProgress } from "@/components/ui/floating-progress"
 import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
 // Home sub-components
 import { ImportBar } from "@/components/home/ImportBar"
+import { PackageDialogs, type PendingPackageUpload } from "@/components/home/PackageDialogs"
 import { TerritoryNotes } from "@/components/home/TerritoryNotes"
 import { StatsBar } from "@/components/home/StatsBar"
 import { BatchActionBar } from "@/components/home/BatchActionBar"
@@ -126,6 +127,9 @@ export default function SearchHelper({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fileUploaded, setFileUploaded] = useState(false)
+  const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
+  const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
+  const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
   const [territoryPageRange, setTerritoryPageRange] = useState("")
@@ -578,10 +582,19 @@ export default function SearchHelper({
           return c
         })
 
-        setContacts(deduped)
-        setFileUploaded(true)
+        if (workspaceSlug) {
+          setPendingPackageUpload({
+            filename: file.name,
+            contacts: deduped.map(({ firstName, lastName, fullName, address, city, zipcode, phone }) => ({
+              firstName, lastName, fullName, address, city, zipcode, phone,
+            })),
+          })
+        } else {
+          setContacts(deduped)
+          setFileUploaded(true)
+        }
         // Run French name detection automatically after import (non-blocking)
-        setTimeout(() => {
+        if (!workspaceSlug) setTimeout(() => {
           try {
             ; (detectFrenchNames as any)?.(false, deduped)
           } catch (e) {
@@ -603,6 +616,26 @@ export default function SearchHelper({
     }
 
     reader.readAsBinaryString(file)
+  }, [workspaceSlug])
+
+  const loadPackageDraft = useCallback((draft: any) => {
+    const nextContacts = Array.isArray(draft.contacts) ? draft.contacts : []
+    setContacts(nextContacts)
+    setGlobalNotes(draft.globalNotes || "")
+    setTerritoryZipcode(draft.territoryZipcode || "")
+    setTerritoryPageRange(draft.territoryPageRange || "")
+    setLastVerifiedId(draft.lastVerifiedId || draft.lastVerifiedContactId || null)
+    const revision = Number(draft.revision) || 0
+    draftRevisionRef.current = revision
+    setDraftRevision(revision)
+    setDraftStatus("saved")
+    setFileUploaded(true)
+    setPackageAssignmentLocked(true)
+    setSelectedContacts([])
+    setError(null)
+    setTimeout(() => {
+      try { ;(detectFrenchNames as any)?.(false, nextContacts) } catch (error) { console.warn("Unable to detect names", error) }
+    }, 50)
   }, [])
 
   // Function to update last verified ID and record interaction time
@@ -1462,6 +1495,7 @@ export default function SearchHelper({
     }
 
     setFileUploaded(false)
+    setPackageAssignmentLocked(false)
     toast.success("New session started. All data has been cleared.")
   }, [storageKey, workspaceSlug])
 
@@ -1664,6 +1698,26 @@ export default function SearchHelper({
         notFrench={notFrenchCount}
         detected={detectedCount}
       />
+
+      {workspaceSlug ? (
+        <PackageDialogs
+          slug={workspaceSlug}
+          pendingUpload={pendingPackageUpload}
+          draftRevision={draftRevision}
+          hasDraft={contacts.length > 0}
+          browseOpen={packageBrowserOpen}
+          onBrowseOpenChange={setPackageBrowserOpen}
+          onCancelUpload={() => {
+            setPendingPackageUpload(null)
+            if (fileInputRef.current) fileInputRef.current.value = ""
+          }}
+          onDraftLoaded={loadPackageDraft}
+          onDraftConflict={(draft) => {
+            setServerDraft(draft)
+            setDraftStatus("conflict")
+          }}
+        />
+      ) : null}
 
       {/* ── Delete contacts confirmation ── */}
       <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
@@ -2001,6 +2055,8 @@ export default function SearchHelper({
           isSubmittingReview={isSendingReview}
           canSubmitForReview={contacts.length > 0}
           onSubmitForReview={sendForReview}
+          packagesEnabled={Boolean(workspaceSlug)}
+          onBrowsePackages={() => setPackageBrowserOpen(true)}
         />
 
         {/* ── Territory / General Notes ── */}
@@ -2012,6 +2068,8 @@ export default function SearchHelper({
             onPageRangeChange={setTerritoryPageRange}
             globalNotes={globalNotes}
             onNotesChange={setGlobalNotes}
+            assignmentLocked={packageAssignmentLocked}
+            teamHref={workspaceSlug ? `/c/${workspaceSlug}/team` : undefined}
           />
         )}
 

@@ -3,7 +3,7 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send } from "lucide-react"
+import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send, PackageOpen } from "lucide-react"
 
 interface ImportBarProps {
   isLoading: boolean
@@ -16,6 +16,8 @@ interface ImportBarProps {
   isSubmittingReview?: boolean
   canSubmitForReview?: boolean
   onSubmitForReview?: () => void
+  packagesEnabled?: boolean
+  onBrowsePackages?: () => void
 }
 
 export function ImportBar({
@@ -29,9 +31,11 @@ export function ImportBar({
   isSubmittingReview = false,
   canSubmitForReview = false,
   onSubmitForReview,
+  packagesEnabled = false,
+  onBrowsePackages,
 }: ImportBarProps) {
   return (
-    <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+    <div className="admin-card mb-4 overflow-hidden rounded-2xl">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
         <Input
           type="file"
@@ -43,12 +47,19 @@ export function ImportBar({
         />
 
         {/* Import button */}
-        <Button asChild disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shrink-0">
+        <Button asChild disabled={isLoading} className="admin-primary-button min-h-11 shrink-0 rounded-xl text-white">
           <label htmlFor="excel-upload" className="flex items-center gap-2 cursor-pointer">
-            <Upload className="h-4 w-4" />
-            <span>{isLoading ? "Loading…" : "Import Excel File"}</span>
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            <span>{isLoading ? "Loading…" : packagesEnabled ? "Upload package" : "Import Excel File"}</span>
           </label>
         </Button>
+
+        {packagesEnabled ? (
+          <Button type="button" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={onBrowsePackages}>
+            <PackageOpen className="h-4 w-4" aria-hidden="true" />
+            Browse packages
+          </Button>
+        ) : null}
 
         {/* Uploaded indicator */}
         {fileUploaded && (

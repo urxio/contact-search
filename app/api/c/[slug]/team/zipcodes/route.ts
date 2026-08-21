@@ -12,7 +12,15 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
         COUNT(s.id)::int AS segment_count,
         COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'Completed'), 0)::int AS completed,
         COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'In progress'), 0)::int AS in_progress,
-        COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'Not started'), 0)::int AS not_started
+        COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'Not started'), 0)::int AS not_started,
+        COALESCE(COUNT(DISTINCT s.id) FILTER (WHERE EXISTS (
+          SELECT 1 FROM zt_segments other
+          WHERE other.congregation_id = s.congregation_id
+            AND other.zipcode_id = s.zipcode_id
+            AND other.id <> s.id
+            AND other.page_start <= COALESCE(s.page_end, z.total_pages)
+            AND s.page_start <= COALESCE(other.page_end, z.total_pages)
+        )), 0)::int AS conflict_count
        FROM zt_zipcodes z
        LEFT JOIN zt_segments s
          ON s.zipcode_id = z.id AND s.congregation_id = z.congregation_id

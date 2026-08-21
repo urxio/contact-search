@@ -105,6 +105,7 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 3, name: "composite tenant integrity" },
       { version: 4, name: "normalized tenant identities" },
       { version: 5, name: "member preferences" },
+      { version: 6, name: "contact package library" },
     ])
   })
 
@@ -179,6 +180,36 @@ describeWithDatabase("multi-congregation database isolation", () => {
     )
     expect(revisions.rows).toHaveLength(2)
     expect(revisions.rows.map((row) => row.revision).sort()).toEqual([1, 7])
+  })
+
+  it("keeps packages linked to exactly one segment in the same congregation", async () => {
+    const zipcodes = await pool.query(
+      `INSERT INTO zt_zipcodes(congregation_id,city,zipcode,total_pages) VALUES
+       ($1,'Central City','22001',20),($2,'North City','22002',20) RETURNING id,congregation_id`,
+      [centralId, secondId],
+    )
+    const centralZip = zipcodes.rows.find(row => String(row.congregation_id) === String(centralId))
+    const segments = await pool.query(
+      `INSERT INTO zt_segments(congregation_id,zipcode_id,page_start,page_end)
+       VALUES($1,$2,1,5),($1,$2,6,10) RETURNING id`,
+      [centralId, centralZip.id],
+    )
+    const contacts = JSON.stringify([{ firstName: "Ana", lastName: "Martin", address: "1 Main", city: "Central City", zipcode: "22001", phone: "" }])
+    await pool.query(
+      `INSERT INTO contact_packages(congregation_id,segment_id,uploaded_by_user_id,name,visibility,contacts,contact_count)
+       VALUES($1,$2,$3,'Central package','shared',$4,1)`,
+      [centralId, segments.rows[0].id, firstUserId, contacts],
+    )
+    await expect(pool.query(
+      `INSERT INTO contact_packages(congregation_id,segment_id,uploaded_by_user_id,name,visibility,contacts,contact_count)
+       VALUES($1,$2,$3,'Wrong tenant','shared',$4,1)`,
+      [secondId, segments.rows[1].id, secondUserId, contacts],
+    )).rejects.toMatchObject({ code: "23503" })
+    await expect(pool.query(
+      `INSERT INTO contact_packages(congregation_id,segment_id,uploaded_by_user_id,name,visibility,contacts,contact_count)
+       VALUES($1,$2,$3,'Duplicate link','private',$4,1)`,
+      [centralId, segments.rows[0].id, firstUserId, contacts],
+    )).rejects.toMatchObject({ code: "23505" })
   })
 
   it("saves member preferences and their audit event atomically", async () => {

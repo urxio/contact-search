@@ -16,6 +16,7 @@ type ZipcodeRow = {
   completed: number
   in_progress: number
   not_started: number
+  conflict_count: number
 }
 
 type MySegment = {
@@ -30,6 +31,7 @@ type MySegment = {
   city: string
   zipcode: string
   total_pages: number
+  package_id?: number | null
 }
 
 function pct(a: number, total: number) {
@@ -268,6 +270,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
   const [saving, setSaving]               = useState<Set<number>>(new Set())
   const [confirming, setConfirming]       = useState<Set<number>>(new Set())
   const [completedOpen, setCompletedOpen] = useState(false)
+  const [editErrors, setEditErrors]       = useState<Record<number, string>>({})
 
   const load = () => {
     setLoading(true)
@@ -305,7 +308,14 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
       }),
     })
     setSaving(prev => { const s = new Set(prev); s.delete(id); return s })
-    if (res.ok) { cancelEdit(id); load() }
+    if (res.ok) {
+      setEditErrors(prev => { const next = { ...prev }; delete next[id]; return next })
+      cancelEdit(id)
+      load()
+    } else {
+      const data = await res.json().catch(() => null)
+      setEditErrors(prev => ({ ...prev, [id]: data?.error ?? "Could not update this segment." }))
+    }
   }
 
   const deleteSeg = async (id: number) => {
@@ -389,6 +399,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
               {seg.status}
             </span>
           )}
+          {editErrors[seg.id] && <p role="alert" className="mt-2 max-w-56 text-xs font-medium text-red-600 dark:text-red-400">{editErrors[seg.id]}</p>}
         </td>
         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
           {timeAgo(seg.updated_at)}
@@ -407,7 +418,9 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
             </div>
           ) : isConfirming ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-sm text-red-500 font-medium">Delete?</span>
+              <span className={`text-sm font-medium ${seg.package_id ? "text-amber-600 dark:text-amber-400" : "text-red-500"}`}>
+                {seg.package_id ? "Release?" : "Delete?"}
+              </span>
               <button onClick={() => deleteSeg(seg.id)}
                 className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors">
                 Yes
@@ -424,8 +437,8 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
                 Update
               </button>
               <button onClick={() => setConfirming(prev => new Set(prev).add(seg.id))}
-                className="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-sm font-semibold transition-colors">
-                Delete
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${seg.package_id ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50" : "bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"}`}>
+                {seg.package_id ? "Release" : "Delete"}
               </button>
             </div>
           )}
@@ -687,9 +700,23 @@ export default function Home() {
           const tInProgress = tRows.reduce((a, z) => a + z.in_progress,   0)
           const tNotStarted = tRows.reduce((a, z) => a + z.not_started,   0)
           const tPct        = pct(tCompleted, tSegs)
+          const tConflicts  = tRows.reduce((a, z) => a + z.conflict_count, 0)
 
           return (
             <div>
+              {tConflicts > 0 && (
+                <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                    <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="font-semibold">Overlapping page ranges need attention</p>
+                    <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200/80">
+                      {tConflicts} segment{tConflicts === 1 ? "" : "s"} overlap in this territory. Open the marked ZIP code{tConflicts === 1 ? "" : "s"} to review them.
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* Territory progress bar */}
               <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
@@ -735,6 +762,12 @@ export default function Home() {
                                 <span className="text-sm font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">{compPct}%</span>
                               )}
                             </div>
+                            {z.conflict_count > 0 && (
+                              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                                {z.conflict_count} overlapping segment{z.conflict_count === 1 ? "" : "s"}
+                              </div>
+                            )}
                             <div className="h-2 w-full rounded-full overflow-hidden flex gap-0.5 mb-3">
                               {z.segment_count === 0 ? (
                                 <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full" />

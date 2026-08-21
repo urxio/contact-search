@@ -15,6 +15,9 @@ type Segment = {
   status: "Completed" | "In progress" | "Not started"
   notes: string
   updated_at: string
+  conflict_segment_ids?: number[]
+  package_id?: number | null
+  is_mine?: boolean
 }
 
 function timeAgo(dateStr: string): string {
@@ -71,6 +74,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   const [editing, setEditing]   = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
   const [saving, setSaving]     = useState<Set<number>>(new Set())
   const [confirming, setConfirming] = useState<Set<number>>(new Set())
+  const [editErrors, setEditErrors] = useState<Record<number, string>>({})
 
   useEffect(() => {
     const saved = localStorage.getItem(userStorageKey)
@@ -106,7 +110,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
     const start = parseInt(claimStart)
     const end   = claimEnd ? parseInt(claimEnd) : null
     if (!start || start < 1) { setClaimError("Enter a valid start page."); return }
-    if (end && end <= start) { setClaimError("End page must be greater than start."); return }
+    if (end && end < start) { setClaimError("End page cannot be before the start page."); return }
 
     setClaiming(true)
     const res = await fetch(`${apiBase}/segments`, {
@@ -159,8 +163,12 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
     })
     setSaving(prev => { const s = new Set(prev); s.delete(id); return s })
     if (res.ok) {
+      setEditErrors(prev => { const next = { ...prev }; delete next[id]; return next })
       cancelEdit(id)
       loadData()
+    } else {
+      const data = await res.json().catch(() => null)
+      setEditErrors(prev => ({ ...prev, [id]: data?.error ?? "Could not update this segment." }))
     }
   }
 
@@ -176,6 +184,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   const compPct = pct(completedCount,  segments.length)
   const ipPct   = pct(inProgressCount, segments.length)
   const nsPct   = pct(notStartedCount, segments.length)
+  const conflictingSegments = segments.filter(segment => (segment.conflict_segment_ids?.length ?? 0) > 0)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -258,6 +267,20 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
               </div>
             )}
 
+            {conflictingSegments.length > 0 && (
+              <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="font-semibold">Page range conflict</p>
+                  <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200/80">
+                    {conflictingSegments.length} segment{conflictingSegments.length === 1 ? "" : "s"} overlap. Update or release one of the highlighted ranges before assigning more work.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* ── Segments table ── */}
             <div className="mb-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -285,15 +308,18 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                     </thead>
                     <tbody>
                       {segments.map(seg => {
-                        const isOwner      = Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
+                        const isOwner      = workspaceSlug
+                          ? Boolean(seg.is_mine)
+                          : Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
                         const canEdit      = isOwner || canManage
                         const isEditing    = !!editing[seg.id]
                         const isSaving     = saving.has(seg.id)
                         const isConfirming = confirming.has(seg.id)
                         const e            = editing[seg.id]
+                        const hasConflict  = (seg.conflict_segment_ids?.length ?? 0) > 0
 
                         return (
-                          <tr key={seg.id} className={`border-b border-gray-100 dark:border-gray-800 last:border-0 ${isOwner ? "bg-indigo-50 dark:bg-indigo-900/20 border-l-[3px] border-l-indigo-500 dark:border-l-indigo-400" : "hover:bg-gray-50 dark:hover:bg-gray-800/30"}`}>
+                          <tr key={seg.id} className={`border-b border-gray-100 dark:border-gray-800 last:border-0 ${hasConflict ? "bg-amber-50/70 dark:bg-amber-950/20 border-l-[3px] border-l-amber-500" : isOwner ? "bg-indigo-50 dark:bg-indigo-900/20 border-l-[3px] border-l-indigo-500 dark:border-l-indigo-400" : "hover:bg-gray-50 dark:hover:bg-gray-800/30"}`}>
                             {/* Pages */}
                             <td className="px-5 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                               {isEditing ? (
@@ -318,6 +344,11 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                               ) : (
                                 <>
                                   {seg.page_start}{seg.page_end ? ` – ${seg.page_end}` : "+"}
+                                  {hasConflict && (
+                                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                                      <AlertTriangle className="h-3 w-3" aria-hidden="true" /> Conflict
+                                    </span>
+                                  )}
                                   {isOwner && (
                                     <span className="ml-1.5 text-xs font-semibold text-indigo-500 uppercase tracking-wide">you</span>
                                   )}
@@ -332,6 +363,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                               ) : (
                                 <span className="text-gray-600 dark:text-gray-400">{seg.owner || "—"}</span>
                               )}
+                              {editErrors[seg.id] && <p role="alert" className="mt-2 max-w-56 text-xs font-medium text-red-600 dark:text-red-400">{editErrors[seg.id]}</p>}
                             </td>
 
                             {/* Stopped at */}
@@ -389,7 +421,9 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                   </div>
                                 ) : isConfirming ? (
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-sm text-red-500 font-medium">Delete?</span>
+                                    <span className={`text-sm font-medium ${seg.package_id ? "text-amber-600 dark:text-amber-400" : "text-red-500"}`}>
+                                      {seg.package_id ? "Release?" : "Delete?"}
+                                    </span>
                                     <button onClick={() => deleteSeg(seg.id)}
                                       className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors">
                                       Yes
@@ -406,8 +440,8 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                       Update
                                     </button>
                                     <button onClick={() => setConfirming(prev => new Set(prev).add(seg.id))}
-                                      className="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-sm font-semibold transition-colors">
-                                      Delete
+                                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${seg.package_id ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50" : "bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"}`}>
+                                      {seg.package_id ? "Release" : "Delete"}
                                     </button>
                                   </div>
                                 )
