@@ -298,19 +298,21 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeSwitcher className="admin-material" />
-            <button
-              onClick={async () => {
-                await fetch(workspace ? "/api/auth/sign-out" : "/api/admin/logout", { method: "POST" })
-                window.location.href = "/"
-              }}
-              className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Sign out</span>
-            </button>
-          </div>
+          {!workspace ? (
+            <div className="flex items-center gap-2">
+              <ThemeSwitcher className="admin-material" />
+              <button
+                onClick={async () => {
+                  await fetch("/api/admin/logout", { method: "POST" })
+                  window.location.href = "/"
+                }}
+                className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {/* ── Primary navigation ── */}
