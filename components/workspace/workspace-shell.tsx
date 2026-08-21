@@ -174,12 +174,12 @@ export function WorkspaceShell({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button asChild variant="ghost" size="icon" className="hidden h-11 w-11 rounded-xl sm:inline-flex">
-                      <Link href={`/c/${activeWorkspace.slug}/admin`} aria-label="Open congregation administration">
+                      <Link href={`/c/${activeWorkspace.slug}/admin`} aria-label="Open submissions review">
                         <ShieldCheck aria-hidden="true" />
                       </Link>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Congregation administration</TooltipContent>
+                  <TooltipContent>Submissions review</TooltipContent>
                 </Tooltip>
               ) : null}
               <ThemeSwitcher className="h-11 w-11 rounded-xl shadow-none hover:translate-y-0 hover:bg-muted" />
@@ -248,7 +248,7 @@ export function WorkspaceShell({
                         <SheetClose asChild>
                           <Link href={`/c/${activeWorkspace.slug}/admin`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                            Administration
+                            Submissions review
                           </Link>
                         </SheetClose>
                       ) : null}
