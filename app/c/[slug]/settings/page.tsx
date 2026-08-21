@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation"
+import { AdminSettingsCollapsible } from "@/components/workspace/admin-settings-collapsible"
 import { PageFrame } from "@/components/workspace/page-frame"
 import { PersonalSettings } from "@/components/workspace/personal-settings"
 import { SettingsWorkspace } from "@/components/workspace/settings-workspace"
@@ -38,16 +39,9 @@ export default async function CongregationSettingsPage({ params }: { params: { s
           initialDefaultWorkspaceView={access.user.preferences?.defaultWorkspaceView ?? "search"}
         />
         {canManage ? (
-          <section className="space-y-4" aria-labelledby="congregation-administration-heading">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administration</p>
-              <h2 id="congregation-administration-heading" className="mt-2 text-2xl font-bold leading-tight">Congregation settings</h2>
-              <p className="mt-2 text-sm font-normal leading-relaxed text-muted-foreground">
-                Manage people, invitations, and territory coverage for this workspace.
-              </p>
-            </div>
+          <AdminSettingsCollapsible>
             <SettingsWorkspace slug={params.slug} initialName={access.congregation.name || titleFromSlug(params.slug)} />
-          </section>
+          </AdminSettingsCollapsible>
         ) : null}
       </div>
     </PageFrame>
