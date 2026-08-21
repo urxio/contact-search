@@ -1568,7 +1568,7 @@ export default function Home() {
           {/* Right — actions */}
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Zipcode Tracker */}
+            {/* Team Progress */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1578,11 +1578,11 @@ export default function Home() {
                 >
                   <a href="/territories">
                     <MapPin className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline text-xs font-semibold">Zipcode Tracker</span>
+                    <span className="hidden sm:inline text-xs font-semibold">Team Progress</span>
                   </a>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Open the integrated territory tracker</TooltipContent>
+              <TooltipContent>Open Team Progress</TooltipContent>
             </Tooltip>
 
             {/* Send for Review */}

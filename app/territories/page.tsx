@@ -81,7 +81,7 @@ function WelcomeCard({ knownUsers, onSelect }: { knownUsers: string[]; onSelect:
         {/* Header */}
         <div className="px-8 pt-8 pb-5 text-center border-b border-gray-100 dark:border-gray-800">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-3xl mb-3">📍</div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome to Zipcode Tracker</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome to Team Progress</h2>
         </div>
 
         {/* Feature list */}
@@ -584,7 +584,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="text-lg">📍</span>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">Zipcode Tracker</span>
+            <span className="text-lg font-bold text-gray-900 dark:text-white">Team Progress</span>
           </div>
           <div className="flex items-center gap-2">
             {/* OTMRT Helper link */}
