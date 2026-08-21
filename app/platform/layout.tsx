@@ -2,6 +2,8 @@ import { notFound, redirect } from "next/navigation"
 import { PlatformHeader } from "@/components/workspace/platform-header"
 import { AuthError, requirePlatformAdmin } from "@/lib/auth"
 
+export const dynamic = "force-dynamic"
+
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   try {
     await requirePlatformAdmin()
