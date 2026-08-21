@@ -281,8 +281,10 @@ export default function SearchHelper({
       setTerritoryPageRange(savedPageRange)
     }
 
-    if (savedViewType) {
+    if (savedViewType === "list" || savedViewType === "grid") {
       setViewType(savedViewType)
+    } else if (window.matchMedia("(max-width: 639px)").matches) {
+      setViewType("grid")
     }
 
     // Load saved user ID from localStorage, or prompt them to enter one
@@ -2032,8 +2034,9 @@ export default function SearchHelper({
                       size="icon"
                       onClick={() => setViewType("list")}
                       className={viewType === "list" ? "bg-muted" : ""}
+                      aria-label="List view"
                     >
-                      <LayoutList className="h-4 w-4" />
+                      <LayoutList className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>List View (Ctrl+G)</TooltipContent>
@@ -2045,11 +2048,12 @@ export default function SearchHelper({
                       size="icon"
                       onClick={() => setViewType("grid")}
                       className={viewType === "grid" ? "bg-muted" : ""}
+                      aria-label="Gallery view"
                     >
-                      <LayoutGrid className="h-4 w-4" />
+                      <LayoutGrid className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Grid View (Ctrl+G)</TooltipContent>
+                  <TooltipContent>Gallery View (Ctrl+G)</TooltipContent>
                 </Tooltip>
               </div>
             </CardHeader>
