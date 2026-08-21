@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 
-import SearchHelper from "@/app/page"
+import SearchHelper from "@/components/search-helper"
 import { WorkspaceRuntimeProvider } from "@/components/workspace/workspace-context"
 import { AuthError, requireMembership } from "@/lib/auth"
 
