@@ -181,6 +181,36 @@ describeWithDatabase("multi-congregation database isolation", () => {
     expect(revisions.rows.map((row) => row.revision).sort()).toEqual([1, 7])
   })
 
+  it("saves member preferences and their audit event atomically", async () => {
+    const fields = ["preferences.theme", "preferences.defaultWorkspaceView"]
+    const saved = await pool.query(
+      `WITH updated AS (
+         UPDATE users
+            SET preferences=preferences || $2::jsonb,updated_at=NOW()
+          WHERE id=$1
+      RETURNING preferences
+       ), audited AS (
+         INSERT INTO audit_events(actor_user_id,congregation_id,action,target_type,target_id,metadata)
+         SELECT $1,$3,'profile.updated','user',$1::text,$4::jsonb FROM updated
+       )
+       SELECT preferences FROM updated`,
+      [
+        firstUserId,
+        JSON.stringify({ theme: "dark", defaultWorkspaceView: "team" }),
+        centralId,
+        JSON.stringify({ fields }),
+      ],
+    )
+    expect(saved.rows[0].preferences).toEqual({ theme: "dark", defaultWorkspaceView: "team" })
+
+    const audit = await pool.query(
+      `SELECT metadata FROM audit_events
+        WHERE actor_user_id=$1 AND congregation_id=$2 AND action='profile.updated'`,
+      [firstUserId, centralId],
+    )
+    expect(audit.rows).toContainEqual({ metadata: { fields } })
+  })
+
   it("makes invitation tokens globally unique and excludes accepted tokens from consumption", async () => {
     const invitation = await pool.query(
       `INSERT INTO invitations(congregation_id,email,role,token_hash,expires_at,created_by_user_id)

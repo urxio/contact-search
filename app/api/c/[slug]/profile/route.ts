@@ -60,6 +60,37 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       preferences.defaultWorkspaceView = body.preferences.defaultWorkspaceView
     }
 
+    const updatedFields = [
+      ...(displayName !== undefined ? ["displayName"] : []),
+      ...(congregationDisplayName !== undefined ? ["congregationDisplayName"] : []),
+      ...Object.keys(preferences).map((key) => `preferences.${key}`),
+    ]
+
+    // Preferences affect one user row, so save them and their audit event in
+    // one atomic statement. This keeps the common settings interaction fast
+    // over a serverless database connection.
+    if (displayName === undefined && congregationDisplayName === undefined && Object.keys(preferences).length) {
+      const result = await pool.query(
+        `WITH updated AS (
+           UPDATE users
+              SET preferences=preferences || $2::jsonb,updated_at=NOW()
+            WHERE id=$1
+        RETURNING preferences
+         ), audited AS (
+           INSERT INTO audit_events(actor_user_id,congregation_id,action,target_type,target_id,metadata)
+           SELECT $1,$3,'profile.updated','user',$1::text,$4::jsonb FROM updated
+         )
+         SELECT preferences FROM updated`,
+        [
+          auth.user.id,
+          JSON.stringify(preferences),
+          auth.congregation.id,
+          JSON.stringify({ fields: updatedFields }),
+        ],
+      )
+      return NextResponse.json({ ok: true, preferences: result.rows[0]?.preferences ?? preferences })
+    }
+
     const client = await pool.connect()
     try {
       await client.query("BEGIN")
@@ -95,16 +126,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       action: "profile.updated",
       targetType: "user",
       targetId: String(auth.user.id),
-      metadata: {
-        fields: [
-          ...(displayName !== undefined ? ["displayName"] : []),
-          ...(congregationDisplayName !== undefined ? ["congregationDisplayName"] : []),
-          ...Object.keys(preferences).map((key) => `preferences.${key}`),
-        ],
-      },
+      metadata: { fields: updatedFields },
     })
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, preferences })
   } catch (error) {
     return apiError(error)
   }

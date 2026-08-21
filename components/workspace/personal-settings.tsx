@@ -39,6 +39,9 @@ export function PersonalSettings({
   const [congregationDisplayName, setCongregationDisplayName] = useState(initialCongregationDisplayName)
   const [preferredTheme, setPreferredTheme] = useState<"light" | "dark">(initialTheme)
   const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team">(initialDefaultWorkspaceView)
+  const [savedTheme, setSavedTheme] = useState<"light" | "dark">(initialTheme)
+  const [savedDefaultWorkspaceView, setSavedDefaultWorkspaceView] = useState<"search" | "team">(initialDefaultWorkspaceView)
+  const [preferenceStatus, setPreferenceStatus] = useState<"idle" | "saved" | "error">("idle")
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPreferences, setSavingPreferences] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
@@ -75,6 +78,8 @@ export function PersonalSettings({
   async function updatePreferences(event: FormEvent) {
     event.preventDefault()
     setSavingPreferences(true)
+    setPreferenceStatus("idle")
+    setTheme(preferredTheme)
     try {
       const response = await fetch(`/api/c/${slug}/profile`, {
         method: "PATCH",
@@ -83,14 +88,28 @@ export function PersonalSettings({
       })
       const result = await response.json().catch(() => null)
       if (!response.ok) throw new Error(result?.error ?? "Preferences could not be saved")
-      setTheme(preferredTheme)
+      const confirmedTheme = result?.preferences?.theme ?? preferredTheme
+      const confirmedDefaultView = result?.preferences?.defaultWorkspaceView ?? defaultWorkspaceView
+      setPreferredTheme(confirmedTheme)
+      setDefaultWorkspaceView(confirmedDefaultView)
+      setSavedTheme(confirmedTheme)
+      setSavedDefaultWorkspaceView(confirmedDefaultView)
+      setTheme(confirmedTheme)
+      setPreferenceStatus("saved")
+      window.dispatchEvent(new CustomEvent("search-helper:preferences-updated", {
+        detail: { theme: confirmedTheme, defaultWorkspaceView: confirmedDefaultView },
+      }))
       toast.success("Preferences saved")
     } catch (error) {
+      setTheme(savedTheme)
+      setPreferenceStatus("error")
       toast.error(error instanceof Error ? error.message : "Preferences could not be saved")
     } finally {
       setSavingPreferences(false)
     }
   }
+
+  const preferencesChanged = preferredTheme !== savedTheme || defaultWorkspaceView !== savedDefaultWorkspaceView
 
   async function updatePassword(event: FormEvent) {
     event.preventDefault()
@@ -197,10 +216,15 @@ export function PersonalSettings({
                 </div>
               </fieldset>
 
-              <Button type="submit" disabled={savingPreferences} className="admin-primary-button min-h-11 rounded-xl">
-                {savingPreferences ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
-                Save preferences
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" disabled={savingPreferences || !preferencesChanged} className="admin-primary-button min-h-11 rounded-xl">
+                  {savingPreferences ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                  {savingPreferences ? "Saving preferences" : "Save preferences"}
+                </Button>
+                <p className={cn("text-sm", preferenceStatus === "error" ? "text-destructive" : "text-muted-foreground")} role="status" aria-live="polite">
+                  {savingPreferences ? "Saving…" : preferenceStatus === "saved" ? "Saved and applied" : preferenceStatus === "error" ? "Not saved—please try again" : preferencesChanged ? "Changes not saved" : "Up to date"}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </form>

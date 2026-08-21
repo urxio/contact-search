@@ -92,16 +92,29 @@ const migrations: Migration[] = [{
   }
 }]
 
+const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
+
 let migrationPromise:Promise<void>|undefined
 export function runMigrations(){if(!migrationPromise)migrationPromise=migrate().catch(error=>{migrationPromise=undefined;throw error});return migrationPromise}
 
 async function migrate(){
   const client=await pool.connect()
+  let migrationLockHeld=false
   try{
+    // Most serverless invocations start in a fresh process. Avoid taking the
+    // advisory lock and replaying bootstrap DDL when the database is current.
+    // The locked path below still performs the authoritative second check.
+    try {
+      const current=await client.query<{version:number|null}>(`SELECT max(version)::int version FROM schema_migrations`)
+      if(current.rows[0]?.version===LATEST_MIGRATION_VERSION)return
+    } catch(error:any) {
+      if(error?.code!=="42P01")throw error
+    }
     await client.query(`SELECT pg_advisory_lock(hashtext('search-helper-schema-migrations'))`)
+    migrationLockHeld=true
     await bootstrapLegacyTables(client)
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations(version INT PRIMARY KEY,name TEXT NOT NULL,applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)
     const applied=await client.query<{version:number}>(`SELECT version FROM schema_migrations`); const versions=new Set(applied.rows.map(r=>r.version))
     for(const migration of migrations){if(versions.has(migration.version))continue;await client.query('BEGIN');try{await migration.run(client);await client.query(`INSERT INTO schema_migrations(version,name) VALUES($1,$2)`,[migration.version,migration.name]);await client.query('COMMIT')}catch(error){await client.query('ROLLBACK');throw error}}
-  } finally {await client.query(`SELECT pg_advisory_unlock(hashtext('search-helper-schema-migrations'))`).catch(()=>undefined);client.release()}
+  } finally {if(migrationLockHeld)await client.query(`SELECT pg_advisory_unlock(hashtext('search-helper-schema-migrations'))`).catch(()=>undefined);client.release()}
 }

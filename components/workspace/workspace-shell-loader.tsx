@@ -49,6 +49,28 @@ export function WorkspaceShellLoader({ slug, fallbackName, children }: Workspace
     }
   }, [])
 
+  useEffect(() => {
+    function updatePreferences(event: Event) {
+      const preferences = (event as CustomEvent<{ defaultWorkspaceView?: "search" | "team" }>).detail
+      if (!preferences?.defaultWorkspaceView) return
+      setSession((current) => current?.user
+        ? {
+            ...current,
+            user: {
+              ...current.user,
+              preferences: {
+                ...current.user.preferences,
+                defaultWorkspaceView: preferences.defaultWorkspaceView,
+              },
+            },
+          }
+        : current)
+    }
+
+    window.addEventListener("search-helper:preferences-updated", updatePreferences)
+    return () => window.removeEventListener("search-helper:preferences-updated", updatePreferences)
+  }, [])
+
   const workspaces = useMemo<WorkspaceSummary[]>(() => {
     if (!session?.memberships?.length) {
       return [{ name: fallbackName, slug, role: "member" }]
