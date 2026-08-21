@@ -84,6 +84,23 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Valid territory details are required." }, { status: 400 })
     }
     try {
+      const segmentUsage = await pool.query(
+        `SELECT MAX(GREATEST(
+           page_start,
+           COALESCE(page_end, page_start),
+           COALESCE(stopped_at_page, page_start)
+         ))::int AS max_page
+         FROM zt_segments
+         WHERE congregation_id = $1 AND zipcode_id = $2`,
+        [auth.congregation.id, id],
+      )
+      const highestUsedPage = Number(segmentUsage.rows[0]?.max_page ?? 0)
+      if (highestUsedPage > totalPages) {
+        return NextResponse.json(
+          { error: `Total pages cannot be below page ${highestUsedPage}, which is already used by a segment.` },
+          { status: 409 },
+        )
+      }
       const result = await pool.query(
         `UPDATE zt_zipcodes SET city = $3, zipcode = $4, territory = $5, total_pages = $6
          WHERE id = $1 AND congregation_id = $2 RETURNING *`,
@@ -108,6 +125,17 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     const auth = await requireCongregationAdmin(params.slug)
     const id = integer(req.nextUrl.searchParams.get("id"))
     if (!id) return NextResponse.json({ error: "Zipcode id is required." }, { status: 400 })
+    const segmentCount = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM zt_segments
+       WHERE congregation_id = $1 AND zipcode_id = $2`,
+      [auth.congregation.id, id],
+    )
+    if (Number(segmentCount.rows[0]?.count ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "This ZIP code has segment history. Delete its segments or packages before deleting the ZIP code." },
+        { status: 409 },
+      )
+    }
     const result = await pool.query(
       `DELETE FROM zt_zipcodes WHERE id = $1 AND congregation_id = $2 RETURNING id`,
       [id, auth.congregation.id],

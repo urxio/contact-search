@@ -215,7 +215,8 @@ function NamePickerModal({ knownUsers, onSelect }: { knownUsers: string[]; onSel
 }
 
 // ── Add Zipcode Modal ─────────────────────────────────────────────────────────
-function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territories" }: { onClose: () => void; onAdded: () => void; territory: string; apiBase?: string }) {
+function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territories" }: { onClose: () => void; onAdded: (territory: string) => void; territory: string; apiBase?: string }) {
+  const [territoryName, setTerritoryName] = useState(territory)
   const [city, setCity] = useState("")
   const [zipcode, setZipcode] = useState("")
   const [totalPages, setTotalPages] = useState("")
@@ -225,21 +226,27 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   const submit = async () => {
     setError("")
     const pages = parseInt(totalPages)
-    if (!city.trim() || !zipcode.trim() || !pages || pages < 1) { setError("All fields are required."); return }
+    if (!territoryName.trim() || !city.trim() || !zipcode.trim() || !pages || pages < 1) { setError("All fields are required."); return }
     setSaving(true)
-    const res = await fetch(`${apiBase}/zipcodes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ city: city.trim(), zipcode: zipcode.trim(), total_pages: pages, territory: territory || "Lacy Boulevard" }) })
+    const res = await fetch(`${apiBase}/zipcodes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ city: city.trim(), zipcode: zipcode.trim(), total_pages: pages, territory: territoryName.trim() }) })
     setSaving(false)
-    if (res.ok) { onAdded(); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to add zipcode.") }
+    if (res.ok) { onAdded(territoryName.trim()); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to add zipcode.") }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-labelledby="zipcode-dialog-title" className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add Zipcode</h2>
+          <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Progress</p><h2 id="zipcode-dialog-title" className="mt-1 text-base font-semibold text-gray-900 dark:text-white">{territory ? "Add ZIP code" : "Create area"}</h2></div>
           <button type="button" onClick={onClose} aria-label="Close add zipcode dialog" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 flex flex-col gap-4">
+          <div>
+            <label htmlFor="area-name" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area name</label>
+            <input id="area-name" value={territoryName} onChange={e => setTerritoryName(e.target.value)} placeholder="e.g. Woodbridge"
+              className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+            <p className="mt-2 text-xs font-normal text-muted-foreground">This becomes a tab containing its cities and ZIP codes.</p>
+          </div>
           {[["City", city, setCity, "e.g. Alexandria"], ["Zipcode", zipcode, setZipcode, "e.g. 22314"]].map(([label, val, setter, ph]) => (
             <div key={label as string}>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">{label as string}</label>
@@ -252,10 +259,10 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
             <input type="number" value={totalPages} onChange={e => setTotalPages(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="e.g. 800" min={1}
               className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-            <button onClick={submit} disabled={saving} className="flex-1 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors">{saving ? "Adding…" : "Add Zipcode"}</button>
+            <button type="button" onClick={onClose} className="flex-1 min-h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+            <button type="button" onClick={submit} disabled={saving} className="admin-primary-button min-h-11 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : territory ? "Add ZIP code" : "Create area"}</button>
           </div>
         </div>
       </div>
@@ -528,7 +535,7 @@ export default function Home() {
   const [userName, setUserName]     = useState("")
   const [knownUsers, setKnownUsers] = useState<string[]>([])
   const [showPicker, setShowPicker]           = useState(false)
-  const [showAddZip, setShowAddZip]           = useState(false)
+  const [zipModalTerritory, setZipModalTerritory] = useState<string | null>(null)
   const [hydrated, setHydrated]               = useState(false)
   const [activeTerritory, setActiveTerritory] = useState("")
   const [canManage, setCanManage]             = useState(!workspaceSlug)
@@ -616,7 +623,7 @@ export default function Home() {
       {/* Change-name modal (for already signed-in users) */}
       {!workspaceSlug && showPicker && hydrated && userName && <NamePickerModal knownUsers={knownUsers} onSelect={selectName} />}
 
-      {showAddZip && <AddZipcodeModal apiBase={apiBase} territory={activeTerritory} onClose={() => setShowAddZip(false)} onAdded={() => { setLoading(true); loadZipcodes() }} />}
+      {zipModalTerritory !== null && <AddZipcodeModal apiBase={apiBase} territory={zipModalTerritory} onClose={() => setZipModalTerritory(null)} onAdded={(territory) => { setActiveTerritory(territory); sessionStorage.setItem(territoryStorageKey, territory); setLoading(true); loadZipcodes(territory) }} />}
 
       {/* Nav */}
       {!embedded && <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
@@ -662,10 +669,10 @@ export default function Home() {
       <main className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Territory tab switcher + Add Zipcode */}
-        <div className="flex items-center justify-between mb-8 gap-4">
+        <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
           {/* Pill tabs */}
           {!loading && Object.keys(grouped).length > 0 && (
-            <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+            <div className="flex max-w-full gap-1 overflow-x-auto p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
               {Object.keys(grouped).map(t => (
                 <button key={t} onClick={() => { setActiveTerritory(t); sessionStorage.setItem(territoryStorageKey, t) }}
                   className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
@@ -678,10 +685,15 @@ export default function Home() {
               ))}
             </div>
           )}
-          {canManage && <button onClick={() => setShowAddZip(true)}
-            className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm">
-            <span className="text-base leading-none">+</span> Add Zipcode
-          </button>}
+          {canManage && <div className="ml-auto flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => setZipModalTerritory("")} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold transition-all duration-150 ease-out hover:bg-muted">
+              <span className="text-base leading-none" aria-hidden="true">+</span> New area
+            </button>
+            <button type="button" onClick={() => setZipModalTerritory(activeTerritory)} disabled={!activeTerritory}
+              className="admin-primary-button inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-50">
+              <span className="text-base leading-none" aria-hidden="true">+</span> Add ZIP
+            </button>
+          </div>}
         </div>
 
         {/* My segments — only shown when signed in */}

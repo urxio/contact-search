@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Pencil, Trash2 } from "lucide-react"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 type Segment = {
   id: number
@@ -34,9 +40,11 @@ function timeAgo(dateStr: string): string {
 }
 
 type ZipcodeInfo = {
+  id: number
   city: string
   zipcode: string
   total_pages: number
+  territory: string
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -51,6 +59,7 @@ function pct(a: number, total: number) {
 
 export default function ZipcodePage({ params }: { params: { zipcode: string } }) {
   const { zipcode } = params
+  const router = useRouter()
   const workspace = useWorkspaceRuntime()
   const workspaceSlug = workspace?.slug
   const embedded = Boolean(workspace)
@@ -60,6 +69,13 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   const [loading, setLoading]         = useState(true)
   const [userName, setUserName]       = useState("")
   const [canManage, setCanManage]     = useState(false)
+  const [editingTotalPages, setEditingTotalPages] = useState(false)
+  const [totalPagesInput, setTotalPagesInput] = useState("")
+  const [totalPagesError, setTotalPagesError] = useState("")
+  const [savingTotalPages, setSavingTotalPages] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
+  const [deletingZipcode, setDeletingZipcode] = useState(false)
 
   const apiBase = workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/team` : "/api/territories"
   const teamHref = workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"
@@ -103,6 +119,56 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
       setSegments(data.segments)
     } catch { /* ignore */ }
     setLoading(false)
+  }
+
+  const saveTotalPages = async () => {
+    if (!workspaceSlug || !zipcodeInfo) return
+    const totalPages = Number.parseInt(totalPagesInput, 10)
+    if (!Number.isSafeInteger(totalPages) || totalPages < 1) {
+      setTotalPagesError("Enter a valid total page count.")
+      return
+    }
+    setSavingTotalPages(true)
+    setTotalPagesError("")
+    try {
+      const response = await fetch(`${apiBase}/zipcodes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: zipcodeInfo.id,
+          city: zipcodeInfo.city,
+          zipcode: zipcodeInfo.zipcode,
+          territory: zipcodeInfo.territory,
+          total_pages: totalPages,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to update total pages.")
+      setZipcodeInfo(current => current ? { ...current, total_pages: Number(result.total_pages ?? totalPages) } : current)
+      setEditingTotalPages(false)
+    } catch (error) {
+      setTotalPagesError(error instanceof Error ? error.message : "Unable to update total pages.")
+    } finally {
+      setSavingTotalPages(false)
+    }
+  }
+
+  const deleteZipcode = async () => {
+    if (!workspaceSlug || !zipcodeInfo) return
+    setDeletingZipcode(true)
+    setDeleteError("")
+    try {
+      const response = await fetch(`${apiBase}/zipcodes?id=${zipcodeInfo.id}`, { method: "DELETE" })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to delete this ZIP code.")
+      setDeleteDialogOpen(false)
+      router.push(teamHref)
+      router.refresh()
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete this ZIP code.")
+    } finally {
+      setDeletingZipcode(false)
+    }
   }
 
   const claim = async () => {
@@ -240,12 +306,67 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
           <p className="text-center text-gray-400 py-24">Zipcode not found.</p>
         ) : (
           <>
+            {embedded ? (
+              <Link href={teamHref} className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-muted-foreground transition-all duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Back to Team Progress
+              </Link>
+            ) : null}
+
             {/* ── Header ── */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-0.5">
-                {zipcodeInfo.city} — {zipcode}
-              </h1>
-              <p className="text-base text-gray-400">{zipcodeInfo.total_pages.toLocaleString()} total pages in A-Z</p>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-0.5">
+                    {zipcodeInfo.city} — {zipcode}
+                  </h1>
+                  <p className="text-base text-gray-400">{zipcodeInfo.total_pages.toLocaleString()} total pages in A-Z</p>
+                </div>
+                {canManage && workspaceSlug ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => { setTotalPagesInput(String(zipcodeInfo.total_pages)); setTotalPagesError(""); setEditingTotalPages(value => !value) }}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold transition-all duration-150 ease-out hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                      Edit total pages
+                    </button>
+                    <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (open) setDeleteError("") }}>
+                      <AlertDialogTrigger asChild>
+                        <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 text-sm font-semibold text-destructive transition-all duration-150 ease-out hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          Delete ZIP
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="rounded-2xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete ZIP {zipcodeInfo.zipcode}?</AlertDialogTitle>
+                          <AlertDialogDescription>This removes the ZIP code from Team Progress. ZIP codes with segment history cannot be deleted.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        {deleteError ? <p role="alert" className="text-sm text-destructive">{deleteError}</p> : null}
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="min-h-11 rounded-xl">Cancel</AlertDialogCancel>
+                          <AlertDialogAction disabled={deletingZipcode} onClick={(event) => { event.preventDefault(); void deleteZipcode() }} className="min-h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
+                            {deletingZipcode ? "Deleting…" : "Delete ZIP"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ) : null}
+              </div>
+              {editingTotalPages ? (
+                <div className="admin-card mt-4 flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor="total-pages" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total pages in A-Z</label>
+                    <input id="total-pages" type="number" min={1} value={totalPagesInput} onChange={event => setTotalPagesInput(event.target.value)}
+                      className="admin-field mt-2 h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                    {totalPagesError ? <p role="alert" className="mt-2 text-sm text-destructive">{totalPagesError}</p> : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setEditingTotalPages(false)} className="min-h-11 rounded-xl border px-4 text-sm font-semibold transition-colors hover:bg-muted">Cancel</button>
+                    <button type="button" onClick={saveTotalPages} disabled={savingTotalPages} className="admin-primary-button min-h-11 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-50">{savingTotalPages ? "Saving…" : "Save"}</button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* ── Progress bar ── */}
