@@ -3,7 +3,7 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Upload, Check, RefreshCw, AlertCircleIcon } from "lucide-react"
+import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send } from "lucide-react"
 
 interface ImportBarProps {
   isLoading: boolean
@@ -12,6 +12,10 @@ interface ImportBarProps {
   fileInputRef: React.RefObject<HTMLInputElement>
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   onNewSession: () => void
+  showSubmitForReview?: boolean
+  isSubmittingReview?: boolean
+  canSubmitForReview?: boolean
+  onSubmitForReview?: () => void
 }
 
 export function ImportBar({
@@ -21,6 +25,10 @@ export function ImportBar({
   fileInputRef,
   onFileUpload,
   onNewSession,
+  showSubmitForReview = false,
+  isSubmittingReview = false,
+  canSubmitForReview = false,
+  onSubmitForReview,
 }: ImportBarProps) {
   return (
     <div className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
@@ -56,14 +64,25 @@ export function ImportBar({
         </p>
 
         {/* New Session */}
-        <div className="sm:ml-auto shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">
+          {showSubmitForReview ? (
+            <Button
+              size="sm"
+              onClick={onSubmitForReview}
+              disabled={!canSubmitForReview || isSubmittingReview}
+              className="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isSubmittingReview ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+              {isSubmittingReview ? "Submitting…" : "Submit for review"}
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"
             onClick={onNewSession}
             className="flex items-center gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
             New Session
           </Button>
         </div>

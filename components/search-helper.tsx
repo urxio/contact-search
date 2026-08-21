@@ -1988,6 +1988,10 @@ export default function SearchHelper({
           fileInputRef={fileInputRef}
           onFileUpload={handleFileUpload}
           onNewSession={startNewSession}
+          showSubmitForReview={embedded}
+          isSubmittingReview={isSendingReview}
+          canSubmitForReview={contacts.length > 0}
+          onSubmitForReview={sendForReview}
         />
 
         {/* ── Territory / General Notes ── */}
