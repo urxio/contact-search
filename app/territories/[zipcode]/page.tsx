@@ -389,7 +389,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
               </div>
             )}
 
-            {conflictingSegments.length > 0 && (
+            {canManage && conflictingSegments.length > 0 && (
               <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
                   <AlertTriangle className="h-5 w-5" aria-hidden="true" />
@@ -439,8 +439,78 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                         const isSaving     = saving.has(seg.id)
                         const isConfirming = confirming.has(seg.id)
                         const e            = editing[seg.id]
-                        const hasConflict  = (seg.conflict_segment_ids?.length ?? 0) > 0
+                        const hasConflict  = canManage && (seg.conflict_segment_ids?.length ?? 0) > 0
                         const isAssignedPackage = Boolean(seg.package_id && seg.owner_user_id)
+
+                        if (isEditing) {
+                          return (
+                            <tr key={seg.id} className="border-b border-border last:border-0">
+                              <td colSpan={6} className="p-4 sm:p-5">
+                                <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4 shadow-sm dark:bg-primary/[0.06]">
+                                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                      <p className="text-base font-semibold text-foreground">Update segment</p>
+                                      <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">Adjust the page range, progress, or status.</p>
+                                    </div>
+                                    <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">{seg.owner || "Unassigned"}</span>
+                                  </div>
+
+                                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.3fr)_minmax(140px,.7fr)_minmax(160px,.8fr)_auto] lg:items-end">
+                                    <fieldset>
+                                      <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Page range</legend>
+                                      <div className="flex items-center gap-2">
+                                        <label htmlFor={`segment-${seg.id}-start`} className="sr-only">Start page</label>
+                                        <input id={`segment-${seg.id}-start`} type="number" value={e.page_start}
+                                          onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_start: ev.target.value } }))}
+                                          className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                          placeholder="Start" />
+                                        <span className="text-muted-foreground" aria-hidden="true">–</span>
+                                        <label htmlFor={`segment-${seg.id}-end`} className="sr-only">End page</label>
+                                        <input id={`segment-${seg.id}-end`} type="number" value={e.page_end}
+                                          onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_end: ev.target.value } }))}
+                                          className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                          placeholder="End" />
+                                      </div>
+                                    </fieldset>
+
+                                    <div>
+                                      <label htmlFor={`segment-${seg.id}-stopped`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stopped at</label>
+                                      <input id={`segment-${seg.id}-stopped`} type="number" value={e.stopped_at_page}
+                                        onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], stopped_at_page: ev.target.value } }))}
+                                        className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                        placeholder="Page number" />
+                                    </div>
+
+                                    <div>
+                                      <label htmlFor={`segment-${seg.id}-status`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
+                                      <select id={`segment-${seg.id}-status`} value={e.status}
+                                        onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], status: ev.target.value } }))}
+                                        className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                        <option>Not started</option>
+                                        <option>In progress</option>
+                                        <option>Completed</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 sm:justify-end">
+                                      <button type="button" onClick={() => cancelEdit(seg.id)} className="min-h-11 rounded-xl border bg-background px-4 text-sm font-semibold text-muted-foreground transition-all duration-150 ease-out hover:bg-muted">Cancel</button>
+                                      <button type="button" onClick={() => saveEdit(seg.id)} disabled={isSaving} className="admin-primary-button min-h-11 rounded-xl px-5 text-sm font-semibold text-white transition-all duration-150 ease-out disabled:opacity-50">
+                                        {isSaving ? "Saving…" : "Save changes"}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {e.page_end && zipcodeInfo && parseInt(e.page_end) > zipcodeInfo.total_pages ? (
+                                    <p role="alert" className="mt-3 flex items-center gap-2 text-sm font-normal leading-relaxed text-amber-700 dark:text-amber-300">
+                                      <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> Exceeds the configured maximum of {zipcodeInfo.total_pages.toLocaleString()} pages.
+                                    </p>
+                                  ) : null}
+                                  {editErrors[seg.id] ? <p role="alert" className="mt-3 text-sm font-normal leading-relaxed text-destructive">{editErrors[seg.id]}</p> : null}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        }
 
                         return (
                           <tr key={seg.id} className={`border-b border-gray-100 dark:border-gray-800 last:border-0 ${hasConflict ? "bg-amber-50/70 dark:bg-amber-950/20 border-l-[3px] border-l-amber-500" : isOwner ? "bg-indigo-50 dark:bg-indigo-900/20 border-l-[3px] border-l-indigo-500 dark:border-l-indigo-400" : "hover:bg-gray-50 dark:hover:bg-gray-800/30"}`}>

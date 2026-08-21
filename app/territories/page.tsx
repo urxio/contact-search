@@ -719,7 +719,7 @@ export default function Home() {
 
           return (
             <div>
-              {tConflicts > 0 && (
+              {canManage && tConflicts > 0 && (
                 <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
                     <AlertTriangle className="h-5 w-5" aria-hidden="true" />
@@ -777,7 +777,7 @@ export default function Home() {
                                 <span className="text-sm font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">{compPct}%</span>
                               )}
                             </div>
-                            {z.conflict_count > 0 && (
+                            {canManage && z.conflict_count > 0 && (
                               <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                                 <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                                 {z.conflict_count} overlapping segment{z.conflict_count === 1 ? "" : "s"}
