@@ -2173,7 +2173,7 @@ export default function SearchHelper({
               Submitted for review!
             </DialogTitle>
             <DialogDescription>
-              Would you like to start a new session and import a new Excel file?
+              Thank you for your submission. Start a new session when you are ready to import another Excel file.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-2">
@@ -2185,14 +2185,7 @@ export default function SearchHelper({
               className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Yes, start new session
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsPostExportDialogOpen(false)}
-              className="w-full"
-            >
-              No, keep working
+              Start new session
             </Button>
           </div>
         </DialogContent>
