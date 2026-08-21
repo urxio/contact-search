@@ -50,14 +50,14 @@ export function ImportBar({
         <Button asChild disabled={isLoading} className="admin-primary-button min-h-11 shrink-0 rounded-xl text-white">
           <label htmlFor="excel-upload" className="flex items-center gap-2 cursor-pointer">
             <Upload className="h-4 w-4" aria-hidden="true" />
-            <span>{isLoading ? "Loading…" : packagesEnabled ? "Upload package" : "Import Excel File"}</span>
+            <span>{isLoading ? "Loading…" : packagesEnabled ? "Upload Excel" : "Import Excel File"}</span>
           </label>
         </Button>
 
         {packagesEnabled ? (
           <Button type="button" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={onBrowsePackages}>
             <PackageOpen className="h-4 w-4" aria-hidden="true" />
-            Browse packages
+            Browse Excels
           </Button>
         ) : null}
 
