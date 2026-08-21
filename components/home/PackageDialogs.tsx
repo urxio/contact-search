@@ -351,7 +351,7 @@ export function PackageDialogs({
       </Dialog>
 
       <Dialog open={browseOpen} onOpenChange={onBrowseOpenChange}>
-        <DialogContent className="admin-material max-h-[88vh] overflow-y-auto rounded-2xl sm:max-w-2xl">
+        <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-semibold">Search packages</DialogTitle>
             <DialogDescription>Choose an available segment or manage one you uploaded.</DialogDescription>
@@ -368,16 +368,17 @@ export function PackageDialogs({
               const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
               const packageStatus = row.state ? row.state.replace("_", " ") : row.status
               return (
-                <div key={row.id} className="admin-card flex flex-col gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
+                <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
                   <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><p className="truncate text-base font-semibold">{row.name}</p><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+                    <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
                     <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
                     <p className="mt-1 text-xs font-normal text-muted-foreground">{owner}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
                     <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
-                    {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}<DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Release assignment</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete package</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
+                    {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete package</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
                   </div>
                 </div>
               )

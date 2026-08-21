@@ -24,6 +24,7 @@ type MySegment = {
   page_start: number
   page_end: number | null
   owner: string
+  owner_user_id: number | null
   stopped_at_page: number | null
   status: string
   notes: string
@@ -346,6 +347,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
     const isEditing    = !!editing[seg.id]
     const isSaving     = saving.has(seg.id)
     const isConfirming = confirming.has(seg.id)
+    const isAssignedPackage = Boolean(seg.package_id && seg.owner_user_id)
     const e            = editing[seg.id]
     return (
       <tr key={seg.id} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
@@ -418,8 +420,8 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
             </div>
           ) : isConfirming ? (
             <div className="flex items-center gap-1.5">
-              <span className={`text-sm font-medium ${seg.package_id ? "text-amber-600 dark:text-amber-400" : "text-red-500"}`}>
-                {seg.package_id ? "Release?" : "Delete?"}
+              <span className={`text-sm font-medium ${isAssignedPackage ? "text-amber-600 dark:text-amber-400" : "text-red-500"}`}>
+                {isAssignedPackage ? "Make available?" : "Delete?"}
               </span>
               <button onClick={() => deleteSeg(seg.id)}
                 className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors">
@@ -436,10 +438,11 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
                 className="px-3 py-1.5 rounded-lg bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-colors">
                 Update
               </button>
-              <button onClick={() => setConfirming(prev => new Set(prev).add(seg.id))}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${seg.package_id ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50" : "bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"}`}>
-                {seg.package_id ? "Release" : "Delete"}
-              </button>
+              {(!seg.package_id || isAssignedPackage) ? <button onClick={() => setConfirming(prev => new Set(prev).add(seg.id))}
+                title={isAssignedPackage ? "Remove the owner and return this package to the available library" : undefined}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isAssignedPackage ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50" : "bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"}`}>
+                {isAssignedPackage ? "Unassign" : "Delete"}
+              </button> : null}
             </div>
           )}
         </td>
