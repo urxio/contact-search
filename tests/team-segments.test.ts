@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg"
 import { describe, expect, it, vi } from "vitest"
-import { assertNoSegmentConflict } from "@/lib/team-segments"
+import { assertNoSegmentConflict, parseSegmentPageRange } from "@/lib/team-segments"
 
 function clientWithConflict(row?: Record<string, unknown>) {
   const query = vi.fn()
@@ -55,5 +55,19 @@ describe("team segment conflict checks", () => {
         packageName: "March list",
       },
     })
+  })
+})
+
+describe("team segment page ranges", () => {
+  it("parses the range formats saved by assignment drafts", () => {
+    expect(parseSegmentPageRange("1-50")).toEqual({ pageStart: 1, pageEnd: 50 })
+    expect(parseSegmentPageRange("51–100")).toEqual({ pageStart: 51, pageEnd: 100 })
+    expect(parseSegmentPageRange("101 to 150")).toEqual({ pageStart: 101, pageEnd: 150 })
+  })
+
+  it("rejects missing, malformed, and reversed ranges", () => {
+    expect(parseSegmentPageRange("")).toBeNull()
+    expect(parseSegmentPageRange("pages 1-50")).toBeNull()
+    expect(parseSegmentPageRange("50-1")).toBeNull()
   })
 })

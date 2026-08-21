@@ -17,6 +17,15 @@ export class SegmentConflictError extends Error {
   }
 }
 
+export function parseSegmentPageRange(value: unknown): { pageStart: number; pageEnd: number } | null {
+  const match = String(value ?? "").trim().match(/^(\d+)\s*(?:-|–|—|to)\s*(\d+)$/i)
+  if (!match) return null
+  const pageStart = Number.parseInt(match[1], 10)
+  const pageEnd = Number.parseInt(match[2], 10)
+  if (!Number.isSafeInteger(pageStart) || !Number.isSafeInteger(pageEnd) || pageStart < 1 || pageEnd < pageStart) return null
+  return { pageStart, pageEnd }
+}
+
 /**
  * Serializes range writes for one congregation/ZIP and rejects inclusive overlap.
  * Call inside a transaction, immediately before inserting or updating a segment.

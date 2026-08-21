@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
+import { parseSegmentPageRange } from "@/lib/team-segments"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../_shared"
 
 type Contact = { status?: string; [key: string]: unknown }
@@ -64,6 +65,32 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
           JSON.stringify(contacts),
         ],
       )
+      const assignmentRange = parseSegmentPageRange(draft.territory_page_range)
+      let completedSegmentIds: number[] = []
+      if (draft.territory_zipcode && assignmentRange) {
+        const completed = await client.query(
+          `UPDATE zt_segments segment
+           SET status = 'Completed', updated_at = NOW()
+           FROM zt_zipcodes zipcode
+           WHERE segment.zipcode_id = zipcode.id
+             AND segment.congregation_id = zipcode.congregation_id
+             AND segment.congregation_id = $1
+             AND segment.owner_user_id = $2
+             AND zipcode.zipcode = $3
+             AND segment.page_start = $4
+             AND COALESCE(segment.page_end, zipcode.total_pages) = $5
+             AND segment.status <> 'Completed'
+           RETURNING segment.id`,
+          [
+            auth.congregation.id,
+            auth.user.id,
+            String(draft.territory_zipcode).trim(),
+            assignmentRange.pageStart,
+            assignmentRange.pageEnd,
+          ],
+        )
+        completedSegmentIds = completed.rows.map(row => Number(row.id))
+      }
       await client.query("COMMIT")
       await auditEvent({
         actorUserId: auth.user.id,
@@ -71,9 +98,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         action: "submission.created",
         targetType: "submission",
         targetId: String(inserted.rows[0].id),
-        metadata: { draftRevision: requestedRevision, contactCount: contacts.length },
+        metadata: { draftRevision: requestedRevision, contactCount: contacts.length, completedSegmentIds },
       })
-      return NextResponse.json({ success: true, ...inserted.rows[0] }, { status: 201 })
+      return NextResponse.json({ success: true, ...inserted.rows[0], completedSegmentIds }, { status: 201 })
     } catch (error) {
       await client.query("ROLLBACK")
       throw error
