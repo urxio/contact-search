@@ -187,6 +187,10 @@ export default function SearchHelper({
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
   const storageKey = useCallback((key: string) => `${storagePrefix}:${key}`, [storagePrefix])
+  const chooseViewType = useCallback((view: ViewType) => {
+    localStorage.setItem(storageKey("viewTypeExplicit"), "true")
+    setViewType(view)
+  }, [storageKey])
 
   // Update the memoized filtered contacts
   const potentiallyFrenchContacts = useMemo(() => {
@@ -260,6 +264,7 @@ export default function SearchHelper({
     const savedZipcode = localStorage.getItem(storageKey("territoryZipcode"))
     const savedPageRange = localStorage.getItem(storageKey("territoryPageRange"))
     const savedViewType = localStorage.getItem(storageKey("viewType")) as ViewType | null
+    const hasExplicitViewType = localStorage.getItem(storageKey("viewTypeExplicit")) === "true"
 
     if (savedContacts) {
       try {
@@ -281,10 +286,12 @@ export default function SearchHelper({
       setTerritoryPageRange(savedPageRange)
     }
 
-    if (savedViewType === "list" || savedViewType === "grid") {
+    if (hasExplicitViewType && (savedViewType === "list" || savedViewType === "grid")) {
       setViewType(savedViewType)
     } else if (window.matchMedia("(max-width: 639px)").matches) {
       setViewType("grid")
+    } else if (savedViewType === "list" || savedViewType === "grid") {
+      setViewType(savedViewType)
     }
 
     // Load saved user ID from localStorage, or prompt them to enter one
@@ -1566,13 +1573,13 @@ export default function SearchHelper({
       // Ctrl+G to toggle between grid and list view
       if (e.ctrlKey && e.key === "g") {
         e.preventDefault()
-        setViewType((prev) => (prev === "list" ? "grid" : "list"))
+        chooseViewType(viewType === "list" ? "grid" : "list")
       }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [toggleSelectAll, updateBatchStatus, selectedContacts, viewType])
+  }, [chooseViewType, toggleSelectAll, updateBatchStatus, selectedContacts, viewType])
 
   // Global keyboard shortcut for creating a contact (Ctrl+N)
   useEffect(() => {
@@ -2032,7 +2039,7 @@ export default function SearchHelper({
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setViewType("list")}
+                      onClick={() => chooseViewType("list")}
                       className={viewType === "list" ? "bg-muted" : ""}
                       aria-label="List view"
                     >
@@ -2046,7 +2053,7 @@ export default function SearchHelper({
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => setViewType("grid")}
+                      onClick={() => chooseViewType("grid")}
                       className={viewType === "grid" ? "bg-muted" : ""}
                       aria-label="Gallery view"
                     >
