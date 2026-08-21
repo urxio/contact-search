@@ -2180,7 +2180,7 @@ export default function SearchHelper({
             <Button
               onClick={() => {
                 setIsPostExportDialogOpen(false)
-                startNewSession()
+                confirmNewSession()
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
