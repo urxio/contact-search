@@ -4,7 +4,10 @@ import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
-import { AlertTriangle, BarChart3, ClipboardList, LayoutDashboard, MapPin, PencilLine } from "lucide-react"
+import { AlertTriangle, BarChart3, ClipboardList, LayoutDashboard, MapPin, Pencil, PencilLine, Trash2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
 
 type ZipcodeRow = {
   id: number
@@ -270,6 +273,109 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   )
 }
 
+function EditZipcodeDialog({ row, apiBase, onClose, onSaved }: { row: ZipcodeRow; apiBase: string; onClose: () => void; onSaved: (row: ZipcodeRow) => void }) {
+  const [territory, setTerritory] = useState(row.territory)
+  const [city, setCity] = useState(row.city)
+  const [zipcode, setZipcode] = useState(row.zipcode)
+  const [totalPages, setTotalPages] = useState(String(row.total_pages))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const save = async () => {
+    const pages = Number.parseInt(totalPages, 10)
+    if (!territory.trim() || !city.trim() || !/^\d{5}$/.test(zipcode.trim()) || !Number.isSafeInteger(pages) || pages < 1) {
+      setError("Enter an area, city, five-digit ZIP code, and valid total pages.")
+      return
+    }
+    setSaving(true)
+    setError("")
+    try {
+      const response = await fetch(`${apiBase}/zipcodes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id, territory: territory.trim(), city: city.trim(), zipcode: zipcode.trim(), total_pages: pages }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to update this ZIP code.")
+      onSaved({ ...row, ...result, total_pages: Number(result.total_pages ?? pages) })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to update this ZIP code.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose() }}>
+      <DialogContent className="admin-material rounded-2xl sm:max-w-md">
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-base font-semibold">Edit ZIP code</DialogTitle>
+          <DialogDescription className="text-sm font-normal leading-relaxed">Update the location and page total shown in Team Progress.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="edit-zip-area" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area</label>
+            <input id="edit-zip-area" value={territory} onChange={event => setTerritory(event.target.value)} className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <div>
+            <label htmlFor="edit-zip-city" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">City</label>
+            <input id="edit-zip-city" value={city} onChange={event => setCity(event.target.value)} className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <div>
+            <label htmlFor="edit-zip-code" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">ZIP code</label>
+            <input id="edit-zip-code" inputMode="numeric" maxLength={5} value={zipcode} onChange={event => setZipcode(event.target.value)} className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="edit-zip-pages" className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total pages in A-Z</label>
+            <input id="edit-zip-pages" type="number" min={1} value={totalPages} onChange={event => setTotalPages(event.target.value)} className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          {error ? <p role="alert" className="text-sm font-normal leading-relaxed text-destructive sm:col-span-2">{error}</p> : null}
+        </div>
+        <DialogFooter className="gap-2 sm:space-x-0">
+          <button type="button" onClick={onClose} disabled={saving} className="min-h-11 rounded-xl border bg-background px-4 text-sm font-semibold transition-all duration-150 ease-out hover:bg-muted disabled:opacity-50">Cancel</button>
+          <button type="button" onClick={save} disabled={saving} className="admin-primary-button min-h-11 rounded-xl px-5 text-sm font-semibold text-white transition-all duration-150 ease-out disabled:opacity-50">{saving ? "Saving…" : "Save changes"}</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteZipcodeDialog({ row, apiBase, onClose, onDeleted }: { row: ZipcodeRow; apiBase: string; onClose: () => void; onDeleted: (row: ZipcodeRow) => void }) {
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState("")
+
+  const remove = async () => {
+    setDeleting(true)
+    setError("")
+    try {
+      const response = await fetch(`${apiBase}/zipcodes?id=${row.id}`, { method: "DELETE" })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to delete this ZIP code.")
+      onDeleted(row)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to delete this ZIP code.")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <AlertDialog open onOpenChange={(open) => { if (!open && !deleting) onClose() }}>
+      <AlertDialogContent className="rounded-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete ZIP {row.zipcode}?</AlertDialogTitle>
+          <AlertDialogDescription>This removes the ZIP code from Team Progress. ZIP codes with segment history cannot be deleted.</AlertDialogDescription>
+        </AlertDialogHeader>
+        {error ? <p role="alert" className="text-sm font-normal leading-relaxed text-destructive">{error}</p> : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting} className="min-h-11 rounded-xl">Cancel</AlertDialogCancel>
+          <AlertDialogAction disabled={deleting} onClick={(event) => { event.preventDefault(); void remove() }} className="min-h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">{deleting ? "Deleting…" : "Delete ZIP"}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 // ── My Segments Panel ─────────────────────────────────────────────────────────
 function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/territories" }: { userName: string; apiBase?: string; teamHref?: string }) {
   const [segments, setSegments]           = useState<MySegment[]>([])
@@ -527,6 +633,8 @@ export default function Home() {
   const [knownUsers, setKnownUsers] = useState<string[]>([])
   const [showPicker, setShowPicker]           = useState(false)
   const [zipModalTerritory, setZipModalTerritory] = useState<string | null>(null)
+  const [editingZipcode, setEditingZipcode] = useState<ZipcodeRow | null>(null)
+  const [deletingZipcode, setDeletingZipcode] = useState<ZipcodeRow | null>(null)
   const [hydrated, setHydrated]               = useState(false)
   const [activeTerritory, setActiveTerritory] = useState("")
   const [canManage, setCanManage]             = useState(!workspaceSlug)
@@ -568,12 +676,11 @@ export default function Home() {
       .then(data => {
         setZipcodes(data)
         setLoading(false)
-        // Auto-select first territory only if none is already set
-        if (!currentTerritory && data.length > 0) {
-          const first = data[0].territory
-          setActiveTerritory(first)
-          sessionStorage.setItem(territoryStorageKey, first)
-        }
+        const territoryExists = data.some((row: ZipcodeRow) => row.territory === currentTerritory)
+        const nextTerritory = territoryExists ? currentTerritory : data[0]?.territory ?? ""
+        setActiveTerritory(nextTerritory)
+        if (nextTerritory) sessionStorage.setItem(territoryStorageKey, nextTerritory)
+        else sessionStorage.removeItem(territoryStorageKey)
       })
       .catch(() => setLoading(false))
   }
@@ -615,6 +722,8 @@ export default function Home() {
       {!workspaceSlug && showPicker && hydrated && userName && <NamePickerModal knownUsers={knownUsers} onSelect={selectName} />}
 
       {zipModalTerritory !== null && <AddZipcodeModal apiBase={apiBase} territory={zipModalTerritory} onClose={() => setZipModalTerritory(null)} onAdded={(territory) => { setActiveTerritory(territory); sessionStorage.setItem(territoryStorageKey, territory); setLoading(true); loadZipcodes(territory) }} />}
+      {editingZipcode ? <EditZipcodeDialog row={editingZipcode} apiBase={apiBase} onClose={() => setEditingZipcode(null)} onSaved={(row) => { setEditingZipcode(null); setLoading(true); loadZipcodes(row.territory) }} /> : null}
+      {deletingZipcode ? <DeleteZipcodeDialog row={deletingZipcode} apiBase={apiBase} onClose={() => setDeletingZipcode(null)} onDeleted={(row) => { setDeletingZipcode(null); setLoading(true); loadZipcodes(row.territory) }} /> : null}
 
       {/* Nav */}
       {!embedded && <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
@@ -752,8 +861,8 @@ export default function Home() {
                         const ipPct   = pct(z.in_progress, z.segment_count)
                         const nsPct   = pct(z.not_started, z.segment_count)
                         const allDone = z.segment_count > 0 && z.not_started === 0 && z.in_progress === 0
-                        return (
-                          <Link key={z.zipcode} href={`${teamHref}/${z.zipcode}`}
+                        const card = (
+                          <Link key={z.id} href={`${teamHref}/${z.zipcode}`} title={canManage ? "Open ZIP. Right-click for admin options." : undefined}
                             className="group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
                             <div className="flex items-start justify-between mb-3">
                               <div>
@@ -792,6 +901,21 @@ export default function Home() {
                               {z.not_started > 0 && <span className="text-gray-400">{z.not_started} open</span>}
                             </div>
                           </Link>
+                        )
+                        if (!canManage) return card
+                        return (
+                          <ContextMenu key={z.id}>
+                            <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+                            <ContextMenuContent className="w-52 rounded-xl p-2 shadow-lg">
+                              <ContextMenuItem onSelect={() => setEditingZipcode(z)} className="min-h-11 gap-2 rounded-lg px-3 text-sm font-medium">
+                                <Pencil className="h-4 w-4" aria-hidden="true" /> Edit ZIP code
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem onSelect={() => setDeletingZipcode(z)} className="min-h-11 gap-2 rounded-lg px-3 text-sm font-medium text-destructive focus:text-destructive">
+                                <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete ZIP
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
                         )
                       })}
                     </div>
