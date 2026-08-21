@@ -4,6 +4,7 @@ export type WorkspaceSummary = {
   name: string
   slug: string
   role: WorkspaceRole
+  supportAccess?: boolean
 }
 
 export type WorkspaceAccount = {
