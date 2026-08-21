@@ -155,13 +155,17 @@ export function WorkspaceShell({
                     </Link>
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
-                  <Link href="/workspaces">
-                    <Building2 aria-hidden="true" />
-                    All congregations
-                  </Link>
-                </DropdownMenuItem>
+                {canAdmin ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
+                      <Link href="/workspaces">
+                        <Building2 aria-hidden="true" />
+                        All congregations
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
 
