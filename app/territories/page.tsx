@@ -61,7 +61,7 @@ const FEATURES = [
   { icon: LayoutDashboard, title: "Territory dashboard", desc: "All zipcodes grouped by city with live segmented progress bars." },
   { icon: ClipboardList, title: "Your segments at a glance", desc: "Active and not-started segments shown front and centre after sign-in." },
   { icon: MapPin, title: "Claim a page range", desc: "Open any zipcode and claim a start–end page range in one tap." },
-  { icon: PencilLine, title: "Update your progress", desc: "Set the page you stopped at and flip the status right from the dashboard." },
+  { icon: PencilLine, title: "Update your progress", desc: "Adjust the assigned page range and status right from the dashboard." },
   { icon: BarChart3, title: "Live progress tracking", desc: "Bars update in real time across all territories as work is logged." },
 ]
 
@@ -387,14 +387,6 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
             `${seg.page_start}${seg.page_end ? ` – ${seg.page_end}` : "+"}`
           )}
         </td>
-        <td className="px-4 py-3 text-gray-500 text-base">
-          {isEditing ? (
-            <input type="number" value={e.stopped_at_page}
-              onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], stopped_at_page: ev.target.value } }))}
-              className="w-24 h-8 px-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              placeholder="page #" />
-          ) : (seg.stopped_at_page ?? "—")}
-        </td>
         <td className="px-4 py-3">
           {isEditing ? (
             <select value={e.status} onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], status: ev.target.value } }))}
@@ -480,7 +472,6 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
               <tr className="border-b border-gray-100 dark:border-gray-800">
                 <th className="text-left px-5 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Zipcode</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Pages</th>
-                <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Stopped at</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Updated</th>
                 <th className="px-4 py-2"></th>

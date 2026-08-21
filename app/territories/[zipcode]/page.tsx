@@ -422,7 +422,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                       <tr className="border-b border-gray-100 dark:border-gray-800">
                         <th className="text-left px-5 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wide">Pages</th>
                         <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wide">Owner</th>
-                        <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wide">Stopped at</th>
                         <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                         <th className="text-left px-4 py-3 text-sm font-semibold text-gray-400 uppercase tracking-wide">Updated</th>
                         <th className="px-4 py-3"></th>
@@ -445,7 +444,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                         if (isEditing) {
                           return (
                             <tr key={seg.id} className="border-b border-border last:border-0">
-                              <td colSpan={6} className="p-4 sm:p-5">
+                              <td colSpan={5} className="p-4 sm:p-5">
                                 <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4 shadow-sm dark:bg-primary/[0.06]">
                                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                                     <div>
@@ -455,7 +454,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                     <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">{seg.owner || "Unassigned"}</span>
                                   </div>
 
-                                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.3fr)_minmax(140px,.7fr)_minmax(160px,.8fr)_auto] lg:items-end">
+                                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1fr)_minmax(180px,.6fr)_auto] lg:items-end">
                                     <fieldset>
                                       <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Page range</legend>
                                       <div className="flex items-center gap-2">
@@ -472,14 +471,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                           placeholder="End" />
                                       </div>
                                     </fieldset>
-
-                                    <div>
-                                      <label htmlFor={`segment-${seg.id}-stopped`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stopped at</label>
-                                      <input id={`segment-${seg.id}-stopped`} type="number" value={e.stopped_at_page}
-                                        onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], stopped_at_page: ev.target.value } }))}
-                                        className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                        placeholder="Page number" />
-                                    </div>
 
                                     <div>
                                       <label htmlFor={`segment-${seg.id}-status`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
@@ -558,21 +549,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                 <span className="text-gray-600 dark:text-gray-400">{seg.owner || "—"}</span>
                               )}
                               {editErrors[seg.id] && <p role="alert" className="mt-2 max-w-56 text-xs font-medium text-red-600 dark:text-red-400">{editErrors[seg.id]}</p>}
-                            </td>
-
-                            {/* Stopped at */}
-                            <td className="px-4 py-3 text-gray-500 dark:text-gray-500">
-                              {isEditing ? (
-                                <input
-                                  type="number"
-                                  value={e.stopped_at_page}
-                                  onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], stopped_at_page: ev.target.value } }))}
-                                  className="w-24 h-8 px-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                                  placeholder="page #"
-                                />
-                              ) : (
-                                seg.stopped_at_page ?? "—"
-                              )}
                             </td>
 
                             {/* Status */}
