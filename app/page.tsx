@@ -1532,7 +1532,7 @@ export default function Home() {
 
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate">
-                OTMRT Helper
+                Search Helper
               </span>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 shrink-0">
                 v2
