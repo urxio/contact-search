@@ -301,7 +301,7 @@ export function PackageDialogs({
   return (
     <>
       <Dialog open={Boolean(pendingUpload)} onOpenChange={(open) => { if (!open && !busy) onCancelUpload() }}>
-        <DialogContent className="admin-material max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-xl">
+        <DialogContent className="admin-material !inset-0 m-auto h-fit max-h-[90vh] w-[calc(100vw-2rem)] !transform-none overflow-y-auto rounded-2xl data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:max-w-xl">
           <DialogHeader className="text-left">
             <div className="admin-icon-well mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-primary">
               <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
