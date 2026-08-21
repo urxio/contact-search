@@ -132,7 +132,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     )
     if (Number(segmentCount.rows[0]?.count ?? 0) > 0) {
       return NextResponse.json(
-        { error: "This ZIP code has segment history. Delete its segments or packages before deleting the ZIP code." },
+        { error: "This ZIP code has segment history. Delete its segments or Excels before deleting the ZIP code." },
         { status: 409 },
       )
     }

@@ -140,10 +140,10 @@ export function PackageDialogs({
     try {
       const response = await fetch(api, { cache: "no-store" })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Unable to load packages")
+      if (!response.ok) throw new Error(result.error || "Unable to load Excels")
       setPackages(Array.isArray(result) ? result : result.packages ?? [])
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to load packages")
+      toast.error(error instanceof Error ? error.message : "Unable to load Excels")
     } finally {
       setLoadingPackages(false)
     }
@@ -160,7 +160,7 @@ export function PackageDialogs({
 
   async function savePackage(startNow: boolean) {
     if (!pendingUpload || !name.trim() || !zipcode || !pageStart || !pageEnd) {
-      toast.error("Add a package name, ZIP code, and complete page range.")
+      toast.error("Add an Excel name, ZIP code, and complete page range.")
       return
     }
     setBusy(true)
@@ -183,14 +183,14 @@ export function PackageDialogs({
       const result = await response.json()
       if (response.status === 409 && result.server) {
         onDraftConflict(result.server)
-        throw new Error("Your draft changed in another tab. Resolve it before starting this package.")
+        throw new Error("Your draft changed in another tab. Resolve it before starting this Excel.")
       }
-      if (!response.ok) throw new Error(result.error || "Unable to save package")
+      if (!response.ok) throw new Error(result.error || "Unable to save Excel")
       if (startNow) applyDraft(result)
       onCancelUpload()
-      toast.success(startNow ? "Package saved and ready to search." : "Package saved for the congregation.")
+      toast.success(startNow ? "Excel saved and ready to search." : "Excel saved for the congregation.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save package")
+      toast.error(error instanceof Error ? error.message : "Unable to save Excel")
     } finally {
       setBusy(false)
     }
@@ -207,15 +207,15 @@ export function PackageDialogs({
       const result = await response.json()
       if (response.status === 409 && result.server) {
         onDraftConflict(result.server)
-        throw new Error("Your draft changed in another tab. Resolve it before opening this package.")
+        throw new Error("Your draft changed in another tab. Resolve it before opening this Excel.")
       }
-      if (!response.ok) throw new Error(result.error || "Unable to open package")
+      if (!response.ok) throw new Error(result.error || "Unable to open Excel")
       applyDraft(result)
       setPackageToOpen(null)
       onBrowseOpenChange(false)
       toast.success(`${row.name} is ready to search.`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to open package")
+      toast.error(error instanceof Error ? error.message : "Unable to open Excel")
     } finally {
       setBusy(false)
     }
@@ -230,13 +230,13 @@ export function PackageDialogs({
         body: JSON.stringify(patch),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Unable to update package")
+      if (!response.ok) throw new Error(result.error || "Unable to update Excel")
       await refreshPackages()
       setEditingPackage(null)
       onBrowseOpenChange(true)
-      toast.success("Package updated.")
+      toast.success("Excel updated.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to update package")
+      toast.error(error instanceof Error ? error.message : "Unable to update Excel")
     } finally {
       setBusy(false)
     }
@@ -251,11 +251,11 @@ export function PackageDialogs({
         body: JSON.stringify({ action }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || `Unable to ${action} package`)
+      if (!response.ok) throw new Error(result.error || `Unable to ${action} Excel`)
       await refreshPackages()
-      toast.success(action === "release" ? "Package released." : "Package deleted.")
+      toast.success(action === "release" ? "Excel made available." : "Excel deleted.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Unable to ${action} package`)
+      toast.error(error instanceof Error ? error.message : `Unable to ${action} Excel`)
     } finally {
       setBusy(false)
     }
@@ -286,13 +286,13 @@ export function PackageDialogs({
         body: JSON.stringify({ action: "assign", userId: Number(assignedUserId) }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Unable to assign package")
+      if (!response.ok) throw new Error(result.error || "Unable to assign Excel")
       setPackageToAssign(null)
       await refreshPackages()
       onBrowseOpenChange(true)
-      toast.success("Package assigned.")
+      toast.success("Excel assigned.")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to assign package")
+      toast.error(error instanceof Error ? error.message : "Unable to assign Excel")
     } finally {
       setBusy(false)
     }
@@ -306,7 +306,7 @@ export function PackageDialogs({
             <div className="admin-icon-well mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-primary">
               <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
             </div>
-            <DialogTitle className="text-base font-semibold">Prepare this search package</DialogTitle>
+            <DialogTitle className="text-base font-semibold">Prepare this Excel</DialogTitle>
             <DialogDescription className="text-sm font-normal leading-relaxed">
               Add the Team Progress segment for these {pendingUpload?.contacts.length.toLocaleString() ?? 0} contacts.
             </DialogDescription>
@@ -314,11 +314,11 @@ export function PackageDialogs({
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="package-name">Package name</Label>
+              <Label htmlFor="package-name">Excel name</Label>
               <Input id="package-name" value={name} onChange={(event) => setName(event.target.value)} className="admin-field h-11 rounded-xl" />
             </div>
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Who can find this package?</legend>
+              <legend className="text-sm font-medium">Who can find this Excel?</legend>
               <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
                 {(["shared", "private"] as const).map((option) => (
                   <button key={option} type="button" onClick={() => setVisibility(option)} aria-pressed={visibility === option}
@@ -344,7 +344,7 @@ export function PackageDialogs({
           </div>
 
           <DialogFooter className="gap-2 sm:space-x-0">
-            <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(false)}>Save package</Button>
+            <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(false)}>Save Excel</Button>
             <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(true)}>{busy ? "Saving…" : "Save & start"}</Button>
           </DialogFooter>
         </DialogContent>
@@ -353,12 +353,12 @@ export function PackageDialogs({
       <Dialog open={browseOpen} onOpenChange={onBrowseOpenChange}>
         <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-base font-semibold">Search packages</DialogTitle>
+            <DialogTitle className="text-base font-semibold">Search Excels</DialogTitle>
             <DialogDescription>Choose an available segment or manage one you uploaded.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {loadingPackages ? <p className="py-10 text-center text-sm text-muted-foreground">Loading packages…</p> : packages.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">No packages yet</p><p className="mt-1 text-sm text-muted-foreground">Upload the first contact package for this congregation.</p></div>
+            {loadingPackages ? <p className="py-10 text-center text-sm text-muted-foreground">Loading Excels…</p> : packages.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">No Excels yet</p><p className="mt-1 text-sm text-muted-foreground">Upload the first Excel for this congregation.</p></div>
             ) : packages.map((row) => {
               const contactCount = value<number>(row, "contactCount", "contact_count") || 0
               const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
@@ -378,7 +378,7 @@ export function PackageDialogs({
                   </div>
                   <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
                     <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
-                    {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete package</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
+                    {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
                   </div>
                 </div>
               )
@@ -388,19 +388,19 @@ export function PackageDialogs({
       </Dialog>
 
       <AlertDialog open={Boolean(packageToOpen)} onOpenChange={(open) => { if (!open) setPackageToOpen(null) }}>
-        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{hasDraft ? "Replace your current search?" : "Open this package?"}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current draft will be replaced with a fresh copy of this package. Submitted work is not affected." : "This claims the segment for you and marks it in progress."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? "Opening…" : "Open package"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{hasDraft ? "Replace your current search?" : "Open this Excel?"}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current draft will be replaced with a fresh copy of this Excel. Submitted work is not affected." : "This claims the segment for you and marks it in progress."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? "Opening…" : "Open Excel"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={Boolean(editingPackage)} onOpenChange={(open) => { if (!open) { setEditingPackage(null); onBrowseOpenChange(true) } }}>
-        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Package details</DialogTitle><DialogDescription>Rename the package or change who can find it.</DialogDescription></DialogHeader><div className="space-y-4 py-2"><div className="space-y-2"><Label htmlFor="edit-package-name">Package name</Label><Input id="edit-package-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="admin-field h-11 rounded-xl" /></div><div className="space-y-2"><Label>Visibility</Label><Select value={editVisibility} onValueChange={(next: "shared" | "private") => setEditVisibility(next)}><SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="shared">Shared with congregation</SelectItem><SelectItem value="private">Only me and admins</SelectItem></SelectContent></Select></div></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !editName.trim()} onClick={() => editingPackage && updatePackage(editingPackage, { name: editName.trim(), visibility: editVisibility })}><Check className="h-4 w-4" aria-hidden="true" />Save changes</Button></DialogFooter></DialogContent>
+        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Excel details</DialogTitle><DialogDescription>Rename the Excel or change who can find it.</DialogDescription></DialogHeader><div className="space-y-4 py-2"><div className="space-y-2"><Label htmlFor="edit-package-name">Excel name</Label><Input id="edit-package-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="admin-field h-11 rounded-xl" /></div><div className="space-y-2"><Label>Visibility</Label><Select value={editVisibility} onValueChange={(next: "shared" | "private") => setEditVisibility(next)}><SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="shared">Shared with congregation</SelectItem><SelectItem value="private">Only me and admins</SelectItem></SelectContent></Select></div></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !editName.trim()} onClick={() => editingPackage && updatePackage(editingPackage, { name: editName.trim(), visibility: editVisibility })}><Check className="h-4 w-4" aria-hidden="true" />Save changes</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(packageToAssign)} onOpenChange={(open) => { if (!open) { setPackageToAssign(null); onBrowseOpenChange(true) } }}>
-        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Assign package</DialogTitle><DialogDescription>The member will see this package as assigned and can start it from their package library.</DialogDescription></DialogHeader><div className="py-2"><Label>Congregation member</Label><Select value={assignedUserId} onValueChange={setAssignedUserId}><SelectTrigger className="admin-field mt-2 h-11 rounded-xl"><SelectValue placeholder="Choose a member" /></SelectTrigger><SelectContent>{members.map((member) => <SelectItem key={member.userId} value={String(member.userId)}>{member.congregationDisplayName || member.displayName}</SelectItem>)}</SelectContent></Select></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !assignedUserId} onClick={assignPackage}>{busy ? "Assigning…" : "Assign package"}</Button></DialogFooter></DialogContent>
+        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Assign Excel</DialogTitle><DialogDescription>The member will see this Excel as assigned and can start it from Browse Excels.</DialogDescription></DialogHeader><div className="py-2"><Label>Congregation member</Label><Select value={assignedUserId} onValueChange={setAssignedUserId}><SelectTrigger className="admin-field mt-2 h-11 rounded-xl"><SelectValue placeholder="Choose a member" /></SelectTrigger><SelectContent>{members.map((member) => <SelectItem key={member.userId} value={String(member.userId)}>{member.congregationDisplayName || member.displayName}</SelectItem>)}</SelectContent></Select></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !assignedUserId} onClick={assignPackage}>{busy ? "Assigning…" : "Assign Excel"}</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <AlertDialog open={Boolean(packageToDelete)} onOpenChange={(open) => { if (!open) setPackageToDelete(null) }}>
-        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>Delete this package?</AlertDialogTitle><AlertDialogDescription>Existing member drafts are preserved. Claimed or completed Team Progress history is also preserved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="min-h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={(event) => { event.preventDefault(); if (packageToDelete) void packageAction(packageToDelete, "delete").then(() => { setPackageToDelete(null); onBrowseOpenChange(true) }) }}>Delete package</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>Delete this Excel?</AlertDialogTitle><AlertDialogDescription>Existing member drafts are preserved. Claimed or completed Team Progress history is also preserved.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="min-h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={(event) => { event.preventDefault(); if (packageToDelete) void packageAction(packageToDelete, "delete").then(() => { setPackageToDelete(null); onBrowseOpenChange(true) }) }}>Delete Excel</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </>
   )

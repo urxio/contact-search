@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const draftRevision = Number(body?.draftRevision)
     if (!name || !visibility || !contacts || !zipcode || !pageStart || !pageEnd || pageEnd < pageStart ||
         (startNow && (!Number.isSafeInteger(draftRevision) || draftRevision < 0))) {
-      return NextResponse.json({ error: "Package name, visibility, contacts, ZIP code, and page range are required." }, { status: 400 })
+      return NextResponse.json({ error: "Excel name, visibility, contacts, ZIP code, and page range are required." }, { status: 400 })
     }
 
     await client.query("BEGIN")

@@ -446,7 +446,7 @@ function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/
                 Update
               </button>
               {(!seg.package_id || isAssignedPackage) ? <button onClick={() => setConfirming(prev => new Set(prev).add(seg.id))}
-                title={isAssignedPackage ? "Remove the owner and return this package to the available library" : undefined}
+                title={isAssignedPackage ? "Remove the owner and return this Excel to Browse Excels" : undefined}
                 className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${isAssignedPackage ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50" : "bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"}`}>
                 {isAssignedPackage ? "Unassign" : "Delete"}
               </button> : null}
