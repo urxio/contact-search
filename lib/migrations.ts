@@ -86,6 +86,10 @@ const migrations: Migration[] = [{
     await client.query(`ALTER TABLE submissions ADD CONSTRAINT submissions_nonnegative_counts_check CHECK(contact_count>=0 AND potentially_french>=0 AND not_french>=0 AND duplicate>=0 AND not_checked>=0) NOT VALID`)
     await client.query(`ALTER TABLE submissions ADD CONSTRAINT submissions_review_status_check CHECK(review_status IN ('pending','in_review','reviewed')) NOT VALID`)
   }
+},{
+  version:5,name:"member preferences",async run(client){
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb`)
+  }
 }]
 
 let migrationPromise:Promise<void>|undefined

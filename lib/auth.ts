@@ -11,7 +11,13 @@ const MAX_FAILED_LOGINS = 5
 const LOCKOUT_MINUTES = 15
 
 type AuthCookie = { sessionId?: string }
-export type AuthUser = { id: number; email: string; displayName: string; isPlatformAdmin: boolean }
+export type AuthUser = {
+  id: number
+  email: string
+  displayName: string
+  isPlatformAdmin: boolean
+  preferences: { theme?: "light" | "dark"; defaultWorkspaceView?: "search" | "team" }
+}
 export type CongregationAccess = {
   user: AuthUser
   congregation: { id: number; name: string; slug: string; settings: Record<string, unknown> }
@@ -69,13 +75,22 @@ export async function getCurrentSession() {
   await ensureSchema()
   const session = await getIronSession<AuthCookie>(await cookies(), sessionOptions())
   if (!session.sessionId) return null
-  const result = await pool.query(`SELECT s.id session_id,u.id,u.email,u.display_name,u.is_platform_admin
+  const result = await pool.query(`SELECT s.id session_id,u.id,u.email,u.display_name,u.is_platform_admin,u.preferences
     FROM auth_sessions s JOIN users u ON u.id=s.user_id
     WHERE s.id=$1 AND s.revoked_at IS NULL AND s.expires_at>NOW()`, [session.sessionId])
   if (!result.rowCount) { session.destroy(); return null }
   await pool.query(`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=$1 AND last_seen_at<NOW()-INTERVAL '5 minutes'`, [session.sessionId])
   const row = result.rows[0]
-  return { sessionId: row.session_id as string, user: { id: Number(row.id), email: row.email, displayName: row.display_name, isPlatformAdmin: row.is_platform_admin } as AuthUser }
+  return {
+    sessionId: row.session_id as string,
+    user: {
+      id: Number(row.id),
+      email: row.email,
+      displayName: row.display_name,
+      isPlatformAdmin: row.is_platform_admin,
+      preferences: row.preferences ?? {},
+    } as AuthUser,
+  }
 }
 
 export async function requireUser() {
@@ -193,7 +208,7 @@ export async function consumePasswordReset(token: string, password: string) {
 
 export async function signIn(email: string, password: string) {
   await ensureSchema()
-  const result = await pool.query(`SELECT id,email,display_name,password_hash,is_platform_admin,failed_login_count,locked_until FROM users WHERE email=$1`, [normalizeEmail(email)])
+  const result = await pool.query(`SELECT id,email,display_name,password_hash,is_platform_admin,failed_login_count,locked_until,preferences FROM users WHERE email=$1`, [normalizeEmail(email)])
   if (!result.rowCount) throw new AuthError(401, "Email or password is incorrect")
   const row = result.rows[0]
   if (row.locked_until && new Date(row.locked_until) > new Date()) throw new AuthError(401, "Account is temporarily locked")
@@ -204,7 +219,13 @@ export async function signIn(email: string, password: string) {
   await pool.query(`UPDATE users SET failed_login_count=0,locked_until=NULL WHERE id=$1`, [row.id])
   await createAuthSession(Number(row.id))
   await auditEvent({ actorUserId: Number(row.id), action: "auth.signed_in", targetType: "user", targetId: String(row.id) })
-  return { id: Number(row.id), email: row.email, displayName: row.display_name, isPlatformAdmin: row.is_platform_admin } as AuthUser
+  return {
+    id: Number(row.id),
+    email: row.email,
+    displayName: row.display_name,
+    isPlatformAdmin: row.is_platform_admin,
+    preferences: row.preferences ?? {},
+  } as AuthUser
 }
 
 export function authErrorResponse(error: unknown) {

@@ -107,6 +107,8 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const router = useRouter()
   const canAdmin = activeWorkspace.role === "admin" || account.isPlatformAdmin
+  const workspaceHref = (workspace: WorkspaceSummary) =>
+    `/c/${workspace.slug}${account.defaultWorkspaceView === "team" ? "/team" : ""}`
 
   async function signOut() {
     await fetch("/api/auth/sign-out", { method: "POST" }).catch(() => undefined)
@@ -144,7 +146,7 @@ export function WorkspaceShell({
                 </DropdownMenuLabel>
                 {workspaces.map((workspace) => (
                   <DropdownMenuItem key={workspace.slug} asChild className="min-h-11 rounded-lg px-3">
-                    <Link href={`/c/${workspace.slug}`} className="flex min-w-0 items-center gap-3">
+                    <Link href={workspaceHref(workspace)} className="flex min-w-0 items-center gap-3">
                       <CongregationMark name={workspace.name} className="h-8 w-8 rounded-lg" />
                       <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                       {workspace.slug === activeWorkspace.slug ? (

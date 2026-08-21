@@ -80,10 +80,10 @@ describeWithDatabase("multi-congregation database isolation", () => {
       `INSERT INTO users(email,display_name,password_hash) VALUES
         ('same-one@example.test','Same Name','test-hash'),
         ('same-two@example.test','Same Name','test-hash')
-       RETURNING id ORDER BY id`,
+       RETURNING id,email`,
     )
-    firstUserId = users.rows[0].id
-    secondUserId = users.rows[1].id
+    firstUserId = users.rows.find((row) => row.email === "same-one@example.test").id
+    secondUserId = users.rows.find((row) => row.email === "same-two@example.test").id
   })
 
   afterAll(async () => {
@@ -104,6 +104,7 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 2, name: "tenant data checks" },
       { version: 3, name: "composite tenant integrity" },
       { version: 4, name: "normalized tenant identities" },
+      { version: 5, name: "member preferences" },
     ])
   })
 

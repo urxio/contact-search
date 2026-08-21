@@ -13,6 +13,9 @@ type SessionPayload = {
     email?: string
     isPlatformAdmin?: boolean
     is_platform_admin?: boolean
+    preferences?: {
+      defaultWorkspaceView?: "search" | "team"
+    }
   }
   memberships?: Array<{
     name?: string
@@ -70,6 +73,7 @@ export function WorkspaceShellLoader({ slug, fallbackName, children }: Workspace
         displayName: session.user.displayName ?? session.user.display_name ?? "Workspace member",
         email: session.user.email,
         isPlatformAdmin: session.user.isPlatformAdmin ?? session.user.is_platform_admin,
+        defaultWorkspaceView: session.user.preferences?.defaultWorkspaceView,
       }
     : undefined
 

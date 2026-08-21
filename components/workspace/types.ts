@@ -11,4 +11,5 @@ export type WorkspaceAccount = {
   displayName: string
   email?: string
   isPlatformAdmin?: boolean
+  defaultWorkspaceView?: "search" | "team"
 }
