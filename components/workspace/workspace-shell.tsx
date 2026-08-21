@@ -155,7 +155,7 @@ export function WorkspaceShell({
                     </Link>
                   </DropdownMenuItem>
                 ))}
-                {canAdmin ? (
+                {account.isPlatformAdmin ? (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
