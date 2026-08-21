@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(req)
-    const auth = await requireMembership(params.slug)
+    const auth = await requireCongregationAdmin(params.slug)
     const body = await req.json()
     const zipcode = String(body.zipcode ?? "").trim()
     const pageStart = integer(body.page_start)

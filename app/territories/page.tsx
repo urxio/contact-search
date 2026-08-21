@@ -63,7 +63,7 @@ const STATUS_STYLES: Record<string, string> = {
 const FEATURES = [
   { icon: LayoutDashboard, title: "Territory dashboard", desc: "All zipcodes grouped by city with live segmented progress bars." },
   { icon: ClipboardList, title: "Your segments at a glance", desc: "Active and not-started segments shown front and centre after sign-in." },
-  { icon: MapPin, title: "Claim a page range", desc: "Open any zipcode and claim a start–end page range in one tap." },
+  { icon: MapPin, title: "Import an assigned range", desc: "Each Excel records its ZIP code and page range directly in Team Progress." },
   { icon: PencilLine, title: "Admin progress controls", desc: "Congregation admins can adjust assigned page ranges and statuses when needed." },
   { icon: BarChart3, title: "Live progress tracking", desc: "Bars update in real time across all territories as work is logged." },
 ]
@@ -447,7 +447,7 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
   if (segments.length === 0) return (
     <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Your segments</p>
-      <p className="text-sm text-gray-400">You don&apos;t have any segments yet. Open a zipcode and claim a page range!</p>
+      <p className="text-sm text-gray-400">You don&apos;t have any assigned Excel ranges yet.</p>
     </div>
   )
 

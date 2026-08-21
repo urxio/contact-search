@@ -67,12 +67,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   const teamHref = workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"
   const userStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:user` : "userId"
 
-  // Claim form
-  const [claimStart, setClaimStart]   = useState("")
-  const [claimEnd, setClaimEnd]       = useState("")
-  const [claiming, setClaiming]       = useState(false)
-  const [claimError, setClaimError]   = useState("")
-
   // Inline edit state: segmentId → { stopped_at_page, status, page_start, page_end }
   const [editing, setEditing]   = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
   const [saving, setSaving]     = useState<Set<number>>(new Set())
@@ -105,31 +99,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
       setSegments(data.segments)
     } catch { /* ignore */ }
     setLoading(false)
-  }
-
-  const claim = async () => {
-    setClaimError("")
-    if (!userName) { setClaimError("Set your name in the top bar first."); return }
-    const start = parseInt(claimStart)
-    const end   = claimEnd ? parseInt(claimEnd) : null
-    if (!start || start < 1) { setClaimError("Enter a valid start page."); return }
-    if (end && end < start) { setClaimError("End page cannot be before the start page."); return }
-
-    setClaiming(true)
-    const res = await fetch(`${apiBase}/segments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(workspaceSlug ? { zipcode, page_start: start, page_end: end } : { zipcode, page_start: start, page_end: end, owner: userName }),
-    })
-    setClaiming(false)
-    if (res.ok) {
-      setClaimStart("")
-      setClaimEnd("")
-      loadData()
-    } else {
-      const d = await res.json()
-      setClaimError(d.error ?? "Failed to claim segment.")
-    }
   }
 
   const startEdit = (seg: Segment) => {
@@ -301,7 +270,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
 
               {segments.length === 0 ? (
                 <p className="px-5 py-10 text-center text-gray-400 text-base">
-                  No segments claimed yet. Be the first!
+                  No segments have been created for this ZIP code yet.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -517,65 +486,6 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
               )}
             </div>
 
-            {/* ── Claim a segment ── */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
-              <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                Claim a page range
-              </h2>
-
-              {!userName && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">
-                  <Link href={teamHref} className="underline">Return to Team Progress</Link> to finish signing in before claiming a segment.
-                </p>
-              )}
-
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Start page</label>
-                  <input
-                    type="number"
-                    value={claimStart}
-                    onChange={e => setClaimStart(e.target.value)}
-                    placeholder="e.g. 501"
-                    min={1}
-                    max={zipcodeInfo.total_pages}
-                    className="h-10 w-32 px-3 text-base rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">End page</label>
-                  <input
-                    type="number"
-                    value={claimEnd}
-                    onChange={e => setClaimEnd(e.target.value)}
-                    placeholder={`e.g. ${zipcodeInfo.total_pages}`}
-                    min={1}
-                    max={zipcodeInfo.total_pages}
-                    className="h-10 w-32 px-3 text-base rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  />
-                  {claimEnd && parseInt(claimEnd) > zipcodeInfo.total_pages && (
-                    <p className="mt-1.5 text-xs text-amber-500 max-w-[8rem] leading-tight">
-                      <AlertTriangle className="mr-1 inline h-3 w-3" aria-hidden="true" /> Exceeds max of {zipcodeInfo.total_pages.toLocaleString()} pages. Double-check the A-Z site.
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={claim}
-                  disabled={claiming || !userName}
-                  className="h-10 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-base font-semibold transition-colors"
-                >
-                  {claiming ? "Claiming…" : "Claim segment"}
-                </button>
-              </div>
-
-              {claimError && (
-                <p className="mt-2 text-sm text-red-500">{claimError}</p>
-              )}
-
-              <p className="mt-3 text-sm text-gray-400">
-                Total pages in this zipcode: <span className="font-semibold text-gray-600 dark:text-gray-300">{zipcodeInfo.total_pages.toLocaleString()}</span>
-              </p>
-            </div>
           </>
         )}
       </main>
