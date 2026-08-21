@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
+import { AlertTriangle, BarChart3, ClipboardList, LayoutDashboard, MapPin, PencilLine } from "lucide-react"
 
 type ZipcodeRow = {
   id: number
@@ -53,11 +55,11 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const FEATURES = [
-  { icon: "📍", title: "Territory dashboard", desc: "All zipcodes grouped by city with live segmented progress bars." },
-  { icon: "📋", title: "Your segments at a glance", desc: "Active and not-started segments shown front and centre after sign-in." },
-  { icon: "✋", title: "Claim a page range", desc: "Open any zipcode and claim a start–end page range in one tap." },
-  { icon: "✏️", title: "Update your progress", desc: "Set the page you stopped at and flip the status right from the dashboard." },
-  { icon: "📊", title: "Live progress tracking", desc: "Bars update in real time across all territories as work is logged." },
+  { icon: LayoutDashboard, title: "Territory dashboard", desc: "All zipcodes grouped by city with live segmented progress bars." },
+  { icon: ClipboardList, title: "Your segments at a glance", desc: "Active and not-started segments shown front and centre after sign-in." },
+  { icon: MapPin, title: "Claim a page range", desc: "Open any zipcode and claim a start–end page range in one tap." },
+  { icon: PencilLine, title: "Update your progress", desc: "Set the page you stopped at and flip the status right from the dashboard." },
+  { icon: BarChart3, title: "Live progress tracking", desc: "Bars update in real time across all territories as work is logged." },
 ]
 
 // ── Welcome card (shown to unsigned-in users) ─────────────────────────────────
@@ -80,7 +82,7 @@ function WelcomeCard({ knownUsers, onSelect }: { knownUsers: string[]; onSelect:
 
         {/* Header */}
         <div className="px-8 pt-8 pb-5 text-center border-b border-gray-100 dark:border-gray-800">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-3xl mb-3">📍</div>
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300"><MapPin className="h-6 w-6" aria-hidden="true" /></div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome to Team Progress</h2>
         </div>
 
@@ -89,7 +91,7 @@ function WelcomeCard({ knownUsers, onSelect }: { knownUsers: string[]; onSelect:
           <div className="px-8 py-6 flex flex-col gap-4">
             {FEATURES.map((f, i) => (
               <div key={i} className="flex items-start gap-3">
-                <span className="shrink-0 w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-lg">{f.icon}</span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300"><f.icon className="h-4 w-4" aria-hidden="true" /></span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{f.title}</p>
                   <p className="text-sm text-gray-400 leading-relaxed">{f.desc}</p>
@@ -106,7 +108,7 @@ function WelcomeCard({ knownUsers, onSelect }: { knownUsers: string[]; onSelect:
               <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4">
                 {(["pick", "new"] as const).map(t => (
                   <button key={t} onClick={() => setTab(t)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${tab === t ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                     {t === "pick" ? "Select existing" : "New user"}
                   </button>
                 ))}
@@ -176,7 +178,7 @@ function NamePickerModal({ knownUsers, onSelect }: { knownUsers: string[]; onSel
           <div className="flex gap-1 p-1.5 bg-gray-100 dark:bg-gray-800 mx-6 mt-4 rounded-xl">
             {(["pick", "new"] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${tab === t ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${tab === t ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                 {t === "pick" ? "Select existing" : "New user"}
               </button>
             ))}
@@ -210,7 +212,7 @@ function NamePickerModal({ knownUsers, onSelect }: { knownUsers: string[]; onSel
 }
 
 // ── Add Zipcode Modal ─────────────────────────────────────────────────────────
-function AddZipcodeModal({ onClose, onAdded, territory }: { onClose: () => void; onAdded: () => void; territory: string }) {
+function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territories" }: { onClose: () => void; onAdded: () => void; territory: string; apiBase?: string }) {
   const [city, setCity] = useState("")
   const [zipcode, setZipcode] = useState("")
   const [totalPages, setTotalPages] = useState("")
@@ -222,7 +224,7 @@ function AddZipcodeModal({ onClose, onAdded, territory }: { onClose: () => void;
     const pages = parseInt(totalPages)
     if (!city.trim() || !zipcode.trim() || !pages || pages < 1) { setError("All fields are required."); return }
     setSaving(true)
-    const res = await fetch("/api/territories/zipcodes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ city: city.trim(), zipcode: zipcode.trim(), total_pages: pages, territory: territory || "Lacy Boulevard" }) })
+    const res = await fetch(`${apiBase}/zipcodes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ city: city.trim(), zipcode: zipcode.trim(), total_pages: pages, territory: territory || "Lacy Boulevard" }) })
     setSaving(false)
     if (res.ok) { onAdded(); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to add zipcode.") }
   }
@@ -259,7 +261,7 @@ function AddZipcodeModal({ onClose, onAdded, territory }: { onClose: () => void;
 }
 
 // ── My Segments Panel ─────────────────────────────────────────────────────────
-function MySegmentsPanel({ userName }: { userName: string }) {
+function MySegmentsPanel({ userName, apiBase = "/api/territories", teamHref = "/territories" }: { userName: string; apiBase?: string; teamHref?: string }) {
   const [segments, setSegments]           = useState<MySegment[]>([])
   const [loading, setLoading]             = useState(true)
   const [editing, setEditing]             = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
@@ -269,7 +271,7 @@ function MySegmentsPanel({ userName }: { userName: string }) {
 
   const load = () => {
     setLoading(true)
-    fetch(`/api/territories/segments/mine?owner=${encodeURIComponent(userName)}`)
+    fetch(apiBase.startsWith("/api/c/") ? `${apiBase}/segments/mine` : `${apiBase}/segments/mine?owner=${encodeURIComponent(userName)}`)
       .then(r => r.json())
       .then(data => { setSegments(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -290,7 +292,7 @@ function MySegmentsPanel({ userName }: { userName: string }) {
   const saveEdit = async (id: number) => {
     const e = editing[id]; if (!e) return
     setSaving(prev => new Set(prev).add(id))
-    const res = await fetch("/api/territories/segments", {
+    const res = await fetch(`${apiBase}/segments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -307,7 +309,7 @@ function MySegmentsPanel({ userName }: { userName: string }) {
   }
 
   const deleteSeg = async (id: number) => {
-    await fetch(`/api/territories/segments?id=${id}`, { method: "DELETE" })
+    await fetch(`${apiBase}/segments?id=${id}`, { method: "DELETE" })
     setConfirming(prev => { const s = new Set(prev); s.delete(id); return s })
     load()
   }
@@ -338,7 +340,7 @@ function MySegmentsPanel({ userName }: { userName: string }) {
     return (
       <tr key={seg.id} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/30">
         <td className="px-5 py-3">
-          <Link href={`/territories/${seg.zipcode}`} className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline text-sm">
+          <Link href={`${teamHref}/${seg.zipcode}`} className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline text-sm">
             {seg.city} {seg.zipcode}
           </Link>
         </td>
@@ -358,7 +360,7 @@ function MySegmentsPanel({ userName }: { userName: string }) {
               </div>
               {e.page_end && parseInt(e.page_end) > seg.total_pages && (
                 <p className="text-xs text-amber-500 whitespace-normal leading-tight">
-                  ⚠ Exceeds max of {seg.total_pages.toLocaleString()} pages. Double-check the A-Z site.
+                  <AlertTriangle className="mr-1 inline h-3 w-3" aria-hidden="true" /> Exceeds max of {seg.total_pages.toLocaleString()} pages. Double-check the A-Z site.
                 </p>
               )}
             </div>
@@ -502,6 +504,9 @@ function MySegmentsPanel({ userName }: { userName: string }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Home() {
+  const workspace = useWorkspaceRuntime()
+  const workspaceSlug = workspace?.slug
+  const embedded = Boolean(workspace)
   const [zipcodes, setZipcodes]     = useState<ZipcodeRow[]>([])
   const [loading, setLoading]       = useState(true)
   const [userName, setUserName]     = useState("")
@@ -510,23 +515,41 @@ export default function Home() {
   const [showAddZip, setShowAddZip]           = useState(false)
   const [hydrated, setHydrated]               = useState(false)
   const [activeTerritory, setActiveTerritory] = useState("")
+  const [canManage, setCanManage]             = useState(!workspaceSlug)
+
+  const apiBase = workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/team` : "/api/territories"
+  const teamHref = workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"
+  const userStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:user` : "userId"
+  const territoryStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:territory` : "zt_territory"
 
   useEffect(() => {
-    const saved = localStorage.getItem("userId")
-    if (saved) setUserName(saved)
+    const saved = localStorage.getItem(userStorageKey)
+    if (saved && !workspaceSlug) setUserName(saved)
     // Restore territory from session so back-button works
-    const savedTerritory = sessionStorage.getItem("zt_territory")
+    const savedTerritory = sessionStorage.getItem(territoryStorageKey)
     if (savedTerritory) setActiveTerritory(savedTerritory)
     setHydrated(true)
     loadZipcodes(savedTerritory ?? "")
-    fetch("/api/territories/users")
-      .then(r => r.json())
-      .then((data: string[]) => setKnownUsers(data))
-      .catch(() => {})
+    if (workspaceSlug) {
+      fetch("/api/auth/session", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const membership = (data?.memberships ?? []).find((item: { slug?: string }) => item.slug === workspaceSlug)
+          const displayName = membership?.displayName ?? membership?.display_name ?? data?.user?.displayName ?? data?.user?.display_name ?? "Member"
+          setUserName(displayName)
+          setCanManage(membership?.role === "admin" || data?.user?.isPlatformAdmin === true || data?.user?.is_platform_admin === true)
+        })
+        .catch(() => {})
+    } else {
+      fetch("/api/territories/users")
+        .then(r => r.json())
+        .then((data: string[]) => setKnownUsers(data))
+        .catch(() => {})
+    }
   }, [])
 
   const loadZipcodes = (currentTerritory = activeTerritory) => {
-    fetch("/api/territories/zipcodes")
+    fetch(`${apiBase}/zipcodes`)
       .then(r => r.json())
       .then(data => {
         setZipcodes(data)
@@ -535,14 +558,14 @@ export default function Home() {
         if (!currentTerritory && data.length > 0) {
           const first = data[0].territory
           setActiveTerritory(first)
-          sessionStorage.setItem("zt_territory", first)
+          sessionStorage.setItem(territoryStorageKey, first)
         }
       })
       .catch(() => setLoading(false))
   }
 
   const selectName = (name: string) => {
-    localStorage.setItem("userId", name)
+    localStorage.setItem(userStorageKey, name)
     localStorage.setItem("zt_seen_overview", "1")
     setUserName(name)
     setShowPicker(false)
@@ -566,7 +589,7 @@ export default function Home() {
   }, [zipcodes])
 
   // Show welcome card for unsigned-in users (after hydration)
-  const showWelcome = hydrated && !userName
+  const showWelcome = !workspaceSlug && hydrated && !userName
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -575,15 +598,15 @@ export default function Home() {
       {showWelcome && <WelcomeCard knownUsers={knownUsers} onSelect={selectName} />}
 
       {/* Change-name modal (for already signed-in users) */}
-      {showPicker && hydrated && userName && <NamePickerModal knownUsers={knownUsers} onSelect={selectName} />}
+      {!workspaceSlug && showPicker && hydrated && userName && <NamePickerModal knownUsers={knownUsers} onSelect={selectName} />}
 
-      {showAddZip && <AddZipcodeModal territory={activeTerritory} onClose={() => setShowAddZip(false)} onAdded={() => { setLoading(true); loadZipcodes() }} />}
+      {showAddZip && <AddZipcodeModal apiBase={apiBase} territory={activeTerritory} onClose={() => setShowAddZip(false)} onAdded={() => { setLoading(true); loadZipcodes() }} />}
 
       {/* Nav */}
-      <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+      {!embedded && <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-lg">📍</span>
+            <MapPin className="h-5 w-5 text-indigo-600" aria-hidden="true" />
             <span className="text-lg font-bold text-gray-900 dark:text-white">Team Progress</span>
           </div>
           <div className="flex items-center gap-2">
@@ -618,7 +641,7 @@ export default function Home() {
             )}
           </div>
         </div>
-      </nav>
+      </nav>}
 
       <main className="max-w-5xl mx-auto px-4 py-8">
 
@@ -628,10 +651,10 @@ export default function Home() {
           {!loading && Object.keys(grouped).length > 0 && (
             <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
               {Object.keys(grouped).map(t => (
-                <button key={t} onClick={() => { setActiveTerritory(t); sessionStorage.setItem("zt_territory", t) }}
+                <button key={t} onClick={() => { setActiveTerritory(t); sessionStorage.setItem(territoryStorageKey, t) }}
                   className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                     activeTerritory === t
-                      ? "bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.65)]"
+                      ? "bg-indigo-600 text-white shadow-sm"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   }`}>
                   {t}
@@ -639,14 +662,14 @@ export default function Home() {
               ))}
             </div>
           )}
-          <button onClick={() => setShowAddZip(true)}
+          {canManage && <button onClick={() => setShowAddZip(true)}
             className="shrink-0 inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shadow-sm">
             <span className="text-base leading-none">+</span> Add Zipcode
-          </button>
+          </button>}
         </div>
 
         {/* My segments — only shown when signed in */}
-        {hydrated && userName && <MySegmentsPanel userName={userName} />}
+        {hydrated && userName && <MySegmentsPanel userName={userName} apiBase={apiBase} teamHref={teamHref} />}
 
         {/* Loading spinner */}
         {loading && (
@@ -674,7 +697,7 @@ export default function Home() {
                   <span className="text-base font-bold text-indigo-600 dark:text-indigo-400">{tPct}%</span>
                 </div>
                 <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500" style={{ width: `${tPct}%` }} />
+                  <div className="h-full bg-indigo-600 rounded-full transition-all duration-500" style={{ width: `${tPct}%` }} />
                 </div>
                 <div className="flex gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
                   <span><span className="font-semibold text-green-600">{tCompleted}</span> completed</span>
@@ -697,7 +720,7 @@ export default function Home() {
                         const nsPct   = pct(z.not_started, z.segment_count)
                         const allDone = z.segment_count > 0 && z.not_started === 0 && z.in_progress === 0
                         return (
-                          <Link key={z.zipcode} href={`/territories/${z.zipcode}`}
+                          <Link key={z.zipcode} href={`${teamHref}/${z.zipcode}`}
                             className="group block bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
                             <div className="flex items-start justify-between mb-3">
                               <div>

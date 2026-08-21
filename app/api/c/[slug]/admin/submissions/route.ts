@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from "next/server"
+import { pool } from "@/lib/db"
+import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
+import { apiError, assertMultiTenantEnabled, integer, RouteContext, safeDownloadName } from "../../../_shared"
+
+export async function GET(req: NextRequest, { params }: RouteContext) {
+  try {
+    assertMultiTenantEnabled()
+    const auth = await requireCongregationAdmin(params.slug)
+    const userId = integer(req.nextUrl.searchParams.get("userId"))
+    const userName = req.nextUrl.searchParams.get("userName")?.trim() || null
+    const submissionId = integer(req.nextUrl.searchParams.get("submissionId"))
+    if (req.nextUrl.searchParams.has("userId") && !userId) {
+      return NextResponse.json({ error: "Invalid user id." }, { status: 400 })
+    }
+
+    if (userId || userName) {
+      const result = await pool.query(
+        `SELECT s.*,
+                COALESCE(m.display_name, u.display_name, s.user_id) AS display_name
+         FROM submissions s
+         LEFT JOIN users u ON u.id = s.owner_user_id
+         LEFT JOIN congregation_memberships m
+           ON m.user_id = s.owner_user_id AND m.congregation_id = s.congregation_id
+         WHERE s.congregation_id = $1
+           AND (($2::bigint IS NOT NULL AND s.owner_user_id = $2)
+             OR ($4::text IS NOT NULL AND s.user_id = $4))
+           AND ($3::bigint IS NULL OR s.id = $3)
+         ORDER BY s.submitted_at DESC LIMIT 1`,
+        [auth.congregation.id, userId, submissionId, userName],
+      )
+      if (!result.rows[0]) return NextResponse.json({ error: "No submission found." }, { status: 404 })
+      const row = result.rows[0]
+      if (req.nextUrl.searchParams.get("format") === "json") {
+        await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+          action: "submission.downloaded", targetType: "submission", targetId: String(row.id) })
+        const filename = `${safeDownloadName(row.display_name)}-submission-${row.id}.json`
+        return new NextResponse(JSON.stringify(row, null, 2), {
+          headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="${filename}"` },
+        })
+      }
+      return NextResponse.json(row)
+    }
+
+    const result = await pool.query(
+      `SELECT s.id, s.owner_user_id, s.user_id, s.submitted_at,
+              s.contact_count, s.potentially_french, s.not_french, s.duplicate,
+              s.not_checked, s.global_notes, s.territory_zipcode,
+              s.territory_page_range, s.review_status, s.archived,
+              COALESCE(m.display_name, u.display_name, s.user_id) AS display_name,
+              (SELECT c->>'zipcode' FROM jsonb_array_elements(s.contacts) c
+               WHERE COALESCE(c->>'zipcode','') <> '' GROUP BY c->>'zipcode'
+               ORDER BY COUNT(*) DESC LIMIT 1) AS top_zipcode
+       FROM submissions s
+       LEFT JOIN users u ON u.id = s.owner_user_id
+       LEFT JOIN congregation_memberships m
+         ON m.user_id = s.owner_user_id AND m.congregation_id = s.congregation_id
+       WHERE s.congregation_id = $1
+       ORDER BY display_name, s.submitted_at DESC`,
+      [auth.congregation.id],
+    )
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    return apiError(error)
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteContext) {
+  try {
+    assertMultiTenantEnabled()
+    validateMutationOrigin(req)
+    const auth = await requireCongregationAdmin(params.slug)
+    const body = await req.json()
+    const id = integer(body.id)
+    if (!id) return NextResponse.json({ error: "Missing submission id." }, { status: 400 })
+    if (body.review_status !== undefined && !["pending", "in_review", "reviewed"].includes(body.review_status)) {
+      return NextResponse.json({ error: "Invalid review_status." }, { status: 400 })
+    }
+    if (body.archived !== undefined && typeof body.archived !== "boolean") {
+      return NextResponse.json({ error: "Invalid archived value." }, { status: 400 })
+    }
+    const result = await pool.query(
+      `UPDATE submissions SET
+         review_status = COALESCE($3, review_status),
+         archived = COALESCE($4, archived)
+       WHERE id = $1 AND congregation_id = $2 RETURNING id`,
+      [id, auth.congregation.id, body.review_status ?? null, body.archived ?? null],
+    )
+    if (!result.rows[0]) return NextResponse.json({ error: "Submission not found." }, { status: 404 })
+    await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+      action: "submission.updated", targetType: "submission", targetId: String(id),
+      metadata: { reviewStatus: body.review_status, archived: body.archived } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return apiError(error)
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
+  try {
+    assertMultiTenantEnabled()
+    validateMutationOrigin(req)
+    const auth = await requireCongregationAdmin(params.slug)
+    const id = integer(req.nextUrl.searchParams.get("id"))
+    if (!id) return NextResponse.json({ error: "Missing submission id." }, { status: 400 })
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query(
+        `DELETE FROM dismissed_dictionary_scan_matches
+         WHERE congregation_id = $1 AND submission_id = $2`,
+        [auth.congregation.id, id],
+      )
+      const result = await client.query(
+        `DELETE FROM submissions WHERE congregation_id = $1 AND id = $2 RETURNING id`,
+        [auth.congregation.id, id],
+      )
+      if (!result.rows[0]) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Submission not found." }, { status: 404 })
+      }
+      await client.query("COMMIT")
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
+    }
+    await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+      action: "submission.deleted", targetType: "submission", targetId: String(id) })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return apiError(error)
+  }
+}

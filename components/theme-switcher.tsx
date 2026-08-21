@@ -21,7 +21,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         type="button"
         disabled
         aria-label="Loading appearance control"
-        className={cn("inline-flex h-10 w-10 items-center justify-center rounded-full", className)}
+        className={cn("inline-flex h-11 w-11 items-center justify-center rounded-full", className)}
       >
         <span className="h-4 w-4 animate-pulse rounded-full bg-muted" aria-hidden="true" />
       </button>
@@ -38,7 +38,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
             type="button"
             onClick={() => setTheme(isDark ? "light" : "dark")}
             className={cn(
-              "inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground shadow-sm transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground shadow-sm transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               className,
             )}
             aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}

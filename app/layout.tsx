@@ -7,9 +7,12 @@ import { Toaster } from "sonner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "OTM Helper",
-  description: "Upload Excel contacts and verify them for OTM",
-    generator: 'v0.app'
+  title: {
+    default: "Search Helper",
+    template: "%s · Search Helper",
+  },
+  description: "A private congregation workspace for contact search and team progress.",
+  generator: "Search Helper",
 }
 
 export default function RootLayout({

@@ -1,0 +1,11 @@
+"use client"
+
+import { FormEvent, useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+
+export default function JoinPage(){
+ const {token}=useParams<{token:string}>();const router=useRouter();const [invite,setInvite]=useState<any>(null);const [error,setError]=useState("");const [displayName,setDisplayName]=useState("");const [password,setPassword]=useState("");const [busy,setBusy]=useState(false)
+ useEffect(()=>{fetch(`/api/invitations/${encodeURIComponent(token)}`).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error);setInvite(d)}).catch(e=>setError(e.message))},[token])
+ async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError("");const r=await fetch(`/api/invitations/${encodeURIComponent(token)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({displayName,password})});const d=await r.json();if(r.ok)router.replace(`/c/${d.slug}`);else setError(d.error||"Unable to accept invitation");setBusy(false)}
+ return <main className="admin-shell flex min-h-screen items-center justify-center px-4"><section className="admin-material w-full max-w-sm rounded-3xl p-8"><h1 className="text-2xl font-bold tracking-tight">Join {invite?.congregation_name||"workspace"}</h1>{invite&&<p className="mb-6 mt-1 text-sm text-muted-foreground">Invited as {invite.role} · {invite.email}</p>}{error&&<p className="mb-4 text-sm text-destructive" role="alert">{error}</p>}{invite&&<form onSubmit={submit} className="space-y-4"><div><label className="mb-1.5 block text-sm font-medium" htmlFor="name">Display name</label><input id="name" className="admin-field h-11 w-full rounded-xl px-4" value={displayName} onChange={e=>setDisplayName(e.target.value)} /></div><div><label className="mb-1.5 block text-sm font-medium" htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" className="admin-field h-11 w-full rounded-xl px-4" value={password} onChange={e=>setPassword(e.target.value)} required /></div><button disabled={busy} className="admin-primary-button h-11 w-full rounded-xl text-sm font-medium text-white disabled:opacity-50">{busy?"Joining…":"Join workspace"}</button></form>}</section></main>
+}

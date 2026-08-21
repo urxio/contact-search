@@ -10,6 +10,7 @@ import {
   CheckCircle2, XCircle, CircleSlash, MapPin,
 } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
@@ -101,7 +102,26 @@ const parseAddress = (address: string) => {
 // Define view types
 type ViewType = "list" | "grid"
 
-export default function Home() {
+type SearchHelperProps = {
+  workspaceSlug?: string
+  authenticatedUserId?: number
+  authenticatedDisplayName?: string
+  embedded?: boolean
+}
+
+type DraftStatus = "loading" | "saving" | "saved" | "offline" | "conflict"
+
+function SearchHelper({
+  workspaceSlug,
+  authenticatedUserId,
+  authenticatedDisplayName,
+  embedded = false,
+}: SearchHelperProps = {}) {
+  const workspace = useWorkspaceRuntime()
+  workspaceSlug = workspaceSlug ?? workspace?.slug
+  authenticatedUserId = authenticatedUserId ?? workspace?.authenticatedUserId
+  authenticatedDisplayName = authenticatedDisplayName ?? workspace?.authenticatedDisplayName
+  embedded = embedded || workspace?.embedded === true
   const [contacts, setContacts] = useState<EnhancedContact[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,6 +129,7 @@ export default function Home() {
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
   const [territoryPageRange, setTerritoryPageRange] = useState("")
+  const [configuredTerritoryZipcodes, setConfiguredTerritoryZipcodes] = useState<Set<string> | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   // Add new state variables for efficiency features
@@ -149,6 +170,11 @@ export default function Home() {
   const [isPostExportDialogOpen, setIsPostExportDialogOpen] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isNewSessionConfirmOpen, setIsNewSessionConfirmOpen] = useState(false)
+  const [draftRevision, setDraftRevision] = useState(0)
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>(workspaceSlug ? "loading" : "saved")
+  const [serverDraft, setServerDraft] = useState<any>(null)
+  const draftReadyRef = useRef(false)
+  const draftRevisionRef = useRef(0)
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -157,6 +183,10 @@ export default function Home() {
 
   // useRef hook for the file input
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const storagePrefix = workspaceSlug
+    ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
+    : "search-helper:legacy"
+  const storageKey = useCallback((key: string) => `${storagePrefix}:${key}`, [storagePrefix])
 
   // Update the memoized filtered contacts
   const potentiallyFrenchContacts = useMemo(() => {
@@ -225,11 +255,11 @@ export default function Home() {
 
   // Load contacts and notes from localStorage on component mount
   useEffect(() => {
-    const savedContacts = localStorage.getItem("contacts")
-    const savedNotes = localStorage.getItem("globalNotes")
-    const savedZipcode = localStorage.getItem("territoryZipcode")
-    const savedPageRange = localStorage.getItem("territoryPageRange")
-    const savedViewType = localStorage.getItem("viewType") as ViewType | null
+    const savedContacts = localStorage.getItem(storageKey("contacts"))
+    const savedNotes = localStorage.getItem(storageKey("globalNotes"))
+    const savedZipcode = localStorage.getItem(storageKey("territoryZipcode"))
+    const savedPageRange = localStorage.getItem(storageKey("territoryPageRange"))
+    const savedViewType = localStorage.getItem(storageKey("viewType")) as ViewType | null
 
     if (savedContacts) {
       try {
@@ -256,10 +286,10 @@ export default function Home() {
     }
 
     // Load saved user ID from localStorage, or prompt them to enter one
-    const savedUserId = localStorage.getItem("userId")
+    const savedUserId = authenticatedDisplayName || localStorage.getItem(storageKey("userId"))
     if (savedUserId) {
       setUserId(savedUserId)
-    } else {
+    } else if (!workspaceSlug) {
       // No userId = first-time visitor. Open the login dialog.
       // After they save their name, the save handler will show the overview prompt.
       setTimeout(() => setIsUserIdDialogOpen(true), 500)
@@ -275,8 +305,49 @@ export default function Home() {
     }
 
     window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+    if (!workspaceSlug) {
+      draftReadyRef.current = true
+      return () => window.removeEventListener("keydown", handleKeyDown)
+    }
+
+    let cancelled = false
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load the server draft")
+        const draft = await response.json()
+        if (cancelled) return
+        setContacts(Array.isArray(draft.contacts) ? draft.contacts : [])
+        setGlobalNotes(draft.globalNotes || "")
+        setTerritoryZipcode(draft.territoryZipcode || "")
+        setTerritoryPageRange(draft.territoryPageRange || "")
+        setLastVerifiedId(draft.lastVerifiedContactId || null)
+        setDraftRevision(Number(draft.revision) || 0)
+        draftRevisionRef.current = Number(draft.revision) || 0
+        setDraftStatus("saved")
+      })
+      .catch(() => {
+        if (!cancelled) setDraftStatus("offline")
+      })
+      .finally(() => {
+        if (!cancelled) draftReadyRef.current = true
+      })
+
+    return () => {
+      cancelled = true
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [authenticatedDisplayName, storageKey, workspaceSlug])
+
+  useEffect(() => {
+    if (!workspaceSlug) return
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/settings`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        const zipcodes = data?.congregation?.settings?.searchTerritoryZipcodes
+        if (Array.isArray(zipcodes)) setConfiguredTerritoryZipcodes(new Set(zipcodes.map(String)))
+      })
+      .catch(() => undefined)
+  }, [workspaceSlug])
 
   // Save contacts to localStorage whenever they change
   // Debounced save of contacts to localStorage to avoid frequent writes
@@ -284,9 +355,9 @@ export default function Home() {
     const handle = setTimeout(() => {
       try {
         if (contacts.length > 0) {
-          localStorage.setItem("contacts", JSON.stringify(contacts))
+          localStorage.setItem(storageKey("contacts"), JSON.stringify(contacts))
         } else {
-          localStorage.removeItem("contacts")
+          localStorage.removeItem(storageKey("contacts"))
         }
       } catch (e) {
         console.error("Failed to save contacts to localStorage", e)
@@ -294,36 +365,77 @@ export default function Home() {
     }, 500)
 
     return () => clearTimeout(handle)
-  }, [contacts])
+  }, [contacts, storageKey])
 
   // Save global notes to localStorage whenever they change
   // Debounce global notes saves to avoid frequent writes
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        localStorage.setItem("globalNotes", globalNotes)
+        localStorage.setItem(storageKey("globalNotes"), globalNotes)
       } catch (e) {
         console.error("Error saving globalNotes:", e)
       }
     }, 500)
 
     return () => clearTimeout(t)
-  }, [globalNotes])
+  }, [globalNotes, storageKey])
 
   // Save view type to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("viewType", viewType)
-  }, [viewType])
+    localStorage.setItem(storageKey("viewType"), viewType)
+  }, [storageKey, viewType])
 
   // Save zipcode to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("territoryZipcode", territoryZipcode)
-  }, [territoryZipcode])
+    localStorage.setItem(storageKey("territoryZipcode"), territoryZipcode)
+  }, [storageKey, territoryZipcode])
 
   // Save page range to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("territoryPageRange", territoryPageRange)
-  }, [territoryPageRange])
+    localStorage.setItem(storageKey("territoryPageRange"), territoryPageRange)
+  }, [storageKey, territoryPageRange])
+
+  // PostgreSQL is authoritative while connected; the namespaced cache above
+  // remains available for offline recovery.
+  useEffect(() => {
+    if (!workspaceSlug || !draftReadyRef.current || draftStatus === "conflict") return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setDraftStatus("saving")
+      try {
+        const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            revision: draftRevisionRef.current,
+            contacts,
+            globalNotes,
+            territoryZipcode,
+            territoryPageRange,
+            lastVerifiedContactId: lastVerifiedId,
+          }),
+        })
+        const result = await response.json()
+        if (response.status === 409) {
+          setServerDraft(result.server)
+          setDraftStatus("conflict")
+          return
+        }
+        if (!response.ok) throw new Error(result.error || "Draft save failed")
+        setDraftRevision(result.revision)
+        draftRevisionRef.current = result.revision
+        setDraftStatus("saved")
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") setDraftStatus("offline")
+      }
+    }, 1000)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [contacts, globalNotes, lastVerifiedId, territoryPageRange, territoryZipcode, workspaceSlug])
 
   // Reset copied state after 2 seconds
   useEffect(() => {
@@ -487,11 +599,11 @@ export default function Home() {
   // Function to update last verified ID and record interaction time
   const updateLastInteraction = useCallback((id: string) => {
     setLastVerifiedId(id)
-    localStorage.setItem("lastVerifiedId", id)
+    localStorage.setItem(storageKey("lastVerifiedId"), id)
 
     // Update the contact's last interaction timestamp
     setContacts((prevContacts) => prevContacts.map((c) => (c.id === id ? { ...c, lastInteraction: new Date() } : c)))
-  }, [])
+  }, [storageKey])
 
   // Update the searchOnTruePeopleSearch function to use fullName and zipcode
   const searchOnTruePeopleSearch = useCallback(
@@ -602,7 +714,7 @@ export default function Home() {
     setContacts((prevContacts) =>
       prevContacts.map((contact) => (contact.id === id ? { ...contact, notes: newNotes } : contact)),
     )
-  }, [])
+  }, [storageKey])
 
   // Update the handleAddressUpdateChange function
   const handleAddressUpdateChange = useCallback((id: string, needAddressUpdate: boolean) => {
@@ -669,7 +781,7 @@ export default function Home() {
             "22333","22334","22336","22401","22402","22403","22404","22405","22406","22407",
             "22412","22430","22463","22471","22554","22555","22556","22712",
           ])
-          const isOutside = !TERRITORY_ZIPCODES.has(value.trim())
+          const isOutside = !(configuredTerritoryZipcodes ?? TERRITORY_ZIPCODES).has(value.trim())
           updatedContact.territoryStatus = isOutside
           if (isOutside && value.trim()) {
             toast.warning("Outside territory", {
@@ -688,7 +800,7 @@ export default function Home() {
         return updatedContact
       }),
     )
-  }, [])
+  }, [configuredTerritoryZipcodes])
 
   // Handler to create and add a new contact
   const handleAddContactSubmit = useCallback(async () => {
@@ -842,7 +954,7 @@ export default function Home() {
 
   // Add this useEffect to load the last verified ID from localStorage
   useEffect(() => {
-    const savedLastVerifiedId = localStorage.getItem("lastVerifiedId")
+    const savedLastVerifiedId = localStorage.getItem(storageKey("lastVerifiedId"))
     if (savedLastVerifiedId) {
       setLastVerifiedId(savedLastVerifiedId)
     }
@@ -1251,15 +1363,39 @@ export default function Home() {
 
     setIsSendingReview(true)
     try {
-      const res = await fetch("/api/submissions", {
+      let revisionToSubmit = draftRevisionRef.current
+      if (workspaceSlug) {
+        const saveResponse = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            revision: revisionToSubmit,
+            contacts,
+            globalNotes,
+            territoryZipcode,
+            territoryPageRange,
+            lastVerifiedContactId: lastVerifiedId,
+          }),
+        })
+        const savedDraft = await saveResponse.json()
+        if (saveResponse.status === 409) {
+          setServerDraft(savedDraft.server)
+          setDraftStatus("conflict")
+          toast.error("This draft changed elsewhere. Resolve the conflict before submitting.")
+          return
+        }
+        if (!saveResponse.ok) throw new Error(savedDraft.error || "Unable to save draft")
+        revisionToSubmit = savedDraft.revision
+        draftRevisionRef.current = revisionToSubmit
+        setDraftRevision(revisionToSubmit)
+        setDraftStatus("saved")
+      }
+
+      const res = await fetch(workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/submissions` : "/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          contacts,
-          globalNotes,
-          territoryZipcode,
-          territoryPageRange,
+        body: JSON.stringify(workspaceSlug ? { draftRevision: revisionToSubmit } : {
+          userId, contacts, globalNotes, territoryZipcode, territoryPageRange,
         }),
       })
 
@@ -1276,7 +1412,7 @@ export default function Home() {
     } finally {
       setIsSendingReview(false)
     }
-  }, [userId, contacts, globalNotes, territoryZipcode, territoryPageRange])
+  }, [contacts, globalNotes, lastVerifiedId, territoryPageRange, territoryZipcode, userId, workspaceSlug])
 
   // Modify the startNewSession function to reset the file input element
   const startNewSession = useCallback(() => {
@@ -1306,15 +1442,20 @@ export default function Home() {
     }
 
     // Clear localStorage
-    localStorage.removeItem("contacts")
-    localStorage.removeItem("globalNotes")
-    localStorage.removeItem("territoryZipcode")
-    localStorage.removeItem("territoryPageRange")
-    localStorage.removeItem("lastVerifiedId")
+    localStorage.removeItem(storageKey("contacts"))
+    localStorage.removeItem(storageKey("globalNotes"))
+    localStorage.removeItem(storageKey("territoryZipcode"))
+    localStorage.removeItem(storageKey("territoryPageRange"))
+    localStorage.removeItem(storageKey("lastVerifiedId"))
+    if (workspaceSlug) {
+      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, { method: "DELETE" })
+      setDraftRevision(0)
+      draftRevisionRef.current = 0
+    }
 
     setFileUploaded(false)
     toast.success("New session started. All data has been cleared.")
-  }, [])
+  }, [storageKey, workspaceSlug])
 
   // Function to get status icon
   const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
@@ -1467,6 +1608,45 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleExportShortcut)
   }, [])
 
+  const reloadServerDraft = useCallback(() => {
+    if (!serverDraft) return
+    setContacts(Array.isArray(serverDraft.contacts) ? serverDraft.contacts : [])
+    setGlobalNotes(serverDraft.globalNotes || "")
+    setTerritoryZipcode(serverDraft.territoryZipcode || "")
+    setTerritoryPageRange(serverDraft.territoryPageRange || "")
+    setLastVerifiedId(serverDraft.lastVerifiedContactId || null)
+    draftRevisionRef.current = Number(serverDraft.revision) || 0
+    setDraftRevision(draftRevisionRef.current)
+    setServerDraft(null)
+    setDraftStatus("saved")
+  }, [serverDraft])
+
+  const keepLocalDraft = useCallback(async () => {
+    if (!workspaceSlug || !serverDraft) return
+    try {
+      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision: Number(serverDraft.revision) || 0,
+          contacts,
+          globalNotes,
+          territoryZipcode,
+          territoryPageRange,
+          lastVerifiedContactId: lastVerifiedId,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to keep local draft")
+      draftRevisionRef.current = result.revision
+      setDraftRevision(result.revision)
+      setServerDraft(null)
+      setDraftStatus("saved")
+    } catch {
+      setDraftStatus("offline")
+    }
+  }, [contacts, globalNotes, lastVerifiedId, serverDraft, territoryPageRange, territoryZipcode, workspaceSlug])
+
   return (
     <TooltipProvider>
       <FloatingProgress
@@ -1520,7 +1700,7 @@ export default function Home() {
       </AlertDialog>
 
       {/* ── Sticky navbar ── */}
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md shadow-sm">
+      {!embedded && <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
 
           {/* Left — wordmark + version + user badge */}
@@ -1576,7 +1756,7 @@ export default function Home() {
                   asChild
                   className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-sm"
                 >
-                  <a href="/territories">
+                  <a href={workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"}>
                     <MapPin className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline text-xs font-semibold">Team Progress</span>
                   </a>
@@ -1652,7 +1832,22 @@ export default function Home() {
             <ThemeSwitcher />
           </div>
         </div>
-      </header>
+      </header>}
+
+      {workspaceSlug && (
+        <div className="container mx-auto flex min-h-9 items-center justify-end gap-2 px-4 pt-3 text-xs text-muted-foreground" aria-live="polite">
+          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1">
+            <span className={`h-1.5 w-1.5 rounded-full ${draftStatus === "offline" || draftStatus === "conflict" ? "bg-amber-500" : draftStatus === "saving" || draftStatus === "loading" ? "bg-blue-500" : "bg-emerald-500"}`} />
+            {draftStatus === "loading" ? "Loading draft" : draftStatus === "saving" ? "Saving" : draftStatus === "offline" ? "Offline · saved locally" : draftStatus === "conflict" ? "Draft conflict" : "Saved"}
+          </span>
+          {draftStatus === "conflict" && (
+            <>
+              <Button size="sm" variant="outline" className="h-8" onClick={reloadServerDraft}>Reload server copy</Button>
+              <Button size="sm" className="h-8" onClick={keepLocalDraft}>Keep my copy</Button>
+            </>
+          )}
+        </div>
+      )}
 
       <main className="container mx-auto py-8 px-4 pb-24">
 
@@ -2023,8 +2218,8 @@ export default function Home() {
                 if (e.key === "Enter") {
                   const trimmed = userIdInput.trim()
                   if (!trimmed) return
-                  const isFirstTime = !localStorage.getItem("userId")
-                  localStorage.setItem("userId", trimmed)
+                  const isFirstTime = !localStorage.getItem(storageKey("userId"))
+                  localStorage.setItem(storageKey("userId"), trimmed)
                   setUserId(trimmed)
                   setIsUserIdDialogOpen(false)
                   setUserIdInput("")
@@ -2038,8 +2233,8 @@ export default function Home() {
               onClick={() => {
                 const trimmed = userIdInput.trim()
                 if (!trimmed) return
-                const isFirstTime = !localStorage.getItem("userId")
-                localStorage.setItem("userId", trimmed)
+                const isFirstTime = !localStorage.getItem(storageKey("userId"))
+                localStorage.setItem(storageKey("userId"), trimmed)
                 setUserId(trimmed)
                 setIsUserIdDialogOpen(false)
                 setUserIdInput("")
@@ -2087,4 +2282,8 @@ export default function Home() {
       </Dialog>
     </TooltipProvider>
   )
+}
+
+export default function Home() {
+  return <SearchHelper />
 }

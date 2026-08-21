@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,9 @@ function userIconClass(userId: string) {
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const workspace = useWorkspaceRuntime()
+  const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
+  const adminPeopleBase = workspace ? `/c/${workspace.slug}/admin/people` : "/admin/user"
   const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names" | "potentiallyFrench" | "dictionaryScan">("submissions")
   // Tabs mount lazily on first visit, then stay mounted (just hidden via
   // CSS) — switching back to an already-visited tab no longer re-runs its
@@ -118,9 +122,9 @@ export default function AdminDashboard() {
 
   const fetchSubmissions = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/submissions")
+      const res = await fetch(`${adminApiBase}/submissions`)
       if (res.status === 401) {
-        router.push("/admin/login")
+        router.push(workspace ? "/auth/sign-in" : "/admin/login")
         return
       }
       const data = await res.json()
@@ -135,7 +139,7 @@ export default function AdminDashboard() {
       setFetchError("Network error — could not reach the server.")
     }
     setLoading(false)
-  }, [router])
+  }, [adminApiBase, router, workspace])
 
   useEffect(() => { fetchSubmissions() }, [fetchSubmissions])
 
@@ -143,7 +147,7 @@ export default function AdminDashboard() {
 
   const setStatus = useCallback(async (id: number, review_status: ReviewStatus) => {
     setBusy(b => ({ ...b, [id]: true }))
-    await fetch("/api/admin/submissions", {
+    await fetch(`${adminApiBase}/submissions`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, review_status }),
@@ -152,11 +156,11 @@ export default function AdminDashboard() {
       s.map(sub => sub.id === id ? { ...sub, review_status } : sub)
     )
     setBusy(b => ({ ...b, [id]: false }))
-  }, [])
+  }, [adminApiBase])
 
   const toggleArchive = useCallback(async (id: number, archived: boolean) => {
     setBusy(b => ({ ...b, [id]: true }))
-    await fetch("/api/admin/submissions", {
+    await fetch(`${adminApiBase}/submissions`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, archived }),
@@ -168,15 +172,15 @@ export default function AdminDashboard() {
     // When restoring (unarchiving), switch back to active view so the
     // submission is visible and the page doesn't crash from an empty group.
     if (!archived) setShowArchived(false)
-  }, [])
+  }, [adminApiBase])
 
   const deleteSubmission = useCallback(async (id: number) => {
     if (!confirm("Permanently delete this submission? This cannot be undone.")) return
     setBusy(b => ({ ...b, [id]: true }))
-    await fetch(`/api/admin/submissions?id=${id}`, { method: "DELETE" })
+    await fetch(`${adminApiBase}/submissions?id=${id}`, { method: "DELETE" })
     setSubmissions(s => s.filter(sub => sub.id !== id))
     setBusy(b => ({ ...b, [id]: false }))
-  }, [])
+  }, [adminApiBase])
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -298,7 +302,7 @@ export default function AdminDashboard() {
             <ThemeSwitcher className="admin-material" />
             <button
               onClick={async () => {
-                await fetch("/api/admin/logout", { method: "POST" })
+                await fetch(workspace ? "/api/auth/sign-out" : "/api/admin/logout", { method: "POST" })
                 window.location.href = "/"
               }}
               className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -628,7 +632,7 @@ export default function AdminDashboard() {
                           <td className="px-3 py-3">
                             <div className="flex items-center justify-end gap-2">
                               <Link
-                                href={`/admin/user/${encodeURIComponent(sub.user_id)}?submissionId=${sub.id}`}
+                                href={`${adminPeopleBase}/${encodeURIComponent(sub.user_id)}?submissionId=${sub.id}`}
                                 className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 Open
@@ -731,6 +735,11 @@ const OTM_LS_NAME = "otm_last_filename"
 type SavedFileInfo = { exists: boolean; filename?: string; uploadedAt?: string }
 
 function OtmPanel() {
+  const workspace = useWorkspaceRuntime()
+  const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
+  const adminPeopleBase = workspace ? `/c/${workspace.slug}/admin/people` : "/admin/user"
+  const otmResultKey = workspace ? `search-helper:${workspace.slug}:admin:${OTM_LS_KEY}` : OTM_LS_KEY
+  const otmNameKey = workspace ? `search-helper:${workspace.slug}:admin:${OTM_LS_NAME}` : OTM_LS_NAME
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName]     = useState<string | null>(null)
   const [running, setRunning]       = useState(false)
@@ -748,8 +757,8 @@ function OtmPanel() {
   useEffect(() => {
     // Restore last result from localStorage (fast, works offline)
     try {
-      const savedName   = localStorage.getItem(OTM_LS_NAME)
-      const savedResult = localStorage.getItem(OTM_LS_KEY)
+      const savedName   = localStorage.getItem(otmNameKey)
+      const savedResult = localStorage.getItem(otmResultKey)
       if (savedResult) {
         setResult(JSON.parse(savedResult) as OtmResult)
         setFileName(savedName ?? "previous file")
@@ -758,11 +767,11 @@ function OtmPanel() {
     } catch { /* ignore parse errors */ }
 
     // Fetch DB-saved file metadata (works across browsers/sessions)
-    fetch("/api/admin/otm-file")
+    fetch(`${adminApiBase}/otm-file`)
       .then(r => r.json())
       .then((data: SavedFileInfo) => setSavedFile(data))
       .catch(() => setSavedFile({ exists: false }))
-  }, [])
+  }, [adminApiBase, otmNameKey, otmResultKey])
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -786,7 +795,7 @@ function OtmPanel() {
     try {
       const form = new FormData()
       form.append("file", file)
-      const res = await fetch("/api/admin/otm-check", { method: "POST", body: form })
+      const res = await fetch(`${adminApiBase}/otm-check`, { method: "POST", body: form })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? "Check failed"); return }
       const otmResult = data as OtmResult
@@ -794,8 +803,8 @@ function OtmPanel() {
 
       // Persist result to localStorage for fast reload
       try {
-        localStorage.setItem(OTM_LS_KEY,  JSON.stringify(otmResult))
-        localStorage.setItem(OTM_LS_NAME, file.name)
+        localStorage.setItem(otmResultKey, JSON.stringify(otmResult))
+        localStorage.setItem(otmNameKey, file.name)
       } catch { /* ignore quota errors */ }
 
       // Also save the file bytes to Neon DB for cross-browser persistence
@@ -803,7 +812,7 @@ function OtmPanel() {
       try {
         const saveForm = new FormData()
         saveForm.append("file", file)
-        const saveRes = await fetch("/api/admin/otm-file", { method: "POST", body: saveForm })
+        const saveRes = await fetch(`${adminApiBase}/otm-file`, { method: "POST", body: saveForm })
         if (saveRes.ok) setSavedFile(await saveRes.json())
       } catch { /* non-critical — don't block the result display */ }
       finally { setSavingFile(false) }
@@ -823,14 +832,14 @@ function OtmPanel() {
     setRestored(false)
     setDismissed(new Set())
     try {
-      const res = await fetch("/api/admin/otm-check?useSaved=true", { method: "POST" })
+      const res = await fetch(`${adminApiBase}/otm-check?useSaved=true`, { method: "POST" })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? "Check failed"); return }
       const otmResult = data as OtmResult
       setResult(otmResult)
       try {
-        localStorage.setItem(OTM_LS_KEY,  JSON.stringify(otmResult))
-        localStorage.setItem(OTM_LS_NAME, savedFile?.filename ?? "saved file")
+        localStorage.setItem(otmResultKey, JSON.stringify(otmResult))
+        localStorage.setItem(otmNameKey, savedFile?.filename ?? "saved file")
       } catch { /* ignore quota errors */ }
     } catch {
       setError("Network error — could not reach the server.")
@@ -840,8 +849,8 @@ function OtmPanel() {
   }
 
   const clearSaved = () => {
-    localStorage.removeItem(OTM_LS_KEY)
-    localStorage.removeItem(OTM_LS_NAME)
+    localStorage.removeItem(otmResultKey)
+    localStorage.removeItem(otmNameKey)
     setResult(null)
     setFileName(null)
     setRestored(false)
@@ -854,7 +863,7 @@ function OtmPanel() {
     setRemoving(prev => new Set(prev).add(key))
     try {
       const res = await fetch(
-        `/api/admin/otm-contact?submissionId=${m.submissionId}&contactId=${encodeURIComponent(m.contactId)}`,
+        `${adminApiBase}/otm-contact?submissionId=${m.submissionId}&contactId=${encodeURIComponent(m.contactId)}`,
         { method: "DELETE" }
       )
       if (res.ok) {
@@ -886,7 +895,7 @@ function OtmPanel() {
     setResult(prev => {
       if (!prev) return prev
       const updated = { ...prev, matches: prev.matches.filter(x => `${x.submissionId}:${x.contactId}` !== key), matchCount: prev.matchCount - 1 }
-      try { localStorage.setItem(OTM_LS_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
+      try { localStorage.setItem(otmResultKey, JSON.stringify(updated)) } catch { /* ignore */ }
       return updated
     })
   }
@@ -904,7 +913,7 @@ function OtmPanel() {
     setResult(prev => {
       if (!prev) return prev
       const updated = { ...prev, matches: prev.matches.filter(m => !visibleKeys.has(`${m.submissionId}:${m.contactId}`)), matchCount: prev.matchCount - visibleKeys.size }
-      try { localStorage.setItem(OTM_LS_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
+      try { localStorage.setItem(otmResultKey, JSON.stringify(updated)) } catch { /* ignore */ }
       return updated
     })
   }
@@ -1231,7 +1240,7 @@ function OtmPanel() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <Link
-                            href={`/admin/user/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
+                            href={`${adminPeopleBase}/${encodeURIComponent(m.userId)}?submissionId=${m.submissionId}`}
                             className="text-xs text-blue-600 hover:underline font-semibold"
                           >
                             View →
@@ -1300,6 +1309,8 @@ function forebearsUrlFor(name: string) {
 }
 
 function DictionaryFeedbackPanel() {
+  const workspace = useWorkspaceRuntime()
+  const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
   const [activeSubTab, setActiveSubTab] = useState<"add" | "remove">("add")
   const [addCandidates, setAddCandidates] = useState<NameCandidate[]>([])
   const [removeCandidates, setRemoveCandidates] = useState<NameCandidate[]>([])
@@ -1317,7 +1328,7 @@ function DictionaryFeedbackPanel() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/admin/dictionary-feedback")
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`)
       const data = await res.json()
       if (!res.ok) {
         setError(data?.error ?? "Failed to load name feedback.")
@@ -1326,12 +1337,12 @@ function DictionaryFeedbackPanel() {
       }
       setAddCandidates(data.addCandidates ?? [])
       setRemoveCandidates(data.removeCandidates ?? [])
-      setDictionaryError(data.dictionaryError ?? null)
+      setDictionaryError(workspace ? "The shared dictionary is managed in the platform portal. You can still dismiss suggestions for this congregation." : data.dictionaryError ?? null)
     } catch {
       setError("Network error — could not reach the server.")
     }
     setLoading(false)
-  }, [])
+  }, [adminApiBase, workspace])
 
   useEffect(() => { load() }, [load])
 
@@ -1354,7 +1365,7 @@ function DictionaryFeedbackPanel() {
   const apply = async (name: string, action: "add" | "remove") => {
     setBusy((b) => ({ ...b, [name]: true }))
     try {
-      const res = await fetch("/api/admin/dictionary-feedback", {
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, action }),
@@ -1381,7 +1392,7 @@ function DictionaryFeedbackPanel() {
     if (names.length === 0) return
     setBatchBusy(true)
     try {
-      const res = await fetch("/api/admin/dictionary-feedback", {
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names, action: list }),
@@ -1412,7 +1423,7 @@ function DictionaryFeedbackPanel() {
     const key = `dismiss:${name}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/dictionary-feedback", {
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, action: "dismiss", list }),
@@ -1439,7 +1450,7 @@ function DictionaryFeedbackPanel() {
     if (names.length === 0) return
     setBatchBusy(true)
     try {
-      const res = await fetch("/api/admin/dictionary-feedback", {
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names, action: "dismiss", list }),
@@ -1804,6 +1815,8 @@ function exportPotentiallyFrenchToCSV(contacts: PotentiallyFrenchContact[], stat
 }
 
 function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
+  const workspace = useWorkspaceRuntime()
+  const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
   const [contacts, setContacts] = useState<PotentiallyFrenchContact[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [duplicateCount, setDuplicateCount] = useState(0)
@@ -1818,7 +1831,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
   const [removingDuplicates, setRemovingDuplicates] = useState(false)
 
   useEffect(() => {
-    fetch("/api/admin/potentially-french")
+    fetch(`${adminApiBase}/potentially-french`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.error) {
@@ -1834,7 +1847,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         setError("Network error — could not reach the server.")
         setLoading(false)
       })
-  }, [])
+  }, [adminApiBase])
 
   const handleExport = () => {
     if (contacts.length === 0) {
@@ -1851,7 +1864,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     const key = `${c.submissionId}:${c.contactId}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/potentially-french", {
+      const res = await fetch(`${adminApiBase}/potentially-french`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: c.submissionId, contactId: c.contactId }),
@@ -1880,7 +1893,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     const key = `${c.submissionId}:${c.contactId}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/potentially-french", {
+      const res = await fetch(`${adminApiBase}/potentially-french`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: c.submissionId, contactId: c.contactId, action: "duplicate" }),
@@ -1965,7 +1978,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     if (contactsToRemove.length === 0) return
     setRemovingDuplicates(true)
     try {
-      const res = await fetch("/api/admin/potentially-french", {
+      const res = await fetch(`${adminApiBase}/potentially-french`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "removeDuplicates", contacts: contactsToRemove }),
@@ -2265,6 +2278,9 @@ function withDictionaryScanDuplicateCounts(matches: DictionaryScanMatch[]) {
 }
 
 function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
+  const workspace = useWorkspaceRuntime()
+  const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
+  const adminPeopleBase = workspace ? `/c/${workspace.slug}/admin/people` : "/admin/user"
   const [matches, setMatches] = useState<DictionaryScanMatch[]>([])
   const [totalScanned, setTotalScanned] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -2285,7 +2301,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    fetch("/api/admin/name-dictionary-scan")
+    fetch(`${adminApiBase}/name-dictionary-scan`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.error) {
@@ -2300,7 +2316,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         setError("Network error — could not reach the server.")
         setLoading(false)
       })
-  }, [])
+  }, [adminApiBase])
 
   useEffect(() => { load() }, [load])
 
@@ -2312,7 +2328,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     setLoading(true)
     setError(null)
     setReviewedNotice(null)
-    fetch("/api/admin/name-dictionary-scan", { method: "POST" })
+    fetch(`${adminApiBase}/name-dictionary-scan`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => {
         if (data?.error) {
@@ -2391,7 +2407,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     if (contacts.length === 0) return
     setRemovingDuplicates(true)
     try {
-      const res = await fetch("/api/admin/name-dictionary-scan", {
+      const res = await fetch(`${adminApiBase}/name-dictionary-scan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "removeDuplicates", contacts }),
@@ -2437,7 +2453,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     const key = `${m.submissionId}:${m.contactId}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/name-dictionary-scan", {
+      const res = await fetch(`${adminApiBase}/name-dictionary-scan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId }),
@@ -2467,7 +2483,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     const key = `remove:${m.matchedName}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/dictionary-feedback", {
+      const res = await fetch(`${adminApiBase}/dictionary-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: m.matchedName, action: "remove" }),
@@ -2491,7 +2507,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     const key = `${m.submissionId}:${m.contactId}`
     setBusy((b) => ({ ...b, [key]: true }))
     try {
-      const res = await fetch("/api/admin/name-dictionary-scan", {
+      const res = await fetch(`${adminApiBase}/name-dictionary-scan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId, action: "dismiss" }),
@@ -2524,7 +2540,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
   const saveEdit = useCallback(async (m: DictionaryScanMatch) => {
     setSavingEdit(true)
     try {
-      const res = await fetch("/api/admin/name-dictionary-scan", {
+      const res = await fetch(`${adminApiBase}/name-dictionary-scan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: m.submissionId, contactId: m.contactId, action: "update", fields: editDraft }),
@@ -2614,7 +2630,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
                         <span className="text-gray-400">· {new Date(g.submittedAt).toLocaleDateString()}</span>
                         <span className="text-gray-400">· {g.items.length} missed name{g.items.length !== 1 ? "s" : ""}</span>
                         <Link
-                          href={`/admin/user/${encodeURIComponent(g.userId)}?submissionId=${g.submissionId}`}
+                          href={`${adminPeopleBase}/${encodeURIComponent(g.userId)}?submissionId=${g.submissionId}`}
                           className="ml-auto text-blue-600 hover:underline font-semibold"
                         >
                           View submission →

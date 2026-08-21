@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
+import { AlertTriangle } from "lucide-react"
 
 type Segment = {
   id: number
@@ -45,11 +47,19 @@ function pct(a: number, total: number) {
 
 export default function ZipcodePage({ params }: { params: { zipcode: string } }) {
   const { zipcode } = params
+  const workspace = useWorkspaceRuntime()
+  const workspaceSlug = workspace?.slug
+  const embedded = Boolean(workspace)
 
   const [zipcodeInfo, setZipcodeInfo] = useState<ZipcodeInfo | null>(null)
   const [segments, setSegments]       = useState<Segment[]>([])
   const [loading, setLoading]         = useState(true)
   const [userName, setUserName]       = useState("")
+  const [canManage, setCanManage]     = useState(false)
+
+  const apiBase = workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/team` : "/api/territories"
+  const teamHref = workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"
+  const userStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:user` : "userId"
 
   // Claim form
   const [claimStart, setClaimStart]   = useState("")
@@ -63,15 +73,25 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   const [confirming, setConfirming] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    const saved = localStorage.getItem("userId")
-    if (saved) setUserName(saved)
+    const saved = localStorage.getItem(userStorageKey)
+    if (saved && !workspaceSlug) setUserName(saved)
+    if (workspaceSlug) {
+      fetch("/api/auth/session", { cache: "no-store" })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+          const membership = (data?.memberships ?? []).find((item: { slug?: string }) => item.slug === workspaceSlug)
+          setUserName(membership?.displayName ?? membership?.display_name ?? data?.user?.displayName ?? data?.user?.display_name ?? "Member")
+          setCanManage(membership?.role === "admin" || data?.user?.isPlatformAdmin === true || data?.user?.is_platform_admin === true)
+        })
+        .catch(() => {})
+    }
     loadData()
   }, [zipcode])
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/territories/segments?zipcode=${zipcode}`)
+      const res = await fetch(`${apiBase}/segments?zipcode=${zipcode}`)
       const data = await res.json()
       if (!res.ok) { setLoading(false); return }
       setZipcodeInfo(data.zipcode)
@@ -89,10 +109,10 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
     if (end && end <= start) { setClaimError("End page must be greater than start."); return }
 
     setClaiming(true)
-    const res = await fetch("/api/territories/segments", {
+    const res = await fetch(`${apiBase}/segments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ zipcode, page_start: start, page_end: end, owner: userName }),
+      body: JSON.stringify(workspaceSlug ? { zipcode, page_start: start, page_end: end } : { zipcode, page_start: start, page_end: end, owner: userName }),
     })
     setClaiming(false)
     if (res.ok) {
@@ -125,7 +145,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
     const e = editing[id]
     if (!e) return
     setSaving(prev => new Set(prev).add(id))
-    const res = await fetch("/api/territories/segments", {
+    const res = await fetch(`${apiBase}/segments`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -145,7 +165,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
   }
 
   const deleteSeg = async (id: number) => {
-    await fetch(`/api/territories/segments?id=${id}`, { method: "DELETE" })
+    await fetch(`${apiBase}/segments?id=${id}`, { method: "DELETE" })
     setConfirming(prev => { const s = new Set(prev); s.delete(id); return s })
     loadData()
   }
@@ -161,10 +181,10 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
 
       {/* ── Nav ── */}
-      <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+      {!embedded && <nav className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/territories" className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-base">
+            <Link href={teamHref} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-base">
               ← Back
             </Link>
             <span className="text-gray-200 dark:text-gray-700">|</span>
@@ -199,7 +219,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
             )}
           </div>
         </div>
-      </nav>
+      </nav>}
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {loading ? (
@@ -265,7 +285,8 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                     </thead>
                     <tbody>
                       {segments.map(seg => {
-                        const isOwner      = userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim()
+                        const isOwner      = Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
+                        const canEdit      = isOwner || canManage
                         const isEditing    = !!editing[seg.id]
                         const isSaving     = saving.has(seg.id)
                         const isConfirming = confirming.has(seg.id)
@@ -290,7 +311,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                   </div>
                                   {e.page_end && zipcodeInfo && parseInt(e.page_end) > zipcodeInfo.total_pages && (
                                     <p className="text-xs text-amber-500 whitespace-normal leading-tight">
-                                      ⚠ Exceeds max of {zipcodeInfo.total_pages.toLocaleString()} pages. Double-check the A-Z site.
+                                      <AlertTriangle className="mr-1 inline h-3 w-3" aria-hidden="true" /> Exceeds max of {zipcodeInfo.total_pages.toLocaleString()} pages. Double-check the A-Z site.
                                     </p>
                                   )}
                                 </div>
@@ -354,7 +375,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
 
                             {/* Actions */}
                             <td className="px-4 py-3">
-                              {isOwner && (
+                              {canEdit && (
                                 isEditing ? (
                                   <div className="flex items-center gap-1.5">
                                     <button onClick={() => saveEdit(seg.id)} disabled={isSaving}
@@ -409,7 +430,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
 
               {!userName && (
                 <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">
-                  ⚠ <Link href="/territories" className="underline">Set your name</Link> on the dashboard first to claim a segment.
+                  <Link href={teamHref} className="underline">Return to Team Progress</Link> to finish signing in before claiming a segment.
                 </p>
               )}
 
@@ -439,7 +460,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                   />
                   {claimEnd && parseInt(claimEnd) > zipcodeInfo.total_pages && (
                     <p className="mt-1.5 text-xs text-amber-500 max-w-[8rem] leading-tight">
-                      ⚠ Exceeds max of {zipcodeInfo.total_pages.toLocaleString()} pages. Double-check the A-Z site.
+                      <AlertTriangle className="mr-1 inline h-3 w-3" aria-hidden="true" /> Exceeds max of {zipcodeInfo.total_pages.toLocaleString()} pages. Double-check the A-Z site.
                     </p>
                   )}
                 </div>
