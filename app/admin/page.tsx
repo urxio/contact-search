@@ -559,14 +559,13 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="overflow-x-auto border-y lg:overflow-visible">
-                <table className="w-full min-w-[960px] text-sm">
+                <table className="w-full min-w-[820px] text-sm">
                   <thead className="sticky top-0 z-10 bg-[hsl(var(--admin-surface))]">
                     <tr className="border-b">
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">User</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Submitted</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contacts</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Review progress</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                       <th className="px-3 py-2"><span className="sr-only">Actions</span></th>
                     </tr>
@@ -574,7 +573,7 @@ export default function AdminDashboard() {
                   <tbody>
                     {filteredVisible.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center">
+                        <td colSpan={6} className="px-6 py-12 text-center">
                           <p className="text-base font-semibold">No matching submissions</p>
                           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Adjust or clear the current search and filters.</p>
                           <button
@@ -588,7 +587,6 @@ export default function AdminDashboard() {
                       </tr>
                     )}
                     {sortedFilteredVisible.map((sub) => {
-                      const checkedPct = pct(sub.potentially_french + sub.not_french + sub.duplicate, sub.contact_count)
                       const isBusy = !!busy[sub.id]
                       const zip = sub.top_zipcode || sub.territory_zipcode
 
@@ -612,12 +610,6 @@ export default function AdminDashboard() {
                             {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
                           </td>
                           <td className="px-3 py-3 text-right font-medium tabular-nums">{sub.contact_count}</td>
-                          <td className="px-3 py-3">
-                            <p className="font-medium">{checkedPct}% checked</p>
-                            <p className="text-xs text-muted-foreground">
-                              {sub.potentially_french} possible · {sub.duplicate} duplicate · {sub.not_checked} unchecked
-                            </p>
-                          </td>
                           <td className="px-3 py-3">
                             <select
                               value={sub.review_status ?? "pending"}

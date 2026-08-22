@@ -221,7 +221,7 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
 
       <Card className="admin-card overflow-hidden rounded-2xl">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                 <th className="px-4 py-3">Name</th>
@@ -229,13 +229,12 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Research</th>
-                <th className="px-4 py-3">Notes</th>
                 <th className="px-4 py-3"><span className="sr-only">Edit</span></th>
               </tr>
             </thead>
             <tbody>
               {visibleContacts.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No contacts match these filters.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">No contacts match these filters.</td></tr>
               ) : visibleContacts.map((contact, index) => {
                 const key = contact.id || String(index)
                 const disabled = !contact.id || !!busy[key]
@@ -303,7 +302,6 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                         </Tooltip>
                       </div>
                     </td>
-                    <td className="max-w-64 truncate px-4 py-3 text-muted-foreground" title={contact.notes}>{contact.notes || "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => openEditor(contact)}>
                         <Pencil aria-hidden="true" />Edit
