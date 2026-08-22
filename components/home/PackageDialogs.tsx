@@ -130,11 +130,11 @@ export function PackageDialogs({
     {
       id: "my-excels",
       title: "My Excels",
-      description: "Excels you uploaded and can manage.",
+      description: "Private Excels only you and admins can find.",
       emptyTitle: "No personal Excels",
-      emptyDescription: "Excels you upload will appear here.",
+      emptyDescription: "Excels you save for only yourself will appear here.",
       icon: UserRound,
-      rows: packages.filter((row) => Boolean(value<boolean>(row, "isMine", "is_mine"))),
+      rows: packages.filter((row) => Boolean(value<boolean>(row, "isMine", "is_mine")) && row.visibility === "private"),
     },
     {
       id: "congregation-excels",
@@ -143,7 +143,7 @@ export function PackageDialogs({
       emptyTitle: "No shared Excels available",
       emptyDescription: "New shared Excels will appear here when they are ready to claim.",
       icon: UsersRound,
-      rows: packages.filter((row) => !value<boolean>(row, "isMine", "is_mine") && row.visibility === "shared"),
+      rows: packages.filter((row) => row.visibility === "shared"),
     },
   ], [packages])
   const packageToOpenIsClaim = Boolean(packageToOpen && isClaimableByViewer(packageToOpen))
@@ -395,8 +395,8 @@ export function PackageDialogs({
           </div>
 
           <DialogFooter className="gap-2 sm:space-x-0">
-            <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(false)}>Save Excel</Button>
-            <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(true)}>{busy ? "Saving…" : "Save & start"}</Button>
+            <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(false)}>Save for later</Button>
+            <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(true)}>{busy ? "Saving…" : "Start search"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -405,7 +405,7 @@ export function PackageDialogs({
         <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-semibold">Browse Excels</DialogTitle>
-            <DialogDescription>Your uploads and available congregation Excels, kept separate.</DialogDescription>
+            <DialogDescription>Your private and congregation Excels, kept separate.</DialogDescription>
           </DialogHeader>
           {loadingPackages ? (
             <p className="py-10 text-center text-sm font-normal leading-relaxed text-muted-foreground">Loading Excels…</p>
