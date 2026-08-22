@@ -347,7 +347,7 @@ export default function AdminDashboard() {
                 ["dictionaryScan", "Find missed French contacts"],
                 ["names", "Manage name dictionary"],
                 ["potentiallyFrench", "Review French contacts"],
-                ["otm", "OTM duplicate check"],
+                ["otm", "Database Duplicates Check"],
               ] as const).map(([tab, label]) => (
                 <DropdownMenuItem
                   key={tab}
@@ -941,10 +941,10 @@ function OtmPanel() {
 
       {/* Upload card */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">OTM duplicate check</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Database Duplicates Check</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Upload an Excel file containing OTM addresses. The tool will scan all active user submissions
-          and flag any contact whose address matches an address in the OTM file.
+          Upload an Excel file containing known database addresses. The tool scans all non-archived submissions
+          and flags Potentially French contacts whose address matches the file.
         </p>
 
         <div className="flex flex-wrap items-center gap-3">

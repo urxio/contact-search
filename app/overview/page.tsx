@@ -130,8 +130,8 @@ const sections = [
       },
       {
         icon: <ShieldCheck className="h-5 w-5 text-indigo-500" />,
-        title: "OTM duplicate check (automatic)",
-        desc: "The \"Copy Name & Open OTM\" button has been removed. OTM address checking is now handled automatically in the background by the admin — your Potentially French contacts are compared against the full OTM address list after you submit. No action needed on your end.",
+        title: "Database Duplicates Check",
+        desc: "Admins compare Potentially French contacts in non-archived submissions against the congregation's saved address database. No action is needed from members.",
       },
       {
         icon: <Globe className="h-5 w-5 text-indigo-500" />,

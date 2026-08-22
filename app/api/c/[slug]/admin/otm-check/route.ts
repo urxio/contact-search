@@ -5,7 +5,9 @@ import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shar
 
 export const runtime = "nodejs"
 
-const normalise = (value: string) => value.toLowerCase().replace(/[.,#-]/g, " ").replace(/\s+/g, " ").trim()
+const normalise = (value: string) => value.toLowerCase()
+  .replace(/\b(?:apartment|unit|suite)\b/g, "apt")
+  .replace(/[.,#-]/g, " ").replace(/\s+/g, " ").trim()
 const fullKey = (address: string, city: string, zipcode: string) => [address, city, zipcode].map(normalise).filter(Boolean).join("|")
 const looseKey = (address: string, zipcode: string) => [address, zipcode].map(normalise).filter(Boolean).join("|")
 
@@ -46,8 +48,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!split && address < 0) return NextResponse.json({ error: "Could not find address columns." }, { status: 400 })
 
     const otmRows = rows.slice(1).map((row) => {
+      const apartmentValue = apartment >= 0 ? String(row[apartment] ?? "").trim() : ""
+      const normalizedApartment = apartmentValue && !/^(?:apt|apartment|unit|suite|#)\b/i.test(apartmentValue)
+        ? `APT ${apartmentValue}`
+        : apartmentValue
       const addressValue = split
-        ? [house, direction, street, apartment].filter((index) => index >= 0).map((index) => String(row[index] ?? "").trim()).filter(Boolean).join(" ")
+        ? [
+          house >= 0 ? String(row[house] ?? "").trim() : "",
+          direction >= 0 ? String(row[direction] ?? "").trim() : "",
+          street >= 0 ? String(row[street] ?? "").trim() : "",
+          normalizedApartment,
+        ].filter(Boolean).join(" ")
         : String(row[address] ?? "").trim()
       return { address: addressValue, city: city >= 0 ? String(row[city] ?? "").trim() : "", zipcode: zipcode >= 0 ? String(row[zipcode] ?? "").trim() : "" }
     }).filter((row) => row.address)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
-import { apiError, assertMultiTenantEnabled, RouteContext, safeDownloadName } from "../../../_shared"
+import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
 export const runtime = "nodejs"
 
@@ -10,20 +10,12 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     assertMultiTenantEnabled()
     const auth = await requireCongregationAdmin(params.slug)
     const result = await pool.query(
-      `SELECT filename, filedata, uploaded_at FROM otm_files WHERE congregation_id = $1`,
+      `SELECT filename, uploaded_at FROM otm_files WHERE congregation_id = $1`,
       [auth.congregation.id],
     )
-    if (!result.rows[0]) return NextResponse.json({ error: "No OTM file saved." }, { status: 404 })
+    if (!result.rows[0]) return NextResponse.json({ exists: false })
     const row = result.rows[0]
-    await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
-      action: "otm_file.downloaded", targetType: "otm_file", metadata: { filename: row.filename } })
-    return new NextResponse(row.filedata, {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${safeDownloadName(row.filename)}"`,
-        "X-Uploaded-At": new Date(row.uploaded_at).toISOString(),
-      },
-    })
+    return NextResponse.json({ exists: true, filename: row.filename, uploadedAt: row.uploaded_at })
   } catch (error) {
     return apiError(error)
   }
@@ -50,7 +42,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     )
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
       action: "otm_file.replaced", targetType: "otm_file", metadata: { filename: file.name, bytes: file.size } })
-    return NextResponse.json(result.rows[0], { status: 201 })
+    return NextResponse.json({
+      exists: true,
+      filename: result.rows[0].filename,
+      uploadedAt: result.rows[0].uploaded_at,
+    }, { status: 201 })
   } catch (error) {
     return apiError(error)
   }

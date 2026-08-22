@@ -8,6 +8,7 @@ import { cookies } from "next/headers"
 function normalise(s: string): string {
   return (s ?? "")
     .toLowerCase()
+    .replace(/\b(?:apartment|unit|suite)\b/g, "apt")
     .replace(/[.,#\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     // sheetRows: 0 means no row limit; defval: "" fills missing cells so
     // row arrays have consistent length even for sparse sheets.
-    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, sheetRows: 0, defval: "" })
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, sheetRows: 0, defval: "" } as any)
 
     if (rows.length < 2) {
       return NextResponse.json({ error: "Excel file is empty or has no data rows" }, { status: 400 })
@@ -133,12 +134,16 @@ export async function POST(req: NextRequest) {
 
       let address: string
       if (isSplitFormat) {
+        const apartmentValue = aptCol >= 0 ? String(row[aptCol] ?? "").trim() : ""
+        const normalizedApartment = apartmentValue && !/^(?:apt|apartment|unit|suite|#)\b/i.test(apartmentValue)
+          ? `APT ${apartmentValue}`
+          : apartmentValue
         // Assemble address from split columns: "2427 N Scuppers Ln APT 300"
         const parts = [
           houseNumCol  >= 0 ? String(row[houseNumCol]  ?? "").trim() : "",
           streetDirCol >= 0 ? String(row[streetDirCol] ?? "").trim() : "",
           streetCol    >= 0 ? String(row[streetCol]    ?? "").trim() : "",
-          aptCol       >= 0 ? String(row[aptCol]       ?? "").trim() : "",
+          normalizedApartment,
         ].filter(Boolean)
         address = parts.join(" ").trim()
       } else {
