@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { pool, ensureSchema } from "@/lib/db"
-import { getDictionaryFile, updateDictionaryFile } from "@/lib/github"
+import { applyDictionaryChanges, getDictionarySet, normalizeDictionaryNames } from "@/lib/dictionary"
 import { normalizeName } from "@/utils/french-name-detection"
 
 function requireAdmin(): NextResponse | null {
@@ -70,15 +70,7 @@ export async function GET() {
     const potentiallyFrenchTally = tallyNames(potentiallyFrenchResult.rows)
     const notFrenchTally = tallyNames(notFrenchResult.rows)
 
-    let dictionaryLines: string[] = []
-    let dictionaryError: string | null = null
-    try {
-      const { lines } = await getDictionaryFile()
-      dictionaryLines = lines
-    } catch (err: any) {
-      dictionaryError = err?.message ?? "Failed to load dictionary from GitHub"
-    }
-    const dictionarySet = new Set(dictionaryLines)
+    const dictionarySet = await getDictionarySet()
 
     const isSuppressed = (list: "add" | "remove", name: string, latestVoteAt: Date) => {
       const dismissedAt = dismissed[list].get(name)
@@ -95,16 +87,15 @@ export async function GET() {
       .map(([name, { count }]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
 
-    return NextResponse.json({ addCandidates, removeCandidates, dictionaryError })
+    return NextResponse.json({ addCandidates, removeCandidates, dictionaryError: null })
   } catch (err: any) {
     console.error("Dictionary feedback fetch error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// POST — apply one or more add/remove changes to the dictionary file as a
-// SINGLE commit to GitHub, or permanently dismiss name(s) from one of the
-// suggestion lists without touching the dictionary.
+// POST — apply one or more add/remove changes to the shared platform
+// dictionary, or dismiss name(s) from one suggestion list.
 // Body: { name?: string, names?: string[], action: "add" | "remove" | "dismiss", list?: "add" | "remove" }
 // `list` is required when action is "dismiss" — it says which list to hide the name(s) from.
 export async function POST(req: NextRequest) {
@@ -112,12 +103,12 @@ export async function POST(req: NextRequest) {
   if (unauthorized) return unauthorized
 
   try {
+    await ensureSchema()
     const body = await req.json()
     const action = body?.action
 
     const rawNames: unknown[] = Array.isArray(body?.names) ? body.names : [body?.name]
-    const names = Array.from(new Set(rawNames.map((n) => normalizeName(String(n ?? "")))))
-      .filter((n) => n && /^[a-z'-]+(\s[a-z'-]+)*$/.test(n))
+    const names = normalizeDictionaryNames(rawNames)
 
     if (names.length === 0) {
       return NextResponse.json({ error: "No valid names provided" }, { status: 400 })
@@ -148,32 +139,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 })
     }
 
-    const { lines, sha } = await getDictionaryFile()
-    const lineSet = new Set(lines)
-
-    const changedNames =
-      action === "add"
-        ? names.filter((n) => !lineSet.has(n))
-        : names.filter((n) => lineSet.has(n))
-
-    if (changedNames.length === 0) {
-      return NextResponse.json({ success: true, note: "No changes needed", applied: [] })
-    }
-
-    const updatedLines =
-      action === "add"
-        ? [...lines, ...changedNames].sort()
-        : lines.filter((l) => !changedNames.includes(l))
-
-    const verb = action === "add" ? "add" : "remove"
-    const preposition = action === "add" ? "to" : "from"
-    const commitMessage =
-      changedNames.length === 1
-        ? `chore: ${verb} "${changedNames[0]}" ${preposition} name dictionary (admin feedback)`
-        : `chore: ${verb} ${changedNames.length} names ${preposition} name dictionary (admin feedback)\n\n${changedNames.join(", ")}`
-
-    await updateDictionaryFile(updatedLines, sha, commitMessage)
-
+    const changedNames = await applyDictionaryChanges(action, names)
     return NextResponse.json({ success: true, applied: changedNames })
   } catch (err: any) {
     console.error("Dictionary feedback apply error:", err)

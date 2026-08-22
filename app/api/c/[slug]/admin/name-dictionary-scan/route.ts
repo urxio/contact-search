@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
-import { getDictionaryFile } from "@/lib/github"
+import { getDictionarySet } from "@/lib/dictionary"
 import { normalizeName } from "@/utils/french-name-detection"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../../_shared"
 import { parseContactRefs, recomputeCounters, updateContactStatus, updateManyStatusesAtomic } from "../_contacts"
@@ -20,7 +20,7 @@ async function scan(congregationId: number) {
          AND COALESCE(c->>'status','') NOT IN ('Potentially French','Duplicate')`,
       [congregationId],
     ),
-    getDictionaryFile(),
+    getDictionarySet(),
     pool.query(
       `SELECT submission_id, contact_id FROM dismissed_dictionary_scan_matches WHERE congregation_id = $1`,
       [congregationId],
@@ -32,7 +32,7 @@ async function scan(congregationId: number) {
       [congregationId],
     ),
   ])
-  const names = new Set(dictionary.lines)
+  const names = dictionary
   const hidden = new Set(dismissed.rows.map((row: any) => `${row.submission_id}:${row.contact_id}`))
   const coveredAddresses = new Set(frenchAddresses.rows.map((row: any) => normalizeAddress(row.address, row.city, row.zipcode)).filter(Boolean))
   const possible = contacts.rows.map((row: any) => {

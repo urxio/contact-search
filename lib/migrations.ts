@@ -1,5 +1,8 @@
 import type { PoolClient } from "pg"
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 import { pool } from "@/lib/db-pool"
+import { normalizeDictionaryNames } from "@/lib/dictionary"
 
 const CENTRAL_SLUG = "central-french-alexandria"
 const CENTRAL_NAME = "Central French Alexandria"
@@ -125,6 +128,24 @@ const migrations: Migration[] = [{
     )`)
     await client.query(`CREATE INDEX search_activity_user_date_idx ON search_activity_buckets(congregation_id,user_id,bucket_started_at DESC)`)
     await client.query(`CREATE INDEX search_activity_team_date_idx ON search_activity_buckets(congregation_id,bucket_started_at DESC)`)
+  }
+},{
+  version:8,name:"platform surname dictionary",async run(client){
+    await client.query(`CREATE TABLE surname_dictionary (
+      name TEXT PRIMARY KEY CHECK(name=lower(trim(name)) AND length(name) BETWEEN 1 AND 120),
+      created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`)
+    const source = await readFile(join(process.cwd(), "public", "name-dictionary-cleaned-suggestion.txt"), "utf8")
+    const names = normalizeDictionaryNames(source.split(/\r?\n/))
+    if (names.length > 0) {
+      await client.query(
+        `INSERT INTO surname_dictionary(name)
+         SELECT candidate FROM unnest($1::text[]) candidate
+         ON CONFLICT(name) DO NOTHING`,
+        [names],
+      )
+    }
   }
 }]
 

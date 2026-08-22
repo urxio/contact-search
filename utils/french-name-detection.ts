@@ -12,22 +12,21 @@ export function normalizeName(name: string): string {
 }
 
 let DICT: Set<string> | null = null
+let dictionaryLoadedAt = 0
+const DICTIONARY_CACHE_MS = 60_000
 
 export async function loadDictionaryIfNeeded(): Promise<void> {
-  if (DICT) return
+  if (DICT && Date.now() - dictionaryLoadedAt < DICTIONARY_CACHE_MS) return
   try {
-    // use the cleaned suggestion dictionary (merged/normalized)
-    const resp = await fetch("/name-dictionary-cleaned-suggestion.txt")
-    const txt = await resp.text()
-    const names = txt
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))
+    const resp = await fetch("/api/dictionary", { cache: "no-store" })
+    if (!resp.ok) throw new Error(`Dictionary request failed (${resp.status})`)
+    const data = await resp.json()
+    const names = Array.isArray(data?.lines) ? data.lines.map((name: unknown) => normalizeName(String(name))) : []
     DICT = new Set(names)
+    dictionaryLoadedAt = Date.now()
   } catch (err) {
     console.warn("Failed to load name dictionary:", err)
-    DICT = null
+    if (!DICT) dictionaryLoadedAt = 0
   }
 }
 

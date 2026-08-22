@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { pool, ensureSchema } from "@/lib/db"
-import { getDictionaryFile } from "@/lib/github"
+import { getDictionarySet } from "@/lib/dictionary"
 import { normalizeName } from "@/utils/french-name-detection"
 
 function requireAdmin(): NextResponse | null {
@@ -64,9 +64,7 @@ async function runScan() {
       FROM submissions s, jsonb_array_elements(s.contacts) c
       WHERE COALESCE(c->>'status', '') NOT IN ('Potentially French', 'Duplicate') AND s.archived = FALSE
     `),
-    getDictionaryFile().catch((err: any) => {
-      throw new Error(err?.message ?? "Failed to load dictionary from GitHub")
-    }),
+    getDictionarySet(),
     pool.query(`SELECT submission_id, contact_id FROM dismissed_dictionary_scan_matches`),
     // Addresses already covered by a contact marked "Potentially French" —
     // a scan match at one of these addresses is the same household as
@@ -78,7 +76,7 @@ async function runScan() {
     `),
   ])
 
-  const dictionarySet = new Set(dictionary.lines)
+  const dictionarySet = dictionary
   const dismissedSet = new Set(
     dismissedResult.rows.map((r: { submission_id: number; contact_id: string }) => `${r.submission_id}:${r.contact_id}`),
   )

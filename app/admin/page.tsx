@@ -1301,8 +1301,8 @@ function OtmPanel() {
 
 // ── Name Feedback panel ───────────────────────────────────────────────────────
 // Aggregates the per-contact 👍/👎 "is this a French name" corrections users
-// leave in the main app, cross-references the live dictionary on GitHub, and
-// lets the admin apply add/remove changes as a direct commit.
+// leave in the main app, cross-references the shared platform dictionary, and
+// lets the admin apply add/remove changes immediately.
 
 type NameCandidate = { name: string; count: number }
 
@@ -1318,7 +1318,6 @@ function DictionaryFeedbackPanel() {
   const [removeCandidates, setRemoveCandidates] = useState<NameCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [dictionaryError, setDictionaryError] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
   const [batchBusy, setBatchBusy] = useState(false)
   const [selected, setSelected] = useState<{ add: Set<string>; remove: Set<string> }>({
@@ -1339,7 +1338,6 @@ function DictionaryFeedbackPanel() {
       }
       setAddCandidates(data.addCandidates ?? [])
       setRemoveCandidates(data.removeCandidates ?? [])
-      setDictionaryError(workspace ? "The shared dictionary is managed in the platform portal. You can still dismiss suggestions for this congregation." : data.dictionaryError ?? null)
     } catch {
       setError("Network error — could not reach the server.")
     }
@@ -1375,10 +1373,8 @@ function DictionaryFeedbackPanel() {
       const data = await res.json()
       if (!res.ok) {
         alert(`Failed to ${action} "${name}": ${data?.error ?? "Unknown error"}`)
-      } else if (action === "add") {
-        setAddCandidates((prev) => prev.filter((c) => c.name !== name))
       } else {
-        setRemoveCandidates((prev) => prev.filter((c) => c.name !== name))
+        await load()
       }
     } catch {
       alert("Network error — could not reach the server.")
@@ -1387,8 +1383,7 @@ function DictionaryFeedbackPanel() {
     }
   }
 
-  // Apply every selected name in one shot — a single GitHub commit covers
-  // the whole batch instead of one commit per name.
+  // Apply every selected name in one database operation.
   const applySelected = async (list: "add" | "remove") => {
     const names = Array.from(selected[list])
     if (names.length === 0) return
@@ -1404,13 +1399,8 @@ function DictionaryFeedbackPanel() {
         alert(`Failed to apply selected names: ${data?.error ?? "Unknown error"}`)
         return
       }
-      const applied = new Set(data.applied ?? names)
-      if (list === "add") {
-        setAddCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
-      } else {
-        setRemoveCandidates((prev) => prev.filter((c) => !applied.has(c.name)))
-      }
       setSelected((prev) => ({ ...prev, [list]: new Set() }))
+      await load()
     } catch {
       alert("Network error — could not reach the server.")
     } finally {
@@ -1419,8 +1409,7 @@ function DictionaryFeedbackPanel() {
   }
 
   // Permanently hide a name from a suggestion list without touching the
-  // dictionary — for junk/false-positive entries. Doesn't need GitHub, so
-  // it stays enabled even when dictionaryError is set.
+  // dictionary — for junk/false-positive entries.
   const dismiss = async (name: string, list: "add" | "remove") => {
     const key = `dismiss:${name}`
     setBusy((b) => ({ ...b, [key]: true }))
@@ -1445,8 +1434,7 @@ function DictionaryFeedbackPanel() {
     }
   }
 
-  // Dismiss every selected name in one shot. Doesn't need GitHub, so it
-  // stays enabled even when dictionaryError is set.
+  // Dismiss every selected name in one shot.
   const dismissSelected = async (list: "add" | "remove") => {
     const names = Array.from(selected[list])
     if (names.length === 0) return
@@ -1508,14 +1496,6 @@ function DictionaryFeedbackPanel() {
         </button>
       </div>
 
-      {dictionaryError && (
-        <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            Couldn't reach the dictionary file on GitHub ({dictionaryError}). Apply actions are unavailable until GITHUB_TOKEN is configured.
-          </p>
-        </div>
-      )}
-
       {loading ? (
         <p className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</p>
       ) : error ? (
@@ -1531,7 +1511,6 @@ function DictionaryFeedbackPanel() {
           batchBusy={batchBusy}
           onApply={apply}
           onDismiss={dismiss}
-          disabled={!!dictionaryError}
           emptyText="No missing names flagged."
           selected={selected.add}
           onToggleSelected={(name) => toggleSelected("add", name)}
@@ -1550,7 +1529,6 @@ function DictionaryFeedbackPanel() {
           batchBusy={batchBusy}
           onApply={apply}
           onDismiss={dismiss}
-          disabled={!!dictionaryError}
           emptyText="No names flagged for removal."
           selected={selected.remove}
           onToggleSelected={(name) => toggleSelected("remove", name)}
@@ -1573,7 +1551,6 @@ function NameCandidateList({
   batchBusy,
   onApply,
   onDismiss,
-  disabled,
   emptyText,
   selected,
   onToggleSelected,
@@ -1590,7 +1567,6 @@ function NameCandidateList({
   batchBusy: boolean
   onApply: (name: string, action: "add" | "remove") => void
   onDismiss: (name: string, list: "add" | "remove") => void
-  disabled: boolean
   emptyText: string
   selected: Set<string>
   onToggleSelected: (name: string) => void
@@ -1622,7 +1598,7 @@ function NameCandidateList({
               {batchBusy ? "Applying…" : `Dismiss (${selected.size})`}
             </button>
             <button
-              disabled={disabled || batchBusy}
+              disabled={batchBusy}
               onClick={onApplySelected}
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50 ${batchButtonClass}`}
             >
@@ -1662,7 +1638,7 @@ function NameCandidateList({
                 </svg>
               </a>
               <button
-                disabled={disabled || !!busy[c.name]}
+                disabled={!!busy[c.name]}
                 onClick={() => onApply(c.name, action)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${buttonClass}`}
               >

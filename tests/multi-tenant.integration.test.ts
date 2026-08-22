@@ -107,7 +107,29 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 5, name: "member preferences" },
       { version: 6, name: "contact package library" },
       { version: 7, name: "personal search activity" },
+      { version: 8, name: "platform surname dictionary" },
     ])
+  })
+
+  it("seeds and atomically mutates the shared platform dictionary", async () => {
+    const seeded = await pool.query(
+      `SELECT name FROM surname_dictionary
+       WHERE name IN ('dupont','file truncated in this viewer for brevity')
+       ORDER BY name`,
+    )
+    expect(seeded.rows).toEqual([{ name: "dupont" }])
+
+    const { applyDictionaryChanges } = await import("@/lib/dictionary")
+    expect(await applyDictionaryChanges("add", [" Testname ", "testname"], Number(firstUserId))).toEqual(["testname"])
+    expect(await applyDictionaryChanges("add", ["testname"], Number(firstUserId))).toEqual([])
+
+    const added = await pool.query(
+      `SELECT name,created_by_user_id FROM surname_dictionary WHERE name='testname'`,
+    )
+    expect(added.rows).toEqual([{ name: "testname", created_by_user_id: firstUserId }])
+
+    expect(await applyDictionaryChanges("remove", ["TESTNAME"])).toEqual(["testname"])
+    expect(await applyDictionaryChanges("remove", ["testname"])).toEqual([])
   })
 
   it("isolates and deduplicates search activity buckets by congregation", async () => {

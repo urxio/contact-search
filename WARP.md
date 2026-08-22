@@ -44,7 +44,7 @@ actions/                # Client-side actions
 └── contact-actions.ts  # localStorage operations
 
 public/                 # Static assets
-├── name-dictionary-cleaned-suggestion.txt # French names dictionary
+├── name-dictionary-cleaned-suggestion.txt # One-time seed for the platform dictionary
 └── placeholder images
 
 hooks/                  # Custom React hooks
@@ -71,7 +71,7 @@ types/                  # TypeScript type definitions
 
 The application uses a two-tier detection system:
 
-1. **Dictionary Matching**: Loads `name-dictionary-cleaned-suggestion.txt` containing known French surnames
+1. **Dictionary Matching**: Loads the database-backed platform dictionary containing known French surnames
 2. **Heuristic Patterns**: Fallback rules for common French name patterns (le/la/du/de prefixes, -eau/-eux/-ier suffixes)
 
 Detection runs automatically after Excel import and can be triggered manually on selected contacts.

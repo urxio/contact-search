@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
-import { getDictionaryFile } from "@/lib/github"
+import { applyDictionaryChanges, getDictionarySet, normalizeDictionaryNames } from "@/lib/dictionary"
 import { normalizeName } from "@/utils/french-name-detection"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireCongregationAdmin(params.slug)
-    const [potentiallyFrench, notFrench, dismissed, dictionary] = await Promise.all([
+    const [potentiallyFrench, notFrench, dismissed, dictionarySet] = await Promise.all([
       pool.query(
         `SELECT c->>'lastName' last_name, c->>'fullName' full_name, s.submitted_at
          FROM submissions s, jsonb_array_elements(s.contacts) c
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
         `SELECT name, list, dismissed_at FROM dismissed_name_feedback WHERE congregation_id = $1`,
         [auth.congregation.id],
       ),
-      getDictionaryFile(),
+      getDictionarySet(),
     ])
     const dismissedAt = new Map<string, Date>(dismissed.rows.map((row: any) => [`${row.list}:${row.name}`, new Date(row.dismissed_at)]))
     const tally = (rows: Vote[], list: "add" | "remove") => {
@@ -46,7 +46,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
           return !dismissedDate || value.latest > dismissedDate
         })
     }
-    const dictionarySet = new Set(dictionary.lines)
     const addCandidates = tally(potentiallyFrench.rows, "add")
       .filter(([name]) => !dictionarySet.has(name)).map(([name, value]) => ({ name, count: value.count }))
       .sort((a, b) => b.count - a.count)
@@ -65,34 +64,46 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     validateMutationOrigin(req)
     const auth = await requireCongregationAdmin(params.slug)
     const body = await req.json()
-    if (body.action !== "dismiss" || !["add", "remove"].includes(body.list)) {
-      return NextResponse.json({ error: "Congregation admins may only dismiss local suggestions." }, { status: 403 })
-    }
     const raw: unknown[] = Array.isArray(body.names) ? body.names : [body.name]
-    const names = Array.from(new Set(raw.map((name) => normalizeName(String(name ?? ""))))).filter(Boolean)
+    const names = normalizeDictionaryNames(raw)
     if (!names.length) return NextResponse.json({ error: "No valid names provided." }, { status: 400 })
-    const client = await pool.connect()
-    try {
-      await client.query("BEGIN")
-      for (const name of names) {
-        await client.query(
-          `INSERT INTO dismissed_name_feedback (congregation_id, name, list, dismissed_at)
-           VALUES ($1,$2,$3,NOW()) ON CONFLICT (congregation_id, name, list)
-           DO UPDATE SET dismissed_at = NOW()`,
-          [auth.congregation.id, name, body.list],
-        )
+    if (body.action === "dismiss") {
+      if (body.list !== "add" && body.list !== "remove") {
+        return NextResponse.json({ error: "Choose which suggestion list to dismiss from." }, { status: 400 })
       }
-      await client.query("COMMIT")
-    } catch (error) {
-      await client.query("ROLLBACK")
-      throw error
-    } finally {
-      client.release()
+      const client = await pool.connect()
+      try {
+        await client.query("BEGIN")
+        for (const name of names) {
+          await client.query(
+            `INSERT INTO dismissed_name_feedback (congregation_id, name, list, dismissed_at)
+             VALUES ($1,$2,$3,NOW()) ON CONFLICT (congregation_id, name, list)
+             DO UPDATE SET dismissed_at = NOW()`,
+            [auth.congregation.id, name, body.list],
+          )
+        }
+        await client.query("COMMIT")
+      } catch (error) {
+        await client.query("ROLLBACK")
+        throw error
+      } finally {
+        client.release()
+      }
+      await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+        action: "dictionary_suggestion.dismissed", targetType: "dictionary_suggestion",
+        metadata: { names, list: body.list } })
+      return NextResponse.json({ success: true, applied: names })
     }
-    await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
-      action: "dictionary_suggestion.dismissed", targetType: "dictionary_suggestion",
-      metadata: { names, list: body.list } })
-    return NextResponse.json({ success: true, applied: names })
+    if (body.action !== "add" && body.action !== "remove") {
+      return NextResponse.json({ error: "Invalid action." }, { status: 400 })
+    }
+    const changed = await applyDictionaryChanges(body.action, names, auth.user.id)
+    if (changed.length > 0) {
+      await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+        action: `dictionary.${body.action}`, targetType: "dictionary",
+        metadata: { names: changed } })
+    }
+    return NextResponse.json({ success: true, applied: changed })
   } catch (error) {
     return apiError(error)
   }
