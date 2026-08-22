@@ -786,7 +786,7 @@ function OtmPanel() {
   // ── Run check using a newly uploaded file ─────────────────────────────────
   const runCheck = async () => {
     const file = fileRef.current?.files?.[0]
-    if (!file) { setError("Please select an Excel file first."); return }
+    if (!file) { setError("Please select an Excel or CSV file first."); return }
 
     setRunning(true)
     setError(null)
@@ -943,7 +943,7 @@ function OtmPanel() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Database Duplicates Check</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Upload an Excel file containing known database addresses. The tool scans all non-archived submissions
+          Upload an Excel or CSV file containing known database addresses. The tool scans all non-archived submissions
           and flags Potentially French contacts whose address matches the file.
         </p>
 
@@ -953,7 +953,7 @@ function OtmPanel() {
             ref={fileRef}
             type="file"
             id="otm-upload"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv,text/csv"
             onChange={handleFile}
             className="hidden"
           />
@@ -1116,7 +1116,7 @@ function OtmPanel() {
               <span className="text-gray-500">Submissions checked: <strong className="text-gray-900 dark:text-white">{result.submissionCount}</strong></span>
               {/* Column detection debug — shows which headers were found */}
               {result.detectedColumns && (
-                <span className="text-gray-400 text-xs" title="Columns detected in the OTM Excel file">
+                <span className="text-gray-400 text-xs" title="Columns detected in the uploaded address file">
                   Cols: {[
                     result.detectedColumns.houseNum  && `HouseNum→${result.detectedColumns.houseNum}`,
                     result.detectedColumns.streetDir && `Dir→${result.detectedColumns.streetDir}`,

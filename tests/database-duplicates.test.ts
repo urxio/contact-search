@@ -123,6 +123,38 @@ describe("Database Duplicates Check", () => {
     ])
   })
 
+  it("accepts CSV address imports through the same comparison flow", async () => {
+    mocks.poolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 93,
+        user_id: "Member Three",
+        submitted_at: "2026-08-22T12:00:00Z",
+        contacts: [{
+          id: "csv-match",
+          fullName: "CSV Match",
+          address: "18 Market St",
+          city: "Alexandria",
+          zipcode: "22301",
+          status: "Potentially French",
+        }],
+      }],
+      rowCount: 1,
+    })
+    const file = new File([
+      "Address,City,Zip\n18 Market St,Alexandria,22301\n",
+    ], "congregation-addresses.csv", { type: "text/csv" })
+
+    const { POST } = await import("@/app/api/c/[slug]/admin/otm-check/route")
+    const response = await POST(uploadRequest(file), context)
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.otmRowCount).toBe(1)
+    expect(body.matches).toEqual([
+      expect.objectContaining({ contactId: "csv-match", matchType: "exact" }),
+    ])
+  })
+
   it("returns saved-file metadata in the shape consumed by the tool", async () => {
     const uploadedAt = new Date("2026-08-22T12:30:00Z")
     mocks.poolQuery.mockResolvedValueOnce({ rows: [{ filename: "database.xlsx", uploaded_at: uploadedAt }] })

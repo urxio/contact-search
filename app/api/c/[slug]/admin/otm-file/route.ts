@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const form = await req.formData()
     const file = form.get("file")
     if (!(file instanceof File) || file.size === 0 || file.size > 15 * 1024 * 1024) {
-      return NextResponse.json({ error: "Choose an OTM spreadsheet up to 15 MB." }, { status: 400 })
+      return NextResponse.json({ error: "Choose an Excel or CSV address file up to 15 MB." }, { status: 400 })
     }
     const bytes = Buffer.from(await file.arrayBuffer())
     const result = await pool.query(

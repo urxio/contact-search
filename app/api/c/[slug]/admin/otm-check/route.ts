@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     } else {
       const file = (await req.formData()).get("file")
       if (!(file instanceof File) || !file.size || file.size > 15 * 1024 * 1024) {
-        return NextResponse.json({ error: "Choose an OTM spreadsheet up to 15 MB." }, { status: 400 })
+        return NextResponse.json({ error: "Choose an Excel or CSV address file up to 15 MB." }, { status: 400 })
       }
       buffer = Buffer.from(await file.arrayBuffer())
     }
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const workbook = XLSX.read(buffer, { type: "buffer", dense: true })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, sheetRows: 0, defval: "" } as any)
-    if (rows.length < 2) return NextResponse.json({ error: "Excel file has no data rows." }, { status: 400 })
+    if (rows.length < 2) return NextResponse.json({ error: "The address file has no data rows." }, { status: 400 })
     const headers = rows[0].map((cell) => String(cell ?? "").trim().toLowerCase())
     const exact = (names: string[]) => headers.findIndex((header) => names.includes(header))
     const contains = (names: string[]) => headers.findIndex((header) => names.some((name) => header.includes(name)))
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         : String(row[address] ?? "").trim()
       return { address: addressValue, city: city >= 0 ? String(row[city] ?? "").trim() : "", zipcode: zipcode >= 0 ? String(row[zipcode] ?? "").trim() : "" }
     }).filter((row) => row.address)
-    if (!otmRows.length) return NextResponse.json({ error: "No address rows found in the Excel file." }, { status: 400 })
+    if (!otmRows.length) return NextResponse.json({ error: "No address rows found in the uploaded file." }, { status: 400 })
     const exactLookup = new Map(otmRows.map((row) => [fullKey(row.address, row.city, row.zipcode), row]))
     const looseLookup = new Map(otmRows.map((row) => [looseKey(row.address, row.zipcode), row]))
 

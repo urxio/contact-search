@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, sheetRows: 0, defval: "" } as any)
 
     if (rows.length < 2) {
-      return NextResponse.json({ error: "Excel file is empty or has no data rows" }, { status: 400 })
+      return NextResponse.json({ error: "The address file is empty or has no data rows" }, { status: 400 })
     }
 
     // Auto-detect columns by header name (case-insensitive)
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (otmRows.length === 0) {
-      return NextResponse.json({ error: "No address rows found in the Excel file" }, { status: 400 })
+      return NextResponse.json({ error: "No address rows found in the uploaded file" }, { status: 400 })
     }
 
     // Pull all non-archived submissions with their contacts JSONB
