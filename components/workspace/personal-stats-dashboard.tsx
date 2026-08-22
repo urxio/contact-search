@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
+  ArrowRight, CalendarDays, CheckCircle2, ChevronDown,
   Clock3, FileSpreadsheet, Flame, MapPin, PackageOpen, RefreshCw, Send, Sparkles, UsersRound,
 } from "lucide-react"
 
@@ -31,7 +31,8 @@ type StatsPayload = {
   month: string
   timeZone: string
   personal: {
-    dailyActivity: DailyActivity[]; totalActiveSeconds: number; activeDays: number; currentStreak: number;
+    dailyActivity: DailyActivity[]; yearlyActivity: DailyActivity[]; totalActiveSeconds: number; yearlyActiveSeconds: number;
+    activeDays: number; currentStreak: number;
     submissions: number; contactsSubmitted: number; completedSegments: number
   }
   team: {
@@ -46,8 +47,6 @@ type StatsPayload = {
   openRanges: OpenRange[]
 }
 
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
 function localMonth() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
@@ -59,9 +58,9 @@ function shiftMonth(month: string, amount: number) {
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`
 }
 
-function monthLabel(month: string) {
+function shortMonthLabel(month: string) {
   const [year, monthNumber] = month.split("-").map(Number)
-  return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, monthNumber - 1, 1)))
+  return new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(year, monthNumber - 1, 1)))
 }
 
 function formatDuration(seconds: number, compact = false) {
@@ -81,18 +80,31 @@ function activityLevel(seconds: number) {
   return 4
 }
 
-function calendarDays(month: string, activity: DailyActivity[]) {
+function activityCalendar(month: string, activity: DailyActivity[]) {
   const [year, monthNumber] = month.split("-").map(Number)
-  const first = new Date(Date.UTC(year, monthNumber - 1, 1))
-  const count = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()
+  const first = new Date(Date.UTC(year, monthNumber - 12, 1))
+  first.setUTCDate(first.getUTCDate() - first.getUTCDay())
+  const today = new Date()
+  const lastDay = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  const last = new Date(lastDay)
+  last.setUTCDate(last.getUTCDate() + (6 - last.getUTCDay()))
   const values = new Map(activity.map((day) => [day.date, day.activeSeconds]))
-  const days: Array<{ date: string; day: number; activeSeconds: number } | null> = Array(first.getUTCDay()).fill(null)
-  for (let day = 1; day <= count; day += 1) {
-    const date = `${month}-${String(day).padStart(2, "0")}`
-    days.push({ date, day, activeSeconds: values.get(date) ?? 0 })
+  const weeks: Array<Array<{ date: string; activeSeconds: number } | null>> = []
+  const cursor = new Date(first)
+  while (cursor <= last) {
+    const week: Array<{ date: string; activeSeconds: number } | null> = []
+    for (let day = 0; day < 7; day += 1) {
+      const date = cursor.toISOString().slice(0, 10)
+      week.push(cursor <= lastDay ? { date, activeSeconds: values.get(date) ?? 0 } : null)
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
+    }
+    weeks.push(week)
   }
-  while (days.length % 7) days.push(null)
-  return days
+  return weeks
+}
+
+function calendarMonthLabels(month: string) {
+  return Array.from({ length: 12 }, (_, index) => shortMonthLabel(shiftMonth(month, index - 11)))
 }
 
 function SummaryCard({ icon: Icon, label, value, detail }: { icon: typeof Clock3; label: string; value: string; detail: string }) {
@@ -121,7 +133,7 @@ function EmptySection({ icon: Icon, title, description }: { icon: typeof MapPin;
 }
 
 export function PersonalStatsDashboard({ slug }: { slug: string }) {
-  const [month, setMonth] = useState(localMonth)
+  const month = localMonth()
   const [data, setData] = useState<StatsPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -146,16 +158,16 @@ export function PersonalStatsDashboard({ slug }: { slug: string }) {
 
   useEffect(() => { void load() }, [load])
 
-  const days = useMemo(() => calendarDays(month, data?.personal.dailyActivity ?? []), [data?.personal.dailyActivity, month])
+  const weeks = useMemo(() => activityCalendar(month, data?.personal.yearlyActivity ?? []), [data?.personal.yearlyActivity, month])
+  const monthLabels = useMemo(() => calendarMonthLabels(month), [month])
   const visibleRanges = showAllRanges ? data?.openRanges ?? [] : data?.openRanges.slice(0, 6) ?? []
-  const isCurrentMonth = month === localMonth()
 
   return (
     <PageFrame eyebrow="Your workspace" title="Personal Stats" description="A calm view of your search rhythm, recent progress, and work ready to continue." className="max-w-6xl">
       {loading && !data ? (
         <div className="space-y-6" aria-busy="true" aria-label="Loading personal stats">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-44 rounded-2xl" />)}</div>
-          <Skeleton className="h-96 rounded-2xl" />
+          <Skeleton className="h-56 rounded-2xl" />
           <Skeleton className="h-64 rounded-2xl" />
         </div>
       ) : error && !data ? (
@@ -174,27 +186,38 @@ export function PersonalStatsDashboard({ slug }: { slug: string }) {
             </section>
 
             <Card className="admin-card rounded-2xl">
-              <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
-                <div><CardTitle className="text-base font-semibold">Monthly activity</CardTitle><CardDescription className="mt-2">Time counted while Search is focused and you are active.</CardDescription></div>
-                <div className="flex shrink-0 items-center gap-1 rounded-xl bg-muted p-1">
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month"><ChevronLeft aria-hidden="true" /></Button>
-                  <span className="min-w-32 px-2 text-center text-sm font-medium">{monthLabel(month)}</span>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg" onClick={() => setMonth(shiftMonth(month, 1))} disabled={isCurrentMonth} aria-label="Next month"><ChevronRight aria-hidden="true" /></Button>
-                </div>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-semibold">{formatDuration(data.personal.yearlyActiveSeconds, true)} of focused search in the last 12 months</CardTitle>
+                <CardDescription>Time counted while Search is focused and you are active.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-7 gap-2" role="grid" aria-label={`Search activity for ${monthLabel(month)}`}>
-                  {weekdays.map((weekday) => <div key={weekday} role="columnheader" className="pb-1 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">{weekday.slice(0, 1)}</div>)}
-                  {days.map((day, index) => day ? (
-                    <Tooltip key={day.date}>
-                      <TooltipTrigger asChild>
-                        <span tabIndex={0} role="gridcell" aria-label={`${day.date}: ${formatDuration(day.activeSeconds)}`} className={cn("flex aspect-square min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", `activity-level-${activityLevel(day.activeSeconds)}`)}>{day.day}</span>
-                      </TooltipTrigger>
-                      <TooltipContent>{new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {formatDuration(day.activeSeconds)}</TooltipContent>
-                    </Tooltip>
-                  ) : <span key={`blank-${index}`} aria-hidden="true" />)}
+              <CardContent className="pb-5">
+                <div className="overflow-x-auto pb-2">
+                  <div className="min-w-[42rem]">
+                    <div className="mb-2 grid grid-cols-12 gap-1 pl-8" aria-hidden="true">
+                      {monthLabels.map((label, index) => <span key={`${label}-${index}`} className="text-xs font-normal text-muted-foreground">{label}</span>)}
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="grid w-6 shrink-0 grid-rows-[repeat(7,0.5rem)] gap-1 text-xs font-normal leading-none text-muted-foreground" aria-hidden="true">
+                        <span /><span>Mon</span><span /><span>Wed</span><span /><span>Fri</span><span />
+                      </div>
+                      <div className="flex gap-1" role="grid" aria-label="Search activity for the last 12 months">
+                        {weeks.map((week, weekIndex) => (
+                          <div key={weekIndex} className="grid grid-rows-7 gap-1" role="row">
+                            {week.map((day, dayIndex) => day ? (
+                              <Tooltip key={day.date}>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0} role="gridcell" aria-label={`${day.date}: ${formatDuration(day.activeSeconds)}`} className={cn("h-2 w-2 rounded-sm border transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1", `activity-level-${activityLevel(day.activeSeconds)}`)} />
+                                </TooltipTrigger>
+                                <TooltipContent>{new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · {formatDuration(day.activeSeconds)}</TooltipContent>
+                              </Tooltip>
+                            ) : <span key={`blank-${weekIndex}-${dayIndex}`} className="h-2 w-2" aria-hidden="true" />)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-5 flex items-center justify-end gap-2 text-xs font-normal text-muted-foreground"><span>Less</span>{[0, 1, 2, 3, 4].map((level) => <span key={level} className={cn("h-4 w-4 rounded border", `activity-level-${level}`)} aria-hidden="true" />)}<span>More</span></div>
+                <div className="mt-2 flex items-center justify-end gap-1 text-xs font-normal text-muted-foreground"><span className="mr-1">Less</span>{[0, 1, 2, 3, 4].map((level) => <span key={level} className={cn("h-3 w-3 rounded-sm border", `activity-level-${level}`)} aria-hidden="true" />)}<span className="ml-1">More</span></div>
               </CardContent>
             </Card>
 

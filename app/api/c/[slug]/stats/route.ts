@@ -7,6 +7,12 @@ import { apiError, assertMultiTenantEnabled, RouteContext } from "../../_shared"
 
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/
 
+function shiftMonth(month: string, amount: number) {
+  const [year, monthNumber] = month.split("-").map(Number)
+  const shifted = new Date(Date.UTC(year, monthNumber - 1 + amount, 1))
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`
+}
+
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
@@ -17,17 +23,26 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     }
     const timeZone = validTimeZone(request.nextUrl.searchParams.get("timeZone") || "UTC")
     const args = [auth.congregation.id, auth.user.id, `${requestedMonth}-01`, timeZone]
+    const yearlyArgs = [auth.congregation.id, auth.user.id, `${shiftMonth(requestedMonth, -11)}-01`, timeZone]
     const teamArgs = [auth.congregation.id, `${requestedMonth}-01`, timeZone]
     const period = `bucket_started_at >= ($3::date AT TIME ZONE $4) AND bucket_started_at < (($3::date + INTERVAL '1 month') AT TIME ZONE $4)`
     const datedPeriod = (column: string) => `${column} >= ($3::date AT TIME ZONE $4) AND ${column} < (($3::date + INTERVAL '1 month') AT TIME ZONE $4)`
     const teamPeriod = `bucket_started_at >= ($2::date AT TIME ZONE $3) AND bucket_started_at < (($2::date + INTERVAL '1 month') AT TIME ZONE $3)`
     const teamDatedPeriod = (column: string) => `${column} >= ($2::date AT TIME ZONE $3) AND ${column} < (($2::date + INTERVAL '1 month') AT TIME ZONE $3)`
 
-    const [dailyResult, personalResult, teamResult, milestoneResult, assignedResult, availableResult, territoryResult, draftResult] = await Promise.all([
+    const [dailyResult, yearlyResult, personalResult, teamResult, milestoneResult, assignedResult, availableResult, territoryResult, draftResult] = await Promise.all([
       pool.query(
         `SELECT TO_CHAR(bucket_started_at AT TIME ZONE $4,'YYYY-MM-DD') date,SUM(active_seconds)::int active_seconds
          FROM search_activity_buckets WHERE congregation_id=$1 AND user_id=$2 AND ${period}
-         GROUP BY date ORDER BY date`, args,
+        GROUP BY date ORDER BY date`, args,
+      ),
+      pool.query(
+        `SELECT TO_CHAR(bucket_started_at AT TIME ZONE $4,'YYYY-MM-DD') date,SUM(active_seconds)::int active_seconds
+         FROM search_activity_buckets
+         WHERE congregation_id=$1 AND user_id=$2
+           AND bucket_started_at >= ($3::date AT TIME ZONE $4)
+           AND bucket_started_at < (($3::date + INTERVAL '12 months') AT TIME ZONE $4)
+         GROUP BY date ORDER BY date`, yearlyArgs,
       ),
       pool.query(
         `SELECT
@@ -92,7 +107,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     ])
 
     const dailyActivity = dailyResult.rows.map((row) => ({ date: row.date, activeSeconds: Number(row.active_seconds) }))
+    const yearlyActivity = yearlyResult.rows.map((row) => ({ date: row.date, activeSeconds: Number(row.active_seconds) }))
     const totalActiveSeconds = dailyActivity.reduce((total, day) => total + day.activeSeconds, 0)
+    const yearlyActiveSeconds = yearlyActivity.reduce((total, day) => total + day.activeSeconds, 0)
     const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
     type ZipcodeCoverage = { id: number; city: string; zipcode: string; territory: string; totalPages: number; ranges: Array<{ pageStart: number; pageEnd: number | null }> }
     const zipcodes = new Map<number, ZipcodeCoverage>()
@@ -116,7 +133,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       month: requestedMonth,
       timeZone,
       personal: {
-        dailyActivity, totalActiveSeconds, activeDays: dailyActivity.length,
+        dailyActivity, yearlyActivity, totalActiveSeconds, yearlyActiveSeconds, activeDays: dailyActivity.length,
         currentStreak: activityStreak(dailyActivity, requestedMonth, today),
         submissions: Number(personal.submissions ?? 0), contactsSubmitted: Number(personal.contacts_submitted ?? 0),
         completedSegments: Number(personal.completed_segments ?? 0),
