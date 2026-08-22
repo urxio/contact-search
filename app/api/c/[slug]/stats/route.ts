@@ -17,8 +17,11 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     }
     const timeZone = validTimeZone(request.nextUrl.searchParams.get("timeZone") || "UTC")
     const args = [auth.congregation.id, auth.user.id, `${requestedMonth}-01`, timeZone]
+    const teamArgs = [auth.congregation.id, `${requestedMonth}-01`, timeZone]
     const period = `bucket_started_at >= ($3::date AT TIME ZONE $4) AND bucket_started_at < (($3::date + INTERVAL '1 month') AT TIME ZONE $4)`
     const datedPeriod = (column: string) => `${column} >= ($3::date AT TIME ZONE $4) AND ${column} < (($3::date + INTERVAL '1 month') AT TIME ZONE $4)`
+    const teamPeriod = `bucket_started_at >= ($2::date AT TIME ZONE $3) AND bucket_started_at < (($2::date + INTERVAL '1 month') AT TIME ZONE $3)`
+    const teamDatedPeriod = (column: string) => `${column} >= ($2::date AT TIME ZONE $3) AND ${column} < (($2::date + INTERVAL '1 month') AT TIME ZONE $3)`
 
     const [dailyResult, personalResult, teamResult, milestoneResult, assignedResult, availableResult, territoryResult, draftResult] = await Promise.all([
       pool.query(
@@ -34,14 +37,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       ),
       pool.query(
         `SELECT
-           (SELECT COALESCE(SUM(active_seconds),0)::int FROM search_activity_buckets WHERE congregation_id=$1 AND ${period}) active_seconds,
-           (SELECT COALESCE(SUM(contact_count),0)::int FROM submissions WHERE congregation_id=$1 AND ${datedPeriod("submitted_at")}) contacts_submitted,
-           (SELECT COUNT(*)::int FROM zt_segments WHERE congregation_id=$1 AND status='Completed' AND ${datedPeriod("updated_at")}) completed_segments,
+           (SELECT COALESCE(SUM(active_seconds),0)::int FROM search_activity_buckets WHERE congregation_id=$1 AND ${teamPeriod}) active_seconds,
+           (SELECT COALESCE(SUM(contact_count),0)::int FROM submissions WHERE congregation_id=$1 AND ${teamDatedPeriod("submitted_at")}) contacts_submitted,
+           (SELECT COUNT(*)::int FROM zt_segments WHERE congregation_id=$1 AND status='Completed' AND ${teamDatedPeriod("updated_at")}) completed_segments,
            (SELECT COUNT(DISTINCT user_id)::int FROM (
-              SELECT user_id FROM search_activity_buckets WHERE congregation_id=$1 AND ${period}
-              UNION SELECT owner_user_id FROM submissions WHERE congregation_id=$1 AND owner_user_id IS NOT NULL AND ${datedPeriod("submitted_at")}
-              UNION SELECT owner_user_id FROM zt_segments WHERE congregation_id=$1 AND owner_user_id IS NOT NULL AND status='Completed' AND ${datedPeriod("updated_at")}
-            ) contributors) contributors`, args,
+              SELECT user_id FROM search_activity_buckets WHERE congregation_id=$1 AND ${teamPeriod}
+              UNION SELECT owner_user_id FROM submissions WHERE congregation_id=$1 AND owner_user_id IS NOT NULL AND ${teamDatedPeriod("submitted_at")}
+              UNION SELECT owner_user_id FROM zt_segments WHERE congregation_id=$1 AND owner_user_id IS NOT NULL AND status='Completed' AND ${teamDatedPeriod("updated_at")}
+            ) contributors) contributors`, teamArgs,
       ),
       pool.query(
         `SELECT * FROM (
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
              FROM submissions s
              LEFT JOIN users u ON u.id=s.owner_user_id
              LEFT JOIN congregation_memberships m ON m.user_id=s.owner_user_id AND m.congregation_id=s.congregation_id
-            WHERE s.congregation_id=$1 AND ${datedPeriod("s.submitted_at")}
+            WHERE s.congregation_id=$1 AND ${teamDatedPeriod("s.submitted_at")}
            UNION ALL
            SELECT 'completion',s.updated_at,COALESCE(m.display_name,u.display_name,s.owner,'Member'),
                   NULL::int,z.zipcode,s.page_start,COALESCE(s.page_end,z.total_pages)
@@ -59,8 +62,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
              JOIN zt_zipcodes z ON z.id=s.zipcode_id AND z.congregation_id=s.congregation_id
              LEFT JOIN users u ON u.id=s.owner_user_id
              LEFT JOIN congregation_memberships m ON m.user_id=s.owner_user_id AND m.congregation_id=s.congregation_id
-            WHERE s.congregation_id=$1 AND s.status='Completed' AND ${datedPeriod("s.updated_at")}
-         ) events ORDER BY happened_at DESC LIMIT 8`, args,
+            WHERE s.congregation_id=$1 AND s.status='Completed' AND ${teamDatedPeriod("s.updated_at")}
+         ) events ORDER BY happened_at DESC LIMIT 8`, teamArgs,
       ),
       pool.query(
         `SELECT s.id,s.status,s.page_start,COALESCE(s.page_end,z.total_pages) page_end,s.stopped_at_page,
