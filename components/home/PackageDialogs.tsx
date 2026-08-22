@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Check, FileSpreadsheet, Lock, MoreHorizontal, PackageOpen, UserRound, Users, UsersRound } from "lucide-react"
+import { Archive, Check, FileSpreadsheet, MoreHorizontal, PackageOpen, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -60,6 +60,7 @@ type PackageRow = {
 
 type ZipcodeRow = { id: number; zipcode: string; city: string; total_pages: number }
 type MemberRow = { userId: number; displayName: string; congregationDisplayName?: string | null; status: string }
+type UploadAction = "start" | "save" | "share"
 
 type DraftPayload = {
   contacts?: unknown[]
@@ -109,11 +110,11 @@ export function PackageDialogs({
   const [zipcodes, setZipcodes] = useState<ZipcodeRow[]>([])
   const [packages, setPackages] = useState<PackageRow[]>([])
   const [name, setName] = useState("")
-  const [visibility, setVisibility] = useState<"shared" | "private">("shared")
   const [zipcode, setZipcode] = useState("")
   const [pageStart, setPageStart] = useState("")
   const [pageEnd, setPageEnd] = useState("")
   const [busy, setBusy] = useState(false)
+  const [uploadAction, setUploadAction] = useState<UploadAction | null>(null)
   const [loadingPackages, setLoadingPackages] = useState(false)
   const [packageToOpen, setPackageToOpen] = useState<PackageRow | null>(null)
   const [editingPackage, setEditingPackage] = useState<PackageRow | null>(null)
@@ -151,7 +152,6 @@ export function PackageDialogs({
   useEffect(() => {
     if (!pendingUpload) return
     setName(pendingUpload.filename.replace(/\.(xlsx?|xls)$/i, ""))
-    setVisibility("shared")
     setZipcode("")
     setPageStart("")
     setPageEnd("")
@@ -203,11 +203,14 @@ export function PackageDialogs({
     onDraftLoaded(draft)
   }
 
-  async function savePackage(startNow: boolean) {
+  async function savePackage(action: UploadAction) {
     if (!pendingUpload || !name.trim() || !zipcode || !pageStart || !pageEnd) {
       toast.error("Add an Excel name, ZIP code, and complete page range.")
       return
     }
+    const startNow = action === "start"
+    const visibility = action === "share" ? "shared" : "private"
+    setUploadAction(action)
     setBusy(true)
     try {
       const response = await fetch(api, {
@@ -234,16 +237,17 @@ export function PackageDialogs({
       if (startNow) applyDraft(result)
       onCancelUpload()
       toast.success(
-        startNow
-          ? "Excel saved and ready to search."
-          : visibility === "private"
-            ? "Private Excel saved to My Excels."
-            : "Excel saved for the congregation.",
+        action === "start"
+          ? "Excel is ready to search."
+          : action === "save"
+            ? "Excel saved to My Excels for later."
+            : "Excel shared with the congregation.",
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save Excel")
     } finally {
       setBusy(false)
+      setUploadAction(null)
     }
   }
 
@@ -359,7 +363,7 @@ export function PackageDialogs({
             </div>
             <DialogTitle className="text-base font-semibold">Prepare this Excel</DialogTitle>
             <DialogDescription className="text-sm font-normal leading-relaxed">
-              Add the Team Progress segment for these {pendingUpload?.contacts.length.toLocaleString() ?? 0} contacts.
+              Add the Team Progress segment for these {pendingUpload?.contacts.length.toLocaleString() ?? 0} contacts, then choose what happens next.
             </DialogDescription>
           </DialogHeader>
 
@@ -368,18 +372,6 @@ export function PackageDialogs({
               <Label htmlFor="package-name">Excel name</Label>
               <Input id="package-name" value={name} onChange={(event) => setName(event.target.value)} className="admin-field h-11 rounded-xl" />
             </div>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Who can find this Excel?</legend>
-              <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
-                {(["shared", "private"] as const).map((option) => (
-                  <button key={option} type="button" onClick={() => setVisibility(option)} aria-pressed={visibility === option}
-                    className={`flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-all duration-150 ease-out ${visibility === option ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                    {option === "shared" ? <Users className="h-4 w-4" aria-hidden="true" /> : <Lock className="h-4 w-4" aria-hidden="true" />}
-                    {option === "shared" ? "Congregation" : "Only me"}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
             <div className="space-y-2">
               <Label>ZIP code</Label>
               <Select value={zipcode} onValueChange={setZipcode}>
@@ -394,10 +386,14 @@ export function PackageDialogs({
             {selectedZip ? <p className="text-xs font-normal text-muted-foreground">Available pages: 1–{selectedZip.total_pages.toLocaleString()}</p> : null}
           </div>
 
-          <DialogFooter className="gap-2 sm:space-x-0">
-            <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(false)}>Save for later</Button>
-            <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage(true)}>{busy ? "Saving…" : "Start search"}</Button>
-          </DialogFooter>
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium">What would you like to do with this Excel?</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("start")}>{uploadAction === "start" ? "Starting…" : "Start working now"}</Button>
+              <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("save")}>{uploadAction === "save" ? "Saving…" : "Save for myself"}</Button>
+              <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("share")}>{uploadAction === "share" ? "Sharing…" : "Share with congregation"}</Button>
+            </div>
+          </fieldset>
         </DialogContent>
       </Dialog>
 
