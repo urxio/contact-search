@@ -290,7 +290,8 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                       {segments.map(seg => {
                         const isAvailablePackage = Boolean(seg.package_id && seg.package_visibility === "shared" && !seg.owner_user_id)
                         const isPrivatePackage = Boolean(seg.package_id && seg.package_visibility === "private" && !seg.owner_user_id)
-                        const displayOwner = seg.owner || (isPrivatePackage ? seg.package_uploader_name : "") || ""
+                        const displayOwner = seg.owner || seg.package_uploader_name || ""
+                        const displayOwnerIsUploader = !seg.owner && Boolean(seg.package_uploader_name)
                         const isOwner      = workspaceSlug
                           ? Boolean(seg.is_mine)
                           : Boolean(userName && displayOwner.toLowerCase().trim() === userName.toLowerCase().trim())
@@ -406,11 +407,14 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
 
                             {/* Owner */}
                             <td className="px-4 py-3">
-                              {isOwner ? (
-                                <span className="font-bold text-indigo-700 dark:text-indigo-300">{displayOwner}</span>
-                              ) : (
-                                <span className="text-gray-600 dark:text-gray-400">{displayOwner || "—"}</span>
-                              )}
+                              <div>
+                                {isOwner ? (
+                                  <span className="font-bold text-indigo-700 dark:text-indigo-300">{displayOwner}</span>
+                                ) : (
+                                  <span className="text-gray-600 dark:text-gray-400">{displayOwner || "—"}</span>
+                                )}
+                                {displayOwnerIsUploader ? <p className="mt-1 text-xs font-medium text-muted-foreground">Uploader</p> : null}
+                              </div>
                               {editErrors[seg.id] && <p role="alert" className="mt-2 max-w-56 text-xs font-medium text-red-600 dark:text-red-400">{editErrors[seg.id]}</p>}
                             </td>
 

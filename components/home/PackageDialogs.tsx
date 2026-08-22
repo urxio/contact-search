@@ -425,7 +425,13 @@ export function PackageDialogs({
                         const contactCount = value<number>(row, "contactCount", "contact_count") || 0
                         const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
                         const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
-                        const owner = row.segment?.owner || value<string>(row, "ownerName", "owner_name") || row.uploader?.displayName || row.uploaderName || "Unassigned"
+                        const assignedOwner = row.segment?.owner || value<string>(row, "ownerName", "owner_name")
+                        const uploader = row.uploader?.displayName || row.uploaderName
+                        const attribution = assignedOwner
+                          ? `Assigned to ${assignedOwner}`
+                          : uploader
+                            ? `Uploaded by ${uploader}`
+                            : "Uploader unavailable"
                         const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
                         const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
                         const packageStatus = row.state ? row.state.replace("_", " ") : row.status
@@ -436,7 +442,7 @@ export function PackageDialogs({
                               <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
                               <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
                               <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
-                              <p className="mt-1 text-xs font-normal text-muted-foreground">{owner}</p>
+                              <p className="mt-1 text-xs font-normal text-muted-foreground">{attribution}</p>
                             </div>
                             <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
                               <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
