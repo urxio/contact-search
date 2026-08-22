@@ -36,7 +36,7 @@ export default async function CongregationSettingsPage({ params }: { params: { s
           congregationDisplayName={access.membership?.displayName ?? access.user.displayName}
           hasMembership={Boolean(access.membership)}
           initialTheme={access.user.preferences?.theme ?? "light"}
-          initialDefaultWorkspaceView={access.user.preferences?.defaultWorkspaceView ?? "search"}
+          initialDefaultWorkspaceView={access.user.preferences?.defaultWorkspaceView === "team" ? "team" : "search"}
         />
         {canManage ? (
           <AdminSettingsCollapsible>

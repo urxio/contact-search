@@ -17,7 +17,7 @@ type SessionPayload = {
     isPlatformAdmin?: boolean
     is_platform_admin?: boolean
     preferences?: {
-      defaultWorkspaceView?: "search" | "team" | "stats"
+      defaultWorkspaceView?: "search" | "team"
     }
   }
   memberships?: Array<{
@@ -30,14 +30,14 @@ type SessionPayload = {
   }>
 }
 
-const viewSuffix = (view: "search" | "team" | "stats") => view === "team" ? "/team" : view === "stats" ? "/stats" : ""
+const viewSuffix = (view: "search" | "team") => view === "team" ? "/team" : ""
 
 export function WorkspacesList() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
-  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team" | "stats">("search")
+  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team">("search")
 
   useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })

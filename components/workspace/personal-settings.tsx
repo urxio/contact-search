@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { BarChart3, Check, KeyRound, Loader2, Moon, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
+import { Check, KeyRound, Loader2, Moon, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 
@@ -19,7 +19,7 @@ type PersonalSettingsProps = {
   congregationDisplayName: string
   hasMembership: boolean
   initialTheme: "light" | "dark"
-  initialDefaultWorkspaceView: "search" | "team" | "stats"
+  initialDefaultWorkspaceView: "search" | "team"
 }
 
 const tabClassName = "min-h-11 rounded-lg px-4 text-sm data-[state=active]:shadow-sm"
@@ -38,9 +38,9 @@ export function PersonalSettings({
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const [congregationDisplayName, setCongregationDisplayName] = useState(initialCongregationDisplayName)
   const [preferredTheme, setPreferredTheme] = useState<"light" | "dark">(initialTheme)
-  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team" | "stats">(initialDefaultWorkspaceView)
+  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team">(initialDefaultWorkspaceView)
   const [savedTheme, setSavedTheme] = useState<"light" | "dark">(initialTheme)
-  const [savedDefaultWorkspaceView, setSavedDefaultWorkspaceView] = useState<"search" | "team" | "stats">(initialDefaultWorkspaceView)
+  const [savedDefaultWorkspaceView, setSavedDefaultWorkspaceView] = useState<"search" | "team">(initialDefaultWorkspaceView)
   const [preferenceStatus, setPreferenceStatus] = useState<"idle" | "saved" | "error">("idle")
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPreferences, setSavingPreferences] = useState(false)
@@ -209,11 +209,11 @@ export function PersonalSettings({
 
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Default workspace page</legend>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {(["search", "team", "stats"] as const).map((view) => (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(["search", "team"] as const).map((view) => (
                     <button key={view} type="button" aria-pressed={defaultWorkspaceView === view} onClick={() => setDefaultWorkspaceView(view)} className={cn(choiceClassName, defaultWorkspaceView === view ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
-                      {view === "search" ? <Search className="h-5 w-5" aria-hidden="true" /> : view === "team" ? <UsersRound className="h-5 w-5" aria-hidden="true" /> : <BarChart3 className="h-5 w-5" aria-hidden="true" />}
-                      <span className="flex-1">{view === "search" ? "Search" : view === "team" ? "Team Progress" : "Stats"}</span>
+                      {view === "search" ? <Search className="h-5 w-5" aria-hidden="true" /> : <UsersRound className="h-5 w-5" aria-hidden="true" />}
+                      <span className="flex-1">{view === "search" ? "Search" : "Team Progress"}</span>
                       {defaultWorkspaceView === view ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
                     </button>
                   ))}

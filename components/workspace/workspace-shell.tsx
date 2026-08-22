@@ -61,9 +61,7 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
   const pathname = usePathname()
   const searchHref = `/c/${slug}`
   const teamHref = `/c/${slug}/team`
-  const statsHref = `/c/${slug}/stats`
   const isTeam = pathname === teamHref || pathname.startsWith(`${teamHref}/`)
-  const isStats = pathname === statsHref
   const isSearch = pathname === searchHref
 
   return (
@@ -98,18 +96,6 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         <UsersRound className="h-4 w-4" aria-hidden="true" />
         Team Progress
       </Link>
-      <Link
-        href={statsHref}
-        aria-current={isStats ? "page" : undefined}
-        className={cn(
-          "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          compact && "w-full justify-start",
-          isStats && "bg-background text-foreground shadow-sm",
-        )}
-      >
-        <BarChart3 className="h-4 w-4" aria-hidden="true" />
-        Stats
-      </Link>
     </nav>
   )
 }
@@ -123,7 +109,7 @@ export function WorkspaceShell({
   const router = useRouter()
   const canAdmin = activeWorkspace.role === "admin" || account.isPlatformAdmin
   const workspaceHref = (workspace: WorkspaceSummary) => {
-    const suffix = account.defaultWorkspaceView === "team" ? "/team" : account.defaultWorkspaceView === "stats" ? "/stats" : ""
+    const suffix = account.defaultWorkspaceView === "team" ? "/team" : ""
     return `/c/${workspace.slug}${suffix}`
   }
 
@@ -226,6 +212,12 @@ export function WorkspaceShell({
                       Workspace settings
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
+                    <Link href={`/c/${activeWorkspace.slug}/stats`}>
+                      <BarChart3 aria-hidden="true" />
+                      Stats
+                    </Link>
+                  </DropdownMenuItem>
                   {account.isPlatformAdmin ? (
                     <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
                       <Link href="/platform">
@@ -276,7 +268,13 @@ export function WorkspaceShell({
                       <SheetClose asChild>
                         <Link href={`/c/${activeWorkspace.slug}/settings`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <Settings className="h-4 w-4" aria-hidden="true" />
-                          Settings
+                          Workspace settings
+                        </Link>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Link href={`/c/${activeWorkspace.slug}/stats`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                          Stats
                         </Link>
                       </SheetClose>
                       <button type="button" onClick={signOut} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 text-sm font-medium text-destructive transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

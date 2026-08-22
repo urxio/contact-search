@@ -14,7 +14,7 @@ type SessionPayload = {
     isPlatformAdmin?: boolean
     is_platform_admin?: boolean
     preferences?: {
-      defaultWorkspaceView?: "search" | "team" | "stats"
+      defaultWorkspaceView?: "search" | "team"
     }
   }
   memberships?: Array<{
@@ -51,7 +51,7 @@ export function WorkspaceShellLoader({ slug, fallbackName, children }: Workspace
 
   useEffect(() => {
     function updatePreferences(event: Event) {
-      const preferences = (event as CustomEvent<{ defaultWorkspaceView?: "search" | "team" | "stats" }>).detail
+      const preferences = (event as CustomEvent<{ defaultWorkspaceView?: "search" | "team" }>).detail
       if (!preferences?.defaultWorkspaceView) return
       setSession((current) => current?.user
         ? {

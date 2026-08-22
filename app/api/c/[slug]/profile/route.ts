@@ -5,7 +5,7 @@ import { pool } from "@/lib/db"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../_shared"
 
 const validTheme = new Set(["light", "dark"])
-const validWorkspaceView = new Set(["search", "team", "stats"])
+const validWorkspaceView = new Set(["search", "team"])
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   try {
@@ -55,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
     if (body.preferences?.defaultWorkspaceView !== undefined) {
       if (!validWorkspaceView.has(body.preferences.defaultWorkspaceView)) {
-        return NextResponse.json({ error: "Default workspace view must be Search, Team Progress, or Stats." }, { status: 400 })
+        return NextResponse.json({ error: "Default workspace view must be Search or Team Progress." }, { status: 400 })
       }
       preferences.defaultWorkspaceView = body.preferences.defaultWorkspaceView
     }
