@@ -215,7 +215,7 @@ export function WorkspaceShell({
                   <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
                     <Link href={`/c/${activeWorkspace.slug}/stats`}>
                       <BarChart3 aria-hidden="true" />
-                      Stats
+                      My stats
                     </Link>
                   </DropdownMenuItem>
                   {canAdmin ? (
@@ -285,7 +285,7 @@ export function WorkspaceShell({
                       <SheetClose asChild>
                         <Link href={`/c/${activeWorkspace.slug}/stats`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                          Stats
+                          My stats
                         </Link>
                       </SheetClose>
                       {canAdmin ? (

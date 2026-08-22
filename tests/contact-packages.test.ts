@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { freshDraftContacts, sanitizePackageContacts, serializePackage } from "@/lib/contact-packages"
+import { freshDraftContacts, isPackageBrowsable, sanitizePackageContacts, serializePackage } from "@/lib/contact-packages"
 
 describe("contact packages", () => {
   it("stores only reusable contact fields", () => {
@@ -37,5 +37,14 @@ describe("contact packages", () => {
     expect(value.canOpen).toBe(true)
     expect(value.canManage).toBe(false)
     expect(value).not.toHaveProperty("contacts")
+  })
+
+  it("hides assigned shared Excels except for an assignee's direct handoff", () => {
+    const assigned = { id: 14, visibility: "shared", owner_user_id: 22 }
+    expect(isPackageBrowsable(assigned, 22)).toBe(false)
+    expect(isPackageBrowsable(assigned, 99)).toBe(false)
+    expect(isPackageBrowsable(assigned, 22, 14)).toBe(true)
+    expect(isPackageBrowsable(assigned, 99, 14)).toBe(false)
+    expect(isPackageBrowsable({ ...assigned, owner_user_id: null }, 99)).toBe(true)
   })
 })

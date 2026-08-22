@@ -115,6 +115,12 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
   }
 }
 
+export function isPackageBrowsable(row: any, viewerUserId: number, includedPackageId?: number | null) {
+  if (row.visibility !== "shared") return true
+  if (row.owner_user_id == null) return true
+  return Number(row.id) === includedPackageId && Number(row.owner_user_id) === viewerUserId
+}
+
 export const PACKAGE_SELECT = `
   SELECT cp.id,cp.name,cp.visibility,cp.original_filename,cp.contact_count,cp.contacts,
          cp.uploaded_by_user_id,cp.created_at,cp.updated_at,u.display_name uploader_name,

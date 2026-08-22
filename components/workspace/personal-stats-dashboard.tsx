@@ -89,10 +89,10 @@ export function PersonalStatsDashboard({ slug }: { slug: string }) {
     try {
       const response = await fetch(`/api/c/${encodeURIComponent(slug)}/stats?month=${month}&timeZone=${encodeURIComponent(timeZone)}`, { cache: "no-store" })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Stats could not be loaded.")
+      if (!response.ok) throw new Error(result.error || "My stats could not be loaded.")
       setData(result)
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Stats could not be loaded.")
+      setError(loadError instanceof Error ? loadError.message : "My stats could not be loaded.")
     } finally {
       setLoading(false)
     }
@@ -109,14 +109,14 @@ export function PersonalStatsDashboard({ slug }: { slug: string }) {
   }
 
   return (
-    <PageFrame eyebrow="Your workspace" title="Stats" description="Your focused search time, simply tracked." className="max-w-3xl">
+    <PageFrame eyebrow="Your workspace" title="My stats" description="Your focused search time, simply tracked." className="max-w-3xl">
       {loading && !data ? (
         <Skeleton className="mx-auto h-96 max-w-2xl rounded-2xl" aria-label="Loading stats" />
       ) : error && !data ? (
         <Card className="admin-material mx-auto max-w-2xl rounded-2xl">
           <CardContent className="flex flex-col items-center p-10 text-center">
             <RefreshCw className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            <p className="mt-4 text-base font-semibold">Stats are temporarily unavailable</p>
+            <p className="mt-4 text-base font-semibold">My stats are temporarily unavailable</p>
             <p className="mt-2 text-sm font-normal leading-relaxed text-muted-foreground">{error}</p>
             <Button className="mt-6 min-h-11 rounded-xl" onClick={() => void load()}>Try again</Button>
           </CardContent>

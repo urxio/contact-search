@@ -377,7 +377,7 @@ function DeleteZipcodeDialog({ row, apiBase, onClose, onDeleted }: { row: Zipcod
 }
 
 // ── My Segments Panel ─────────────────────────────────────────────────────────
-function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", teamHref = "/territories" }: { userName: string; canManage: boolean; apiBase?: string; teamHref?: string }) {
+function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", teamHref = "/territories", searchHref = "/" }: { userName: string; canManage: boolean; apiBase?: string; teamHref?: string; searchHref?: string }) {
   const [segments, setSegments]           = useState<MySegment[]>([])
   const [loading, setLoading]             = useState(true)
   const [editing, setEditing]             = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
@@ -455,6 +455,7 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
   const notStarted = segments.filter(s => s.status === "Not started")
   const completed  = segments.filter(s => s.status === "Completed")
   const active     = [...inProgress, ...notStarted]
+  const showActions = canManage || active.some(segment => Boolean(segment.package_id))
 
   const renderSegRow = (seg: MySegment) => {
     const isEditing    = !!editing[seg.id]
@@ -511,8 +512,14 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
         <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
           {timeAgo(seg.updated_at)}
         </td>
-        {canManage ? <td className="px-4 py-3">
-          {isEditing ? (
+        {showActions ? <td className="px-4 py-3">
+          <div className="flex items-center justify-end gap-2">
+          {seg.package_id && seg.status !== "Completed" && !isEditing && !isConfirming ? (
+            <Link href={`${searchHref}?package=${seg.package_id}`} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              {seg.status === "In progress" ? "Continue" : "Start"}
+            </Link>
+          ) : null}
+          {canManage ? isEditing ? (
             <div className="flex gap-1.5">
               <button onClick={() => saveEdit(seg.id)} disabled={isSaving}
                 className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors">
@@ -549,7 +556,8 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
                 {isAssignedPackage ? "Unassign" : "Delete"}
               </button> : null}
             </div>
-          )}
+          ) : null}
+          </div>
         </td> : null}
       </tr>
     )
@@ -580,7 +588,7 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Pages</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2.5 text-sm font-semibold text-gray-400 uppercase tracking-wide">Updated</th>
-                {canManage ? <th className="px-4 py-2"><span className="sr-only">Actions</span></th> : null}
+                {showActions ? <th className="px-4 py-2"><span className="sr-only">Actions</span></th> : null}
               </tr>
             </thead>
             <tbody>
@@ -641,6 +649,7 @@ export default function Home() {
 
   const apiBase = workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/team` : "/api/territories"
   const teamHref = workspaceSlug ? `/c/${workspaceSlug}/team` : "/territories"
+  const searchHref = workspaceSlug ? `/c/${workspaceSlug}` : "/"
   const userStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:user` : "userId"
   const territoryStorageKey = workspaceSlug ? `team-progress:${workspaceSlug}:territory` : "zt_territory"
 
@@ -797,7 +806,7 @@ export default function Home() {
         </div>
 
         {/* My segments — only shown when signed in */}
-        {hydrated && userName && <MySegmentsPanel userName={userName} canManage={canManage} apiBase={apiBase} teamHref={teamHref} />}
+        {hydrated && userName && <MySegmentsPanel userName={userName} canManage={canManage} apiBase={apiBase} teamHref={teamHref} searchHref={searchHref} />}
 
         {/* Loading spinner */}
         {loading && (

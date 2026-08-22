@@ -4,15 +4,16 @@ import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/aut
 import { apiError, assertMultiTenantEnabled, canManageAll, integer, RouteContext } from "../../_shared"
 import {
   DraftConflictError, insertPackageAudit, PACKAGE_SELECT, replaceDraft, sanitizePackageContacts,
-  serializePackage, validatePackageName, validateVisibility,
+  isPackageBrowsable, serializePackage, validatePackageName, validateVisibility,
 } from "@/lib/contact-packages"
 import { assertNoSegmentConflict, SegmentConflictError } from "@/lib/team-segments"
 
-export async function GET(_req: NextRequest, { params }: RouteContext) {
+export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
     const manageAll = canManageAll(auth)
+    const includedPackageId = integer(req.nextUrl.searchParams.get("include"))
     const result = await pool.query(
       `${PACKAGE_SELECT}
         WHERE cp.congregation_id=$1
@@ -20,7 +21,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
         ORDER BY cp.created_at DESC,cp.id DESC`,
       [auth.congregation.id, manageAll, auth.user.id],
     )
-    return NextResponse.json({ packages: result.rows.map(row => serializePackage(row, auth.user.id, manageAll)) })
+    return NextResponse.json({
+      packages: result.rows
+        .filter(row => isPackageBrowsable(row, auth.user.id, includedPackageId))
+        .map(row => serializePackage(row, auth.user.id, manageAll)),
+    })
   } catch (error) { return apiError(error) }
 }
 
