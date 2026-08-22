@@ -41,6 +41,7 @@ import { BatchActionBar } from "@/components/home/BatchActionBar"
 import { ContactTable } from "@/components/home/ContactTable"
 import { ContactGrid } from "@/components/home/ContactGrid"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
+import { useSearchActivity } from "@/hooks/use-search-activity"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -123,12 +124,14 @@ export default function SearchHelper({
   authenticatedUserId = authenticatedUserId ?? workspace?.authenticatedUserId
   authenticatedDisplayName = authenticatedDisplayName ?? workspace?.authenticatedDisplayName
   embedded = embedded || workspace?.embedded === true
+  useSearchActivity(workspaceSlug)
   const [contacts, setContacts] = useState<EnhancedContact[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fileUploaded, setFileUploaded] = useState(false)
   const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
+  const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
@@ -187,6 +190,14 @@ export default function SearchHelper({
 
   // useRef hook for the file input
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!workspaceSlug) return
+    const packageId = Number(new URLSearchParams(window.location.search).get("package"))
+    const browsePackages = new URLSearchParams(window.location.search).get("browse") === "excels"
+    if (Number.isSafeInteger(packageId) && packageId > 0) setPreferredPackageId(packageId)
+    if ((Number.isSafeInteger(packageId) && packageId > 0) || browsePackages) setPackageBrowserOpen(true)
+  }, [workspaceSlug])
   const storagePrefix = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
@@ -1706,6 +1717,7 @@ export default function SearchHelper({
           draftRevision={draftRevision}
           hasDraft={contacts.length > 0}
           browseOpen={packageBrowserOpen}
+          preferredPackageId={preferredPackageId}
           onBrowseOpenChange={setPackageBrowserOpen}
           onCancelUpload={() => {
             setPendingPackageUpload(null)

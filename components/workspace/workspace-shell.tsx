@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Building2,
+  BarChart3,
   Check,
   ChevronDown,
   CircleUserRound,
@@ -60,7 +61,9 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
   const pathname = usePathname()
   const searchHref = `/c/${slug}`
   const teamHref = `/c/${slug}/team`
+  const statsHref = `/c/${slug}/stats`
   const isTeam = pathname === teamHref || pathname.startsWith(`${teamHref}/`)
+  const isStats = pathname === statsHref
   const isSearch = pathname === searchHref
 
   return (
@@ -95,6 +98,18 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         <UsersRound className="h-4 w-4" aria-hidden="true" />
         Team Progress
       </Link>
+      <Link
+        href={statsHref}
+        aria-current={isStats ? "page" : undefined}
+        className={cn(
+          "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          compact && "w-full justify-start",
+          isStats && "bg-background text-foreground shadow-sm",
+        )}
+      >
+        <BarChart3 className="h-4 w-4" aria-hidden="true" />
+        Personal Stats
+      </Link>
     </nav>
   )
 }
@@ -107,8 +122,10 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const router = useRouter()
   const canAdmin = activeWorkspace.role === "admin" || account.isPlatformAdmin
-  const workspaceHref = (workspace: WorkspaceSummary) =>
-    `/c/${workspace.slug}${account.defaultWorkspaceView === "team" ? "/team" : ""}`
+  const workspaceHref = (workspace: WorkspaceSummary) => {
+    const suffix = account.defaultWorkspaceView === "team" ? "/team" : account.defaultWorkspaceView === "stats" ? "/stats" : ""
+    return `/c/${workspace.slug}${suffix}`
+  }
 
   async function signOut() {
     await fetch("/api/auth/sign-out", { method: "POST" }).catch(() => undefined)
@@ -169,7 +186,7 @@ export function WorkspaceShell({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <div className="mx-auto hidden md:block">
+            <div className="mx-auto hidden lg:block">
               <WorkspaceNav slug={activeWorkspace.slug} />
             </div>
 
@@ -227,7 +244,7 @@ export function WorkspaceShell({
 
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl md:hidden" aria-label="Open workspace menu">
+                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl lg:hidden" aria-label="Open workspace menu">
                     <Menu aria-hidden="true" />
                   </Button>
                 </SheetTrigger>

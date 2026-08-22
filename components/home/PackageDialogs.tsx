@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Archive, Check, FileSpreadsheet, Lock, MoreHorizontal, PackageOpen, Users } from "lucide-react"
 import { toast } from "sonner"
 
@@ -76,6 +76,7 @@ type Props = {
   draftRevision: number
   hasDraft: boolean
   browseOpen: boolean
+  preferredPackageId?: number | null
   onBrowseOpenChange: (open: boolean) => void
   onCancelUpload: () => void
   onDraftLoaded: (draft: DraftPayload) => void
@@ -92,6 +93,7 @@ export function PackageDialogs({
   draftRevision,
   hasDraft,
   browseOpen,
+  preferredPackageId,
   onBrowseOpenChange,
   onCancelUpload,
   onDraftLoaded,
@@ -115,6 +117,7 @@ export function PackageDialogs({
   const [assignedUserId, setAssignedUserId] = useState("")
   const [editName, setEditName] = useState("")
   const [editVisibility, setEditVisibility] = useState<"shared" | "private">("shared")
+  const handledPreferredPackage = useRef<number | null>(null)
 
   const selectedZip = useMemo(() => zipcodes.find((item) => item.zipcode === zipcode), [zipcode, zipcodes])
 
@@ -152,6 +155,18 @@ export function PackageDialogs({
   useEffect(() => {
     if (browseOpen) void refreshPackages()
   }, [browseOpen])
+
+  useEffect(() => {
+    if (!preferredPackageId || handledPreferredPackage.current === preferredPackageId || loadingPackages) return
+    const preferred = packages.find((row) => row.id === preferredPackageId)
+    if (!preferred) return
+    handledPreferredPackage.current = preferredPackageId
+    onBrowseOpenChange(false)
+    setPackageToOpen(preferred)
+    const url = new URL(window.location.href)
+    url.searchParams.delete("package")
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`)
+  }, [loadingPackages, onBrowseOpenChange, packages, preferredPackageId])
 
   function applyDraft(result: any) {
     const draft = result.draft ?? result

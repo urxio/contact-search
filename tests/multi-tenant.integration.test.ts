@@ -106,7 +106,34 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 4, name: "normalized tenant identities" },
       { version: 5, name: "member preferences" },
       { version: 6, name: "contact package library" },
+      { version: 7, name: "personal search activity" },
     ])
+  })
+
+  it("isolates and deduplicates search activity buckets by congregation", async () => {
+    const bucket = "2026-08-21T12:00:00.000Z"
+    await pool.query(
+      `INSERT INTO search_activity_buckets(congregation_id,user_id,bucket_started_at,active_seconds)
+       VALUES($1,$2,$3,10),($4,$2,$3,20)`,
+      [centralId, firstUserId, bucket, secondId],
+    )
+    await pool.query(
+      `INSERT INTO search_activity_buckets(congregation_id,user_id,bucket_started_at,active_seconds)
+       VALUES($1,$2,$3,25)
+       ON CONFLICT(congregation_id,user_id,bucket_started_at) DO UPDATE
+       SET active_seconds=GREATEST(search_activity_buckets.active_seconds,EXCLUDED.active_seconds)`,
+      [centralId, firstUserId, bucket],
+    )
+    const central = await pool.query(
+      `SELECT active_seconds FROM search_activity_buckets WHERE congregation_id=$1 AND user_id=$2`,
+      [centralId, firstUserId],
+    )
+    const second = await pool.query(
+      `SELECT active_seconds FROM search_activity_buckets WHERE congregation_id=$1 AND user_id=$2`,
+      [secondId, firstUserId],
+    )
+    expect(central.rows).toEqual([{ active_seconds: 25 }])
+    expect(second.rows).toEqual([{ active_seconds: 20 }])
   })
 
   it("backfills legacy submissions and normalized identities into Central French Alexandria", async () => {

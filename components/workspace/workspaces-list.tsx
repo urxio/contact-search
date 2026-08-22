@@ -17,7 +17,7 @@ type SessionPayload = {
     isPlatformAdmin?: boolean
     is_platform_admin?: boolean
     preferences?: {
-      defaultWorkspaceView?: "search" | "team"
+      defaultWorkspaceView?: "search" | "team" | "stats"
     }
   }
   memberships?: Array<{
@@ -30,12 +30,14 @@ type SessionPayload = {
   }>
 }
 
+const viewSuffix = (view: "search" | "team" | "stats") => view === "team" ? "/team" : view === "stats" ? "/stats" : ""
+
 export function WorkspacesList() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
-  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team">("search")
+  const [defaultWorkspaceView, setDefaultWorkspaceView] = useState<"search" | "team" | "stats">("search")
 
   useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })
@@ -54,7 +56,7 @@ export function WorkspacesList() {
         setDefaultWorkspaceView(preferredView)
         setWorkspaces(nextWorkspaces)
         if (!platformAdmin && nextWorkspaces.length === 1) {
-          router.replace(`/c/${nextWorkspaces[0].slug}${preferredView === "team" ? "/team" : ""}`)
+          router.replace(`/c/${nextWorkspaces[0].slug}${viewSuffix(preferredView)}`)
         }
       })
       .catch(() => setWorkspaces([]))
@@ -106,7 +108,7 @@ export function WorkspacesList() {
       {workspaces.length ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {workspaces.map((workspace) => (
-            <Link key={workspace.slug} href={`/c/${workspace.slug}${defaultWorkspaceView === "team" ? "/team" : ""}`} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <Link key={workspace.slug} href={`/c/${workspace.slug}${viewSuffix(defaultWorkspaceView)}`} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <Card className="admin-card h-full rounded-2xl group-hover:-translate-y-px">
                 <CardContent className="flex min-h-32 items-center gap-4 p-6">
                   <CongregationMark name={workspace.name} className="h-12 w-12 text-base" />

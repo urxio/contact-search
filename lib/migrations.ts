@@ -112,6 +112,20 @@ const migrations: Migration[] = [{
     await client.query(`CREATE INDEX contact_packages_tenant_date_idx ON contact_packages(congregation_id,created_at DESC)`)
     await client.query(`CREATE INDEX contact_packages_uploader_idx ON contact_packages(congregation_id,uploaded_by_user_id)`)
   }
+},{
+  version:7,name:"personal search activity",async run(client){
+    await client.query(`CREATE TABLE search_activity_buckets (
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      bucket_started_at TIMESTAMPTZ NOT NULL,
+      active_seconds SMALLINT NOT NULL CHECK(active_seconds BETWEEN 1 AND 30),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(congregation_id,user_id,bucket_started_at)
+    )`)
+    await client.query(`CREATE INDEX search_activity_user_date_idx ON search_activity_buckets(congregation_id,user_id,bucket_started_at DESC)`)
+    await client.query(`CREATE INDEX search_activity_team_date_idx ON search_activity_buckets(congregation_id,bucket_started_at DESC)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
