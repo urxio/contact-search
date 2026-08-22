@@ -1,8 +1,13 @@
 export const ADMIN_CONTACT_STATUSES = ["Potentially French", "Not French", "Duplicate"] as const
 export const ADMIN_CHECKED_SOURCES = ["forebears", "truePeopleSearch"] as const
+export const ADMIN_EDITABLE_CONTACT_FIELDS = [
+  "firstName", "lastName", "fullName", "address", "city", "zipcode", "phone", "notes",
+] as const
 
 export type AdminContactStatus = (typeof ADMIN_CONTACT_STATUSES)[number]
 export type AdminCheckedSource = (typeof ADMIN_CHECKED_SOURCES)[number]
+export type AdminEditableContactField = (typeof ADMIN_EDITABLE_CONTACT_FIELDS)[number]
+export type AdminContactEdits = Partial<Record<AdminEditableContactField, string>>
 
 type DatabaseClient = {
   query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }>
@@ -14,6 +19,7 @@ export type AdminContactMutation = ContactRef & {
   congregationId?: number
   status?: AdminContactStatus
   checkedSource?: AdminCheckedSource
+  fields?: AdminContactEdits
 }
 
 export type SubmissionCounters = {
@@ -29,6 +35,17 @@ const CHECKED_SOURCE_FIELDS: Record<AdminCheckedSource, string> = {
   truePeopleSearch: "checkedOnTPS",
 }
 
+const CONTACT_FIELD_LIMITS: Record<AdminEditableContactField, number> = {
+  firstName: 200,
+  lastName: 200,
+  fullName: 200,
+  address: 300,
+  city: 100,
+  zipcode: 20,
+  phone: 50,
+  notes: 2000,
+}
+
 export function isAdminContactStatus(value: unknown): value is AdminContactStatus {
   return ADMIN_CONTACT_STATUSES.includes(value as AdminContactStatus)
 }
@@ -37,8 +54,19 @@ export function isAdminCheckedSource(value: unknown): value is AdminCheckedSourc
   return ADMIN_CHECKED_SOURCES.includes(value as AdminCheckedSource)
 }
 
-function scopeClause(congregationId?: number) {
-  return congregationId === undefined ? "" : " AND congregation_id = $5"
+export function parseAdminContactEdits(value: unknown): AdminContactEdits | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (!entries.length) return null
+  const allowed = new Set<string>(ADMIN_EDITABLE_CONTACT_FIELDS)
+  if (entries.some(([key, fieldValue]) => !allowed.has(key) || typeof fieldValue !== "string" || fieldValue.length > CONTACT_FIELD_LIMITS[key as AdminEditableContactField])) {
+    return null
+  }
+  return Object.fromEntries(entries) as AdminContactEdits
+}
+
+function scopeClause(congregationId: number | undefined, position: number) {
+  return congregationId === undefined ? "" : ` AND congregation_id = $${position}`
 }
 
 function scopeValues(congregationId?: number) {
@@ -49,19 +77,26 @@ export async function updateSubmissionContact(
   client: DatabaseClient,
   mutation: AdminContactMutation,
 ): Promise<{ contact: Record<string, unknown>; counters: SubmissionCounters } | null> {
-  const property = mutation.status ? "status" : CHECKED_SOURCE_FIELDS[mutation.checkedSource!]
-  const value: string | boolean = mutation.status ?? true
-  const valueExpression = mutation.status ? "$4::text" : "$4::boolean"
+  const fieldUpdate = mutation.fields ? JSON.stringify(mutation.fields) : null
+  const property = mutation.status ? "status" : mutation.checkedSource ? CHECKED_SOURCE_FIELDS[mutation.checkedSource] : null
+  const value: string | boolean | null = mutation.status ?? (mutation.checkedSource ? true : null)
+  const mergeExpression = fieldUpdate
+    ? "$3::jsonb"
+    : `jsonb_build_object($3::text, ${mutation.status ? "$4::text" : "$4::boolean"})`
+  const values = fieldUpdate
+    ? [mutation.submissionId, mutation.contactId, fieldUpdate, ...scopeValues(mutation.congregationId)]
+    : [mutation.submissionId, mutation.contactId, property, value, ...scopeValues(mutation.congregationId)]
+  const congregationParameter = fieldUpdate ? 4 : 5
   const result = await client.query(
     `UPDATE submissions SET contacts = (
        SELECT COALESCE(jsonb_agg(CASE WHEN elem->>'id' = $2
-         THEN elem || jsonb_build_object($3::text, ${valueExpression}) ELSE elem END), '[]'::jsonb)
+         THEN elem || ${mergeExpression} ELSE elem END), '[]'::jsonb)
        FROM jsonb_array_elements(contacts) elem
      )
-     WHERE id = $1${scopeClause(mutation.congregationId)}
+     WHERE id = $1${scopeClause(mutation.congregationId, congregationParameter)}
        AND EXISTS (SELECT 1 FROM jsonb_array_elements(contacts) elem WHERE elem->>'id' = $2)
      RETURNING contacts`,
-    [mutation.submissionId, mutation.contactId, property, value, ...scopeValues(mutation.congregationId)],
+    values,
   )
   if (!result.rows[0]) return null
 

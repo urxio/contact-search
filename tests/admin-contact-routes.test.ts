@@ -113,6 +113,30 @@ describe("congregation admin contact review route", () => {
     expect(mocks.clientQuery).toHaveBeenCalledWith("ROLLBACK")
   })
 
+  it("persists validated contact information and audits field names only", async () => {
+    const fields = { fullName: "Marie Martin", address: "10 Main St", notes: "Reviewed" }
+    const { PATCH } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await PATCH(patchRequest("https://search.example/api/c/central/admin/submissions", {
+      id: 41, contactId: "contact-1", fields,
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(200)
+    expect(mocks.updateSubmissionContact).toHaveBeenCalledWith(expect.anything(), {
+      submissionId: 41, congregationId: 34, contactId: "contact-1", fields,
+    })
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: { fields: ["fullName", "address", "notes"] },
+    }))
+  })
+
+  it("rejects unknown contact fields", async () => {
+    const { PATCH } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await PATCH(patchRequest("https://search.example/api/c/central/admin/submissions", {
+      id: 41, contactId: "contact-1", fields: { status: "Duplicate" },
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(400)
+    expect(mocks.updateSubmissionContact).not.toHaveBeenCalled()
+  })
+
   it("requires congregation-admin authorization", async () => {
     mocks.requireCongregationAdmin.mockRejectedValueOnce(new AuthError(404, "Workspace not found"))
     const { PATCH } = await import("@/app/api/c/[slug]/admin/submissions/route")

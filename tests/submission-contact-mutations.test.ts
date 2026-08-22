@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { updateSubmissionContact } from "@/lib/submission-contacts"
+import { parseAdminContactEdits, updateSubmissionContact } from "@/lib/submission-contacts"
 
 const counters = {
   contact_count: 2,
@@ -52,6 +52,25 @@ describe("submission contact mutations", () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE submissions s SET"))).toBe(false)
   })
 
+  it("merges editable contact fields without rewriting cached counters", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ contacts: [{ id: "contact-1", fullName: "Marie Martin", city: "Alexandria" }] }] })
+      .mockResolvedValueOnce({ rows: [counters] })
+
+    const result = await updateSubmissionContact({ query }, {
+      submissionId: 41,
+      congregationId: 9,
+      contactId: "contact-1",
+      fields: { fullName: "Marie Martin", city: "Alexandria" },
+    })
+
+    expect(result?.contact).toEqual({ id: "contact-1", fullName: "Marie Martin", city: "Alexandria" })
+    expect(query).toHaveBeenCalledTimes(2)
+    expect(query.mock.calls[0][0]).toContain("elem || $3::jsonb")
+    expect(query.mock.calls[0][0]).toContain("congregation_id = $4")
+    expect(query.mock.calls[0][1]).toEqual([41, "contact-1", JSON.stringify({ fullName: "Marie Martin", city: "Alexandria" }), 9])
+  })
+
   it("returns null without touching counters when the scoped contact is absent", async () => {
     const query = vi.fn().mockResolvedValueOnce({ rows: [] })
     await expect(updateSubmissionContact({ query }, {
@@ -61,5 +80,13 @@ describe("submission contact mutations", () => {
       status: "Duplicate",
     })).resolves.toBeNull()
     expect(query).toHaveBeenCalledOnce()
+  })
+
+  it("accepts only known string contact fields within their limits", () => {
+    expect(parseAdminContactEdits({ fullName: "Marie Martin", notes: "Reviewed" })).toEqual({ fullName: "Marie Martin", notes: "Reviewed" })
+    expect(parseAdminContactEdits({ status: "Duplicate" })).toBeNull()
+    expect(parseAdminContactEdits({ phone: 123 })).toBeNull()
+    expect(parseAdminContactEdits({ notes: "x".repeat(2001) })).toBeNull()
+    expect(parseAdminContactEdits({})).toBeNull()
   })
 })

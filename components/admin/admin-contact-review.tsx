@@ -1,15 +1,20 @@
 "use client"
 
 import React, { type ReactNode, useMemo, useState } from "react"
-import { Globe, Search } from "lucide-react"
+import { Globe, Pencil, Search, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ADMIN_CONTACT_STATUSES,
+  type AdminContactEdits,
   type AdminCheckedSource,
   type AdminContactStatus,
 } from "@/lib/submission-contacts"
@@ -59,6 +64,11 @@ function normalizeSurname(lastName: string) {
 export function AdminContactReview({ submissionId, initialContacts, apiUrl, children }: Props) {
   const [contacts, setContacts] = useState(initialContacts)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
+  const [searchText, setSearchText] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [editingContact, setEditingContact] = useState<AdminReviewContact | null>(null)
+  const [editFields, setEditFields] = useState<AdminContactEdits>({})
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const metrics = useMemo(() => ({
     total: contacts.length,
@@ -68,7 +78,18 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
     unchecked: contacts.filter((contact) => contact.status === "Not checked").length,
   }), [contacts])
 
-  async function saveContact(contact: AdminReviewContact, update: { status: AdminContactStatus } | { checkedSource: AdminCheckedSource }) {
+  const availableStatuses = useMemo(() => Array.from(new Set(contacts.map((contact) => contact.status || "Not checked"))).sort(), [contacts])
+  const visibleContacts = useMemo(() => {
+    const query = searchText.trim().toLowerCase()
+    return contacts.filter((contact) => {
+      if (statusFilter !== "all" && (contact.status || "Not checked") !== statusFilter) return false
+      if (!query) return true
+      return [contact.fullName, contact.firstName, contact.lastName, contact.address, contact.city, contact.zipcode, contact.phone, contact.notes]
+        .some((value) => value?.toLowerCase().includes(query))
+    })
+  }, [contacts, searchText, statusFilter])
+
+  async function saveContact(contact: AdminReviewContact, update: { status: AdminContactStatus } | { checkedSource: AdminCheckedSource } | { fields: AdminContactEdits }) {
     if (!contact.id) return false
     const key = contact.id
     setBusy((current) => ({ ...current, [key]: true }))
@@ -92,6 +113,29 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
         return next
       })
     }
+  }
+
+  function openEditor(contact: AdminReviewContact) {
+    setEditingContact(contact)
+    setEditFields({
+      firstName: contact.firstName || "",
+      lastName: contact.lastName || "",
+      fullName: contact.fullName || "",
+      address: contact.address || "",
+      city: contact.city || "",
+      zipcode: contact.zipcode || "",
+      phone: contact.phone || "",
+      notes: contact.notes || "",
+    })
+  }
+
+  async function submitEdit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!editingContact) return
+    setSavingEdit(true)
+    const saved = await saveContact(editingContact, { fields: editFields })
+    setSavingEdit(false)
+    if (saved) setEditingContact(null)
   }
 
   async function changeStatus(contact: AdminReviewContact, status: AdminContactStatus) {
@@ -143,6 +187,38 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
 
       {children}
 
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Search contacts…"
+            aria-label="Search contacts in this submission"
+            className="pl-9 pr-9"
+          />
+          {searchText ? (
+            <button type="button" onClick={() => setSearchText("")} aria-label="Clear contact search" className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-3">
+          <Label htmlFor={`contact-status-filter-${submissionId}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</Label>
+          <select
+            id={`contact-status-filter-${submissionId}`}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="admin-field h-10 min-w-44 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="all">All statuses</option>
+            {availableStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{visibleContacts.length} of {contacts.length}</span>
+        </div>
+      </div>
+
       <Card className="admin-card overflow-hidden rounded-2xl">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-sm">
@@ -154,10 +230,13 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Research</th>
                 <th className="px-4 py-3">Notes</th>
+                <th className="px-4 py-3"><span className="sr-only">Edit</span></th>
               </tr>
             </thead>
             <tbody>
-              {contacts.map((contact, index) => {
+              {visibleContacts.length === 0 ? (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No contacts match these filters.</td></tr>
+              ) : visibleContacts.map((contact, index) => {
                 const key = contact.id || String(index)
                 const disabled = !contact.id || !!busy[key]
                 const forebearsDisabled = disabled || !contact.lastName?.trim()
@@ -225,6 +304,11 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                       </div>
                     </td>
                     <td className="max-w-64 truncate px-4 py-3 text-muted-foreground" title={contact.notes}>{contact.notes || "—"}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => openEditor(contact)}>
+                        <Pencil aria-hidden="true" />Edit
+                      </Button>
+                    </td>
                   </tr>
                 )
               })}
@@ -232,6 +316,46 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!editingContact} onOpenChange={(open) => { if (!open && !savingEdit) setEditingContact(null) }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <form onSubmit={submitEdit}>
+            <DialogHeader>
+              <DialogTitle>Edit contact</DialogTitle>
+              <DialogDescription>Update the saved information for this submitted contact.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-5 sm:grid-cols-2">
+              {([
+                ["firstName", "First name"],
+                ["lastName", "Last name"],
+                ["fullName", "Full name"],
+                ["phone", "Phone"],
+                ["address", "Address"],
+                ["city", "City"],
+                ["zipcode", "ZIP code"],
+              ] as const).map(([field, label]) => (
+                <div key={field} className={field === "address" || field === "fullName" ? "space-y-2 sm:col-span-2" : "space-y-2"}>
+                  <Label htmlFor={`edit-contact-${field}`}>{label}</Label>
+                  <Input
+                    id={`edit-contact-${field}`}
+                    value={editFields[field] || ""}
+                    maxLength={field === "address" ? 300 : field === "city" ? 100 : field === "zipcode" ? 20 : field === "phone" ? 50 : 200}
+                    onChange={(event) => setEditFields((current) => ({ ...current, [field]: event.target.value }))}
+                  />
+                </div>
+              ))}
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="edit-contact-notes">Notes</Label>
+                <Textarea id="edit-contact-notes" value={editFields.notes || ""} maxLength={2000} onChange={(event) => setEditFields((current) => ({ ...current, notes: event.target.value }))} className="min-h-28" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={savingEdit} onClick={() => setEditingContact(null)}>Cancel</Button>
+              <Button type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save changes"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

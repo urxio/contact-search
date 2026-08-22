@@ -5,6 +5,7 @@ import { apiError, assertMultiTenantEnabled, integer, RouteContext, safeDownload
 import {
   isAdminCheckedSource,
   isAdminContactStatus,
+  parseAdminContactEdits,
   updateSubmissionContact,
 } from "@/lib/submission-contacts"
 
@@ -79,20 +80,25 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const id = integer(body.id)
     if (!id) return NextResponse.json({ error: "Missing submission id." }, { status: 400 })
     const contactId = String(body.contactId ?? "").trim()
-    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined)) {
+    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined || body.fields !== undefined)) {
       return NextResponse.json({ error: "Missing contact id." }, { status: 400 })
     }
     if (contactId) {
       const hasStatus = body.status !== undefined
       const hasCheckedSource = body.checkedSource !== undefined
-      if (hasStatus === hasCheckedSource) {
-        return NextResponse.json({ error: "Choose either a status or checkedSource update." }, { status: 400 })
+      const hasFields = body.fields !== undefined
+      if ([hasStatus, hasCheckedSource, hasFields].filter(Boolean).length !== 1) {
+        return NextResponse.json({ error: "Choose one contact update at a time." }, { status: 400 })
       }
       if (hasStatus && !isAdminContactStatus(body.status)) {
         return NextResponse.json({ error: "Invalid contact status." }, { status: 400 })
       }
       if (hasCheckedSource && !isAdminCheckedSource(body.checkedSource)) {
         return NextResponse.json({ error: "Invalid checked source." }, { status: 400 })
+      }
+      const fields = hasFields ? parseAdminContactEdits(body.fields) : null
+      if (hasFields && !fields) {
+        return NextResponse.json({ error: "Invalid contact fields." }, { status: 400 })
       }
       const client = await pool.connect()
       let updated: NonNullable<Awaited<ReturnType<typeof updateSubmissionContact>>>
@@ -102,7 +108,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
           submissionId: id,
           congregationId: auth.congregation.id,
           contactId,
-          ...(hasStatus ? { status: body.status } : { checkedSource: body.checkedSource }),
+          ...(hasStatus ? { status: body.status } : hasCheckedSource ? { checkedSource: body.checkedSource } : { fields: fields! }),
         })
         if (!mutationResult) {
           await client.query("ROLLBACK")
@@ -122,7 +128,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         action: "submission_contact.updated",
         targetType: "submission_contact",
         targetId: `${id}:${contactId}`,
-        metadata: hasStatus ? { status: body.status } : { checkedSource: body.checkedSource },
+        metadata: hasStatus
+          ? { status: body.status }
+          : hasCheckedSource
+            ? { checkedSource: body.checkedSource }
+            : { fields: Object.keys(fields!) },
       })
       return NextResponse.json({ success: true, ...updated })
     }

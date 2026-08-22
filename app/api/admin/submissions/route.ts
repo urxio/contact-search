@@ -4,6 +4,7 @@ import { cookies } from "next/headers"
 import {
   isAdminCheckedSource,
   isAdminContactStatus,
+  parseAdminContactEdits,
   updateSubmissionContact,
 } from "@/lib/submission-contacts"
 
@@ -104,17 +105,18 @@ export async function PATCH(req: NextRequest) {
 
     const submissionId = Number(id)
     const contactId = String(body.contactId ?? "").trim()
-    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined)) {
+    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined || body.fields !== undefined)) {
       return NextResponse.json({ error: "Missing contact id" }, { status: 400 })
     }
     if (contactId) {
       const hasStatus = body.status !== undefined
       const hasCheckedSource = body.checkedSource !== undefined
+      const hasFields = body.fields !== undefined
       if (!Number.isSafeInteger(submissionId) || submissionId < 1) {
         return NextResponse.json({ error: "Invalid submission id" }, { status: 400 })
       }
-      if (hasStatus === hasCheckedSource) {
-        return NextResponse.json({ error: "Choose either a status or checkedSource update" }, { status: 400 })
+      if ([hasStatus, hasCheckedSource, hasFields].filter(Boolean).length !== 1) {
+        return NextResponse.json({ error: "Choose one contact update at a time" }, { status: 400 })
       }
       if (hasStatus && !isAdminContactStatus(body.status)) {
         return NextResponse.json({ error: "Invalid contact status" }, { status: 400 })
@@ -122,13 +124,17 @@ export async function PATCH(req: NextRequest) {
       if (hasCheckedSource && !isAdminCheckedSource(body.checkedSource)) {
         return NextResponse.json({ error: "Invalid checked source" }, { status: 400 })
       }
+      const fields = hasFields ? parseAdminContactEdits(body.fields) : null
+      if (hasFields && !fields) {
+        return NextResponse.json({ error: "Invalid contact fields" }, { status: 400 })
+      }
       const client = await pool.connect()
       try {
         await client.query("BEGIN")
         const updated = await updateSubmissionContact(client, {
           submissionId,
           contactId,
-          ...(hasStatus ? { status: body.status } : { checkedSource: body.checkedSource }),
+          ...(hasStatus ? { status: body.status } : hasCheckedSource ? { checkedSource: body.checkedSource } : { fields: fields! }),
         })
         if (!updated) {
           await client.query("ROLLBACK")
