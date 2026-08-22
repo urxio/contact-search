@@ -103,7 +103,9 @@ export default async function UserDetailPage({
                           : "admin-material text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {i === 0 ? "Latest" : new Date(s.submitted_at).toLocaleDateString()}
+                      {i === 0 ? "Latest" : new Date(s.submitted_at).toLocaleString([], {
+                        month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+                      })}
                     </Link>
                   ))}
                 </div>
@@ -112,7 +114,7 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        <AdminContactReview submissionId={Number(targetId)} initialContacts={contacts} apiUrl="/api/admin/submissions">
+        <AdminContactReview key={targetId} submissionId={Number(targetId)} initialContacts={contacts} apiUrl="/api/admin/submissions">
           {submission.global_notes && (
             <div className="admin-material mb-6 rounded-2xl p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>

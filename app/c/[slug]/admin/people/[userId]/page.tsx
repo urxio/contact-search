@@ -69,13 +69,18 @@ export default async function CongregationPersonPage({
         <div className="mb-6 flex gap-2 overflow-x-auto pb-2" aria-label="Submission history">
           {submissions.rows.map((row, index) => (
             <Button key={row.id} asChild size="sm" variant={row.id === submission.id ? "default" : "outline"} className="shrink-0 rounded-full">
-              <Link href={`${base}?submissionId=${row.id}`}>{index === 0 ? "Latest" : new Date(row.submitted_at).toLocaleDateString()}</Link>
+              <Link href={`${base}?submissionId=${row.id}`}>
+                {index === 0 ? "Latest" : new Date(row.submitted_at).toLocaleString([], {
+                  month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+                })}
+              </Link>
             </Button>
           ))}
         </div>
       ) : null}
 
       <AdminContactReview
+        key={submission.id}
         submissionId={Number(submission.id)}
         initialContacts={contacts}
         apiUrl={`/api/c/${params.slug}/admin/submissions`}
