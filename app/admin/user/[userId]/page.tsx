@@ -2,9 +2,10 @@ import { cookies } from "next/headers"
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
 import { pool } from "@/lib/db"
-import { ArrowLeft, Download, UserRound } from "lucide-react"
+import { ArrowLeft, UserRound } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { AdminContactReview, type AdminReviewContact } from "@/components/admin/admin-contact-review"
+import { SubmissionStatusSelect } from "@/components/admin/submission-status-select"
 
 interface SubmissionSummary {
   id: number
@@ -114,7 +115,7 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        <AdminContactReview key={targetId} submissionId={Number(targetId)} initialContacts={contacts} initialReviewStatus={submission.review_status || "pending"} apiUrl="/api/admin/submissions">
+        <AdminContactReview key={targetId} submissionId={Number(targetId)} initialContacts={contacts} apiUrl="/api/admin/submissions">
           {submission.global_notes && (
             <div className="admin-material mb-6 rounded-2xl p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>
@@ -122,14 +123,7 @@ export default async function UserDetailPage({
             </div>
           )}
           <div className="mb-4 flex justify-end">
-            <a
-              href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&submissionId=${targetId}&format=json`}
-              download={`${userId}-submission-${targetId}.json`}
-              className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all duration-150 ease-out hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Download className="h-4 w-4" aria-hidden="true" />
-              Download JSON
-            </a>
+            <SubmissionStatusSelect submissionId={Number(targetId)} initialStatus={submission.review_status || "pending"} apiUrl="/api/admin/submissions" />
           </div>
         </AdminContactReview>
       </div>

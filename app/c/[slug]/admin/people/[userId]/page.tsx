@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, Download, UserRound } from "lucide-react"
+import { ArrowLeft, UserRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AdminContactReview, type AdminReviewContact } from "@/components/admin/admin-contact-review"
+import { SubmissionStatusSelect } from "@/components/admin/submission-status-select"
 import { AuthError, requireCongregationAdmin } from "@/lib/auth"
 import { pool } from "@/lib/db"
 
@@ -50,11 +51,11 @@ export default async function CongregationPersonPage({
         <Button asChild variant="outline" className="min-h-11 rounded-xl">
           <Link href={`/c/${params.slug}/admin`}><ArrowLeft aria-hidden="true" />Review queue</Link>
         </Button>
-        <Button asChild variant="outline" className="min-h-11 rounded-xl">
-          <a href={`/api/c/${params.slug}/admin/submissions?userName=${encodeURIComponent(displayName)}&submissionId=${submission.id}&format=json`} download>
-            <Download aria-hidden="true" />Download JSON
-          </a>
-        </Button>
+        <SubmissionStatusSelect
+          submissionId={Number(submission.id)}
+          initialStatus={submission.review_status || "pending"}
+          apiUrl={`/api/c/${params.slug}/admin/submissions`}
+        />
       </div>
 
       <div className="mb-6 flex items-center gap-3">
@@ -83,7 +84,6 @@ export default async function CongregationPersonPage({
         key={submission.id}
         submissionId={Number(submission.id)}
         initialContacts={contacts}
-        initialReviewStatus={submission.review_status || "pending"}
         apiUrl={`/api/c/${params.slug}/admin/submissions`}
       >
         {submission.global_notes ? (
