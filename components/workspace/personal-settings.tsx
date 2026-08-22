@@ -213,7 +213,7 @@ export function PersonalSettings({
                   {(["search", "team", "stats"] as const).map((view) => (
                     <button key={view} type="button" aria-pressed={defaultWorkspaceView === view} onClick={() => setDefaultWorkspaceView(view)} className={cn(choiceClassName, defaultWorkspaceView === view ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
                       {view === "search" ? <Search className="h-5 w-5" aria-hidden="true" /> : view === "team" ? <UsersRound className="h-5 w-5" aria-hidden="true" /> : <BarChart3 className="h-5 w-5" aria-hidden="true" />}
-                      <span className="flex-1">{view === "search" ? "Search" : view === "team" ? "Team Progress" : "Personal Stats"}</span>
+                      <span className="flex-1">{view === "search" ? "Search" : view === "team" ? "Team Progress" : "Stats"}</span>
                       {defaultWorkspaceView === view ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
                     </button>
                   ))}

@@ -55,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
     if (body.preferences?.defaultWorkspaceView !== undefined) {
       if (!validWorkspaceView.has(body.preferences.defaultWorkspaceView)) {
-        return NextResponse.json({ error: "Default workspace view must be Search, Team Progress, or Personal Stats." }, { status: 400 })
+        return NextResponse.json({ error: "Default workspace view must be Search, Team Progress, or Stats." }, { status: 400 })
       }
       preferences.defaultWorkspaceView = body.preferences.defaultWorkspaceView
     }

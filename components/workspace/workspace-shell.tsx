@@ -108,7 +108,7 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         )}
       >
         <BarChart3 className="h-4 w-4" aria-hidden="true" />
-        Personal Stats
+        Stats
       </Link>
     </nav>
   )
