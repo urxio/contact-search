@@ -1,13 +1,13 @@
 "use client"
 
-import { type ReactNode, useMemo, useState } from "react"
+import React, { type ReactNode, useMemo, useState } from "react"
 import { Globe, Search } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ADMIN_CONTACT_STATUSES,
   type AdminCheckedSource,
@@ -123,7 +123,7 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
   }
 
   return (
-    <>
+    <TooltipProvider delayDuration={300}>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           ["Total", metrics.total],
@@ -232,6 +232,6 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
           </table>
         </div>
       </Card>
-    </>
+    </TooltipProvider>
   )
 }
