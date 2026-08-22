@@ -87,6 +87,12 @@ function value<T>(row: PackageRow, camel: keyof PackageRow, snake: keyof Package
   return (row[camel] ?? row[snake]) as T
 }
 
+function isClaimableByViewer(row: PackageRow) {
+  return row.visibility === "shared" &&
+    !Boolean(value<boolean>(row, "isMine", "is_mine")) &&
+    row.state === "available"
+}
+
 export function PackageDialogs({
   slug,
   pendingUpload,
@@ -140,6 +146,7 @@ export function PackageDialogs({
       rows: packages.filter((row) => !value<boolean>(row, "isMine", "is_mine") && row.visibility === "shared"),
     },
   ], [packages])
+  const packageToOpenIsClaim = Boolean(packageToOpen && isClaimableByViewer(packageToOpen))
 
   useEffect(() => {
     if (!pendingUpload) return
@@ -434,6 +441,7 @@ export function PackageDialogs({
                             : "Uploader unavailable"
                         const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
                         const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
+                        const isClaim = isClaimableByViewer(row)
                         const packageStatus = row.state ? row.state.replace("_", " ") : row.status
                         return (
                           <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
@@ -445,7 +453,7 @@ export function PackageDialogs({
                               <p className="mt-1 text-xs font-normal text-muted-foreground">{attribution}</p>
                             </div>
                             <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
+                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : "Open"}</Button>
                               {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
                             </div>
                           </div>
@@ -467,7 +475,7 @@ export function PackageDialogs({
       </Dialog>
 
       <AlertDialog open={Boolean(packageToOpen)} onOpenChange={(open) => { if (!open) setPackageToOpen(null) }}>
-        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{hasDraft ? "Replace your current search?" : "Open this Excel?"}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current draft will be replaced with a fresh copy of this Excel. Submitted work is not affected." : "This claims the segment for you and marks it in progress."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? "Opening…" : "Open Excel"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{packageToOpenIsClaim ? (hasDraft ? "Claim and replace your current search?" : "Claim this Excel?") : (hasDraft ? "Replace your current search?" : "Open this Excel?")}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current draft will be replaced with a fresh copy of this Excel. Submitted work is not affected." : packageToOpenIsClaim ? "This assigns the Excel to you and marks its segment in progress." : "This Excel will open as your active search."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? (packageToOpenIsClaim ? "Claiming…" : "Opening…") : (packageToOpenIsClaim ? "Claim Excel" : "Open Excel")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={Boolean(editingPackage)} onOpenChange={(open) => { if (!open) { setEditingPackage(null); onBrowseOpenChange(true) } }}>
