@@ -19,6 +19,7 @@ type Segment = {
   conflict_segment_ids?: number[]
   package_id?: number | null
   package_visibility?: "shared" | "private" | null
+  package_uploader_name?: string | null
   is_mine?: boolean
 }
 
@@ -287,11 +288,12 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                     </thead>
                     <tbody>
                       {segments.map(seg => {
-                        const isOwner      = workspaceSlug
-                          ? Boolean(seg.is_mine)
-                          : Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
                         const isAvailablePackage = Boolean(seg.package_id && seg.package_visibility === "shared" && !seg.owner_user_id)
                         const isPrivatePackage = Boolean(seg.package_id && seg.package_visibility === "private" && !seg.owner_user_id)
+                        const displayOwner = seg.owner || (isPrivatePackage ? seg.package_uploader_name : "") || ""
+                        const isOwner      = workspaceSlug
+                          ? Boolean(seg.is_mine)
+                          : Boolean(userName && displayOwner.toLowerCase().trim() === userName.toLowerCase().trim())
                         const canEdit      = canManage && !isAvailablePackage
                         const isEditing    = !!editing[seg.id]
                         const isSaving     = saving.has(seg.id)
@@ -310,7 +312,7 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                       <p className="text-base font-semibold text-foreground">Update segment</p>
                                       <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">Adjust the page range, progress, or status.</p>
                                     </div>
-                                    <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">{seg.owner || "Unassigned"}</span>
+                                    <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">{displayOwner || "Unassigned"}</span>
                                   </div>
 
                                   <div className="space-y-4">
@@ -405,9 +407,9 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                             {/* Owner */}
                             <td className="px-4 py-3">
                               {isOwner ? (
-                                <span className="font-bold text-indigo-700 dark:text-indigo-300">{seg.owner}</span>
+                                <span className="font-bold text-indigo-700 dark:text-indigo-300">{displayOwner}</span>
                               ) : (
-                                <span className="text-gray-600 dark:text-gray-400">{seg.owner || "—"}</span>
+                                <span className="text-gray-600 dark:text-gray-400">{displayOwner || "—"}</span>
                               )}
                               {editErrors[seg.id] && <p role="alert" className="mt-2 max-w-56 text-xs font-medium text-red-600 dark:text-red-400">{editErrors[seg.id]}</p>}
                             </td>

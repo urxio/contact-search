@@ -21,8 +21,9 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const segments = await pool.query(
       `SELECT s.id, s.page_start, s.page_end, s.owner, s.owner_user_id,
               s.stopped_at_page, s.status, s.notes, s.updated_at,
-              (s.owner_user_id = $3) AS is_mine,
+              (s.owner_user_id = $3 OR (cp.visibility = 'private' AND cp.uploaded_by_user_id = $3)) AS is_mine,
               cp.id AS package_id, cp.visibility AS package_visibility,
+              package_uploader.display_name AS package_uploader_name,
               COALESCE(ARRAY(
                 SELECT other.id FROM zt_segments other
                 WHERE other.congregation_id = s.congregation_id
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
        FROM zt_segments s
        LEFT JOIN contact_packages cp
          ON cp.segment_id = s.id AND cp.congregation_id = s.congregation_id
+       LEFT JOIN users package_uploader ON package_uploader.id = cp.uploaded_by_user_id
        WHERE s.congregation_id = $1 AND s.zipcode_id = $2
        ORDER BY s.page_start`,
       [auth.congregation.id, zipResult.rows[0].id, auth.user.id, zipResult.rows[0].total_pages],
