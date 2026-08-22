@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Check, FileSpreadsheet, MoreHorizontal, PackageOpen, UserRound, UsersRound } from "lucide-react"
+import { Archive, Check, FileSpreadsheet, MoreHorizontal, PackageOpen, Search, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -388,10 +388,42 @@ export function PackageDialogs({
 
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">What would you like to do with this Excel?</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("start")}>{uploadAction === "start" ? "Starting…" : "Start searching now"}</Button>
-              <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("save")}>{uploadAction === "save" ? "Saving…" : "Save for myself"}</Button>
-              <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("share")}>{uploadAction === "share" ? "Sharing…" : "Share with congregation"}</Button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                className="admin-primary-button h-auto min-h-16 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left sm:col-span-2"
+                disabled={busy}
+                onClick={() => savePackage("start")}
+              >
+                <Search className="shrink-0" aria-hidden="true" />
+                <span>
+                  <span className="block text-sm font-semibold">{uploadAction === "start" ? "Starting…" : "Start searching now"}</span>
+                  <span className="mt-0.5 block text-xs font-normal text-primary-foreground/80">Save privately and begin searching right away</span>
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto min-h-20 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left transition-all duration-150 ease-out"
+                disabled={busy}
+                onClick={() => savePackage("save")}
+              >
+                <UserRound className="shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <span className="block text-sm font-semibold">{uploadAction === "save" ? "Saving…" : "Save in My Excels"}</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Keep it private for later</span>
+                </span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto min-h-20 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left transition-all duration-150 ease-out"
+                disabled={busy}
+                onClick={() => savePackage("share")}
+              >
+                <UsersRound className="shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <span className="block text-sm font-semibold">{uploadAction === "share" ? "Sharing…" : "Share with congregation"}</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Let another member claim it</span>
+                </span>
+              </Button>
             </div>
           </fieldset>
         </DialogContent>
