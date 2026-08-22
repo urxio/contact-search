@@ -104,6 +104,7 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
     id: Number(row.id), name: row.name, visibility: row.visibility,
     originalFilename: row.original_filename, contactCount: Number(row.contact_count),
     createdAt: row.created_at, updatedAt: row.updated_at,
+    isMine: Number(row.uploaded_by_user_id) === viewerUserId,
     uploader: row.uploaded_by_user_id == null ? null : { id: Number(row.uploaded_by_user_id), displayName: row.uploader_name },
     segment: {
       id: Number(row.segment_id), zipcode: row.zipcode, city: row.city,

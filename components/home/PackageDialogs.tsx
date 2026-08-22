@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Check, FileSpreadsheet, Lock, MoreHorizontal, PackageOpen, Users } from "lucide-react"
+import { Archive, Check, FileSpreadsheet, Lock, MoreHorizontal, PackageOpen, UserRound, Users, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -120,6 +120,26 @@ export function PackageDialogs({
   const handledPreferredPackage = useRef<number | null>(null)
 
   const selectedZip = useMemo(() => zipcodes.find((item) => item.zipcode === zipcode), [zipcode, zipcodes])
+  const packageSections = useMemo(() => [
+    {
+      id: "my-excels",
+      title: "My Excels",
+      description: "Excels you uploaded and can manage.",
+      emptyTitle: "No personal Excels",
+      emptyDescription: "Excels you upload will appear here.",
+      icon: UserRound,
+      rows: packages.filter((row) => Boolean(value<boolean>(row, "isMine", "is_mine"))),
+    },
+    {
+      id: "congregation-excels",
+      title: "Congregation Excels",
+      description: "Available shared Excels from your congregation.",
+      emptyTitle: "No shared Excels available",
+      emptyDescription: "New shared Excels will appear here when they are ready to claim.",
+      icon: UsersRound,
+      rows: packages.filter((row) => !value<boolean>(row, "isMine", "is_mine") && row.visibility === "shared"),
+    },
+  ], [packages])
 
   useEffect(() => {
     if (!pendingUpload) return
@@ -371,37 +391,66 @@ export function PackageDialogs({
       <Dialog open={browseOpen} onOpenChange={onBrowseOpenChange}>
         <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-base font-semibold">Search Excels</DialogTitle>
-            <DialogDescription>Choose an available segment or manage one you uploaded.</DialogDescription>
+            <DialogTitle className="text-base font-semibold">Browse Excels</DialogTitle>
+            <DialogDescription>Your uploads and available congregation Excels, kept separate.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            {loadingPackages ? <p className="py-10 text-center text-sm text-muted-foreground">Loading Excels…</p> : packages.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">No Excels yet</p><p className="mt-1 text-sm text-muted-foreground">Upload the first Excel for this congregation.</p></div>
-            ) : packages.map((row) => {
-              const contactCount = value<number>(row, "contactCount", "contact_count") || 0
-              const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
-              const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
-              const owner = row.segment?.owner || value<string>(row, "ownerName", "owner_name") || row.uploader?.displayName || row.uploaderName || "Unassigned"
-              const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
-              const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
-              const packageStatus = row.state ? row.state.replace("_", " ") : row.status
-              return (
-                <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-                  <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
-                    <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
-                    <p className="mt-1 text-xs font-normal text-muted-foreground">{owner}</p>
+          {loadingPackages ? (
+            <p className="py-10 text-center text-sm font-normal leading-relaxed text-muted-foreground">Loading Excels…</p>
+          ) : (
+            <div className="space-y-8 py-2">
+              {packageSections.map((section) => (
+                <section key={section.id} aria-labelledby={`${section.id}-title`} className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary">
+                      <section.icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 id={`${section.id}-title`} className="text-base font-semibold">{section.title}</h3>
+                        <Badge variant="secondary" aria-label={`${section.rows.length} ${section.title}`}>{section.rows.length}</Badge>
+                      </div>
+                      <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">{section.description}</p>
+                    </div>
                   </div>
-                  <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-                    <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
-                    {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+
+                  {section.rows.length ? (
+                    <div className="space-y-3">
+                      {section.rows.map((row) => {
+                        const contactCount = value<number>(row, "contactCount", "contact_count") || 0
+                        const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
+                        const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
+                        const owner = row.segment?.owner || value<string>(row, "ownerName", "owner_name") || row.uploader?.displayName || row.uploaderName || "Unassigned"
+                        const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
+                        const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
+                        const packageStatus = row.state ? row.state.replace("_", " ") : row.status
+                        return (
+                          <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+                            <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
+                            <div className="min-w-0 flex-1">
+                              <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+                              <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
+                              <p className="mt-1 text-xs font-normal text-muted-foreground">{owner}</p>
+                            </div>
+                            <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
+                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>Open</Button>
+                              {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center">
+                      <Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                      <p className="mt-3 text-base font-semibold">{section.emptyTitle}</p>
+                      <p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">{section.emptyDescription}</p>
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

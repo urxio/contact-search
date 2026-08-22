@@ -36,7 +36,18 @@ describe("contact packages", () => {
     expect(value.state).toBe("available")
     expect(value.canOpen).toBe(true)
     expect(value.canManage).toBe(false)
+    expect(value.isMine).toBe(false)
     expect(value).not.toHaveProperty("contacts")
+  })
+
+  it("identifies an Excel uploaded by the viewer", () => {
+    const value = serializePackage({
+      id: 5, name: "My pages", visibility: "private", original_filename: "mine.xlsx", contact_count: 1,
+      created_at: new Date(), updated_at: new Date(), uploaded_by_user_id: 10, uploader_name: "Ana",
+      segment_id: 9, zipcode: "22301", city: "Alexandria", page_start: 4, page_end: 5,
+      owner_user_id: null, owner: "", status: "Not started", stopped_at_page: null,
+    }, 10, false)
+    expect(value.isMine).toBe(true)
   })
 
   it("hides assigned shared Excels except for an assignee's direct handoff", () => {
