@@ -389,7 +389,7 @@ export function PackageDialogs({
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">What would you like to do with this Excel?</legend>
             <div className="grid gap-2 sm:grid-cols-3">
-              <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("start")}>{uploadAction === "start" ? "Starting…" : "Start working now"}</Button>
+              <Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("start")}>{uploadAction === "start" ? "Starting…" : "Start searching now"}</Button>
               <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("save")}>{uploadAction === "save" ? "Saving…" : "Save for myself"}</Button>
               <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => savePackage("share")}>{uploadAction === "share" ? "Sharing…" : "Share with congregation"}</Button>
             </div>
