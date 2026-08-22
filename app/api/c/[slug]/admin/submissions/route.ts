@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext, safeDownloadName } from "../../../_shared"
+import {
+  isAdminCheckedSource,
+  isAdminContactStatus,
+  updateSubmissionContact,
+} from "@/lib/submission-contacts"
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
@@ -73,6 +78,54 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const body = await req.json()
     const id = integer(body.id)
     if (!id) return NextResponse.json({ error: "Missing submission id." }, { status: 400 })
+    const contactId = String(body.contactId ?? "").trim()
+    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined)) {
+      return NextResponse.json({ error: "Missing contact id." }, { status: 400 })
+    }
+    if (contactId) {
+      const hasStatus = body.status !== undefined
+      const hasCheckedSource = body.checkedSource !== undefined
+      if (hasStatus === hasCheckedSource) {
+        return NextResponse.json({ error: "Choose either a status or checkedSource update." }, { status: 400 })
+      }
+      if (hasStatus && !isAdminContactStatus(body.status)) {
+        return NextResponse.json({ error: "Invalid contact status." }, { status: 400 })
+      }
+      if (hasCheckedSource && !isAdminCheckedSource(body.checkedSource)) {
+        return NextResponse.json({ error: "Invalid checked source." }, { status: 400 })
+      }
+      const client = await pool.connect()
+      let updated: NonNullable<Awaited<ReturnType<typeof updateSubmissionContact>>>
+      try {
+        await client.query("BEGIN")
+        const mutationResult = await updateSubmissionContact(client, {
+          submissionId: id,
+          congregationId: auth.congregation.id,
+          contactId,
+          ...(hasStatus ? { status: body.status } : { checkedSource: body.checkedSource }),
+        })
+        if (!mutationResult) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: "Contact not found." }, { status: 404 })
+        }
+        updated = mutationResult
+        await client.query("COMMIT")
+      } catch (error) {
+        await client.query("ROLLBACK")
+        throw error
+      } finally {
+        client.release()
+      }
+      await auditEvent({
+        actorUserId: auth.user.id,
+        congregationId: auth.congregation.id,
+        action: "submission_contact.updated",
+        targetType: "submission_contact",
+        targetId: `${id}:${contactId}`,
+        metadata: hasStatus ? { status: body.status } : { checkedSource: body.checkedSource },
+      })
+      return NextResponse.json({ success: true, ...updated })
+    }
     if (body.review_status !== undefined && !["pending", "in_review", "reviewed"].includes(body.review_status)) {
       return NextResponse.json({ error: "Invalid review_status." }, { status: 400 })
     }

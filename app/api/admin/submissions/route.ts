@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool, ensureSchema } from "@/lib/db"
 import { cookies } from "next/headers"
+import {
+  isAdminCheckedSource,
+  isAdminContactStatus,
+  updateSubmissionContact,
+} from "@/lib/submission-contacts"
 
 export async function GET(req: NextRequest) {
   // Verify admin session cookie
@@ -95,6 +100,48 @@ export async function PATCH(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "Missing submission id" }, { status: 400 })
+    }
+
+    const submissionId = Number(id)
+    const contactId = String(body.contactId ?? "").trim()
+    if (!contactId && (body.status !== undefined || body.checkedSource !== undefined)) {
+      return NextResponse.json({ error: "Missing contact id" }, { status: 400 })
+    }
+    if (contactId) {
+      const hasStatus = body.status !== undefined
+      const hasCheckedSource = body.checkedSource !== undefined
+      if (!Number.isSafeInteger(submissionId) || submissionId < 1) {
+        return NextResponse.json({ error: "Invalid submission id" }, { status: 400 })
+      }
+      if (hasStatus === hasCheckedSource) {
+        return NextResponse.json({ error: "Choose either a status or checkedSource update" }, { status: 400 })
+      }
+      if (hasStatus && !isAdminContactStatus(body.status)) {
+        return NextResponse.json({ error: "Invalid contact status" }, { status: 400 })
+      }
+      if (hasCheckedSource && !isAdminCheckedSource(body.checkedSource)) {
+        return NextResponse.json({ error: "Invalid checked source" }, { status: 400 })
+      }
+      const client = await pool.connect()
+      try {
+        await client.query("BEGIN")
+        const updated = await updateSubmissionContact(client, {
+          submissionId,
+          contactId,
+          ...(hasStatus ? { status: body.status } : { checkedSource: body.checkedSource }),
+        })
+        if (!updated) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: "Contact not found" }, { status: 404 })
+        }
+        await client.query("COMMIT")
+        return NextResponse.json({ success: true, ...updated })
+      } catch (error) {
+        await client.query("ROLLBACK")
+        throw error
+      } finally {
+        client.release()
+      }
     }
 
     const VALID_STATUSES = ["pending", "in_review", "reviewed"]

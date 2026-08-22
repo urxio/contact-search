@@ -4,19 +4,9 @@ import { ArrowLeft, Download, UserRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AdminContactReview, type AdminReviewContact } from "@/components/admin/admin-contact-review"
 import { AuthError, requireCongregationAdmin } from "@/lib/auth"
 import { pool } from "@/lib/db"
-
-type Contact = {
-  id?: string
-  fullName?: string
-  address?: string
-  city?: string
-  zipcode?: string
-  phone?: string
-  status?: string
-  notes?: string
-}
 
 export default async function CongregationPersonPage({
   params,
@@ -51,8 +41,7 @@ export default async function CongregationPersonPage({
     ? submissions.rows.find((row) => Number(row.id) === requestedId)
     : submissions.rows[0]
   if (!submission) notFound()
-  const contacts: Contact[] = Array.isArray(submission.contacts) ? submission.contacts : []
-  const statusCount = (status: string) => contacts.filter((contact) => contact.status === status).length
+  const contacts: AdminReviewContact[] = Array.isArray(submission.contacts) ? submission.contacts : []
   const base = `/c/${params.slug}/admin/people/${encodeURIComponent(displayName)}`
 
   return (
@@ -86,40 +75,15 @@ export default async function CongregationPersonPage({
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          ["Total", contacts.length],
-          ["Potential", statusCount("Potentially French")],
-          ["Not French", statusCount("Not French")],
-          ["Duplicates", statusCount("Duplicate")],
-          ["Unchecked", statusCount("Not checked")],
-        ].map(([label, value]) => (
-          <Card key={String(label)} className="admin-card rounded-2xl"><CardContent className="p-4"><p className="text-xl font-semibold tabular-nums">{value}</p><p className="text-xs text-muted-foreground">{label}</p></CardContent></Card>
-        ))}
-      </div>
-
-      {submission.global_notes ? (
-        <Card className="admin-card mb-6 rounded-2xl"><CardHeader><CardTitle className="text-base">Territory notes</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.global_notes}</p></CardContent></Card>
-      ) : null}
-
-      <Card className="admin-card overflow-hidden rounded-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead><tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground"><th className="px-4 py-3">Name</th><th className="px-4 py-3">Location</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Notes</th></tr></thead>
-            <tbody>
-              {contacts.map((contact, index) => (
-                <tr key={contact.id || index} className="border-b last:border-0">
-                  <td className="px-4 py-3 font-medium">{contact.fullName || "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{contact.address || "—"}<span className="block text-xs">{[contact.city, contact.zipcode].filter(Boolean).join(", ")}</span></td>
-                  <td className="px-4 py-3 text-muted-foreground">{contact.phone || "—"}</td>
-                  <td className="px-4 py-3"><span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{contact.status || "Not checked"}</span></td>
-                  <td className="max-w-64 truncate px-4 py-3 text-muted-foreground" title={contact.notes}>{contact.notes || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <AdminContactReview
+        submissionId={Number(submission.id)}
+        initialContacts={contacts}
+        apiUrl={`/api/c/${params.slug}/admin/submissions`}
+      >
+        {submission.global_notes ? (
+          <Card className="admin-card mb-6 rounded-2xl"><CardHeader><CardTitle className="text-base">Territory notes</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm text-muted-foreground">{submission.global_notes}</p></CardContent></Card>
+        ) : null}
+      </AdminContactReview>
     </div>
   )
 }

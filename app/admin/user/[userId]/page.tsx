@@ -4,23 +4,7 @@ import Link from "next/link"
 import { pool } from "@/lib/db"
 import { ArrowLeft, Download, UserRound } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
-
-interface Contact {
-  id: string
-  fullName: string
-  address: string
-  city: string
-  zipcode: string
-  phone: string
-  status: string
-  notes: string
-  checkedOnTPS: boolean
-  checkedOnOTM: boolean
-  checkedOnForebears: boolean
-  needAddressUpdate: boolean
-  needPhoneUpdate: boolean
-  territoryStatus: boolean
-}
+import { AdminContactReview, type AdminReviewContact } from "@/components/admin/admin-contact-review"
 
 interface SubmissionSummary {
   id: number
@@ -28,14 +12,6 @@ interface SubmissionSummary {
   contact_count: number
   territory_zipcode: string
   territory_page_range: string
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  "Potentially French": "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300",
-  "Not French":         "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300",
-  "Duplicate":          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  "Not checked":        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
-  "Detected":           "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300",
 }
 
 export default async function UserDetailPage({
@@ -72,14 +48,9 @@ export default async function UserDetailPage({
   if (result.rows.length === 0) notFound()
 
   const submission = result.rows[0]
-  const contacts: Contact[] = submission.contacts
+  const contacts: AdminReviewContact[] = Array.isArray(submission.contacts) ? submission.contacts : []
   const isLatest = targetId === allSubmissions[0].id
   const submissionIndex = allSubmissions.findIndex((s) => s.id === targetId)
-
-  const potentiallyFrench = contacts.filter((c) => c.status === "Potentially French")
-  const notFrench         = contacts.filter((c) => c.status === "Not French")
-  const duplicate         = contacts.filter((c) => c.status === "Duplicate")
-  const notChecked        = contacts.filter((c) => c.status === "Not checked")
 
   return (
     <div className="admin-shell min-h-screen">
@@ -141,93 +112,25 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        {/* Compact submission summary */}
-        <div className="admin-material mb-6 grid grid-cols-2 divide-x divide-y overflow-hidden rounded-2xl sm:grid-cols-5 sm:divide-y-0">
-          <DetailMetric label="Total" value={contacts.length} />
-          <DetailMetric label="Potential" value={potentiallyFrench.length} />
-          <DetailMetric label="Not French" value={notFrench.length} />
-          <DetailMetric label="Duplicates" value={duplicate.length} />
-          <DetailMetric label="Unchecked" value={notChecked.length} />
-        </div>
-
-        {/* Global notes */}
-        {submission.global_notes && (
-          <div className="admin-material mb-6 rounded-2xl p-5">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
-              {submission.global_notes}
-            </p>
+        <AdminContactReview submissionId={Number(targetId)} initialContacts={contacts} apiUrl="/api/admin/submissions">
+          {submission.global_notes && (
+            <div className="admin-material mb-6 rounded-2xl p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{submission.global_notes}</p>
+            </div>
+          )}
+          <div className="mb-4 flex justify-end">
+            <a
+              href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&submissionId=${targetId}&format=json`}
+              download={`${userId}-submission-${targetId}.json`}
+              className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all duration-150 ease-out hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Download JSON
+            </a>
           </div>
-        )}
-
-        {/* Download JSON */}
-        <div className="mb-4 flex justify-end">
-          <a
-            href={`/api/admin/submissions?userId=${encodeURIComponent(userId)}&submissionId=${targetId}&format=json`}
-            download={`${userId}-submission-${targetId}.json`}
-            className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all duration-150 ease-out hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Download JSON
-          </a>
-        </div>
-
-        {/* Contact table */}
-        <div className="admin-card overflow-x-auto rounded-2xl">
-          <table className="w-full min-w-[840px] text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Location</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sources checked</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.map((contact, i) => (
-                <tr
-                  key={contact.id ?? i}
-                  className="border-b transition-colors duration-150 ease-out last:border-0 hover:bg-primary/[0.035]"
-                >
-                  <td className="px-4 py-3 font-medium">
-                    {contact.fullName}
-                    {contact.territoryStatus && (
-                      <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive">Territory</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    <p>{contact.address || "—"}</p>
-                    <p className="text-xs">{[contact.city, contact.zipcode].filter(Boolean).join(", ")}</p>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{contact.phone || "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_COLORS[contact.status] ?? "border-border bg-muted text-muted-foreground"}`}>
-                      {contact.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {[contact.checkedOnForebears && "Forebears", contact.checkedOnTPS && "TPS", contact.checkedOnOTM && "OTM"].filter(Boolean).join(" · ") || "—"}
-                  </td>
-                  <td className="max-w-[200px] truncate px-4 py-3 text-xs text-muted-foreground" title={contact.notes || undefined}>
-                    {contact.notes}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </AdminContactReview>
       </div>
-    </div>
-  )
-}
-
-function DetailMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="px-4 py-4">
-      <p className="text-base font-semibold tabular-nums">{value}</p>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   )
 }
