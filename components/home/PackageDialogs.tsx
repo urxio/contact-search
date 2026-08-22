@@ -226,7 +226,13 @@ export function PackageDialogs({
       if (!response.ok) throw new Error(result.error || "Unable to save Excel")
       if (startNow) applyDraft(result)
       onCancelUpload()
-      toast.success(startNow ? "Excel saved and ready to search." : "Excel saved for the congregation.")
+      toast.success(
+        startNow
+          ? "Excel saved and ready to search."
+          : visibility === "private"
+            ? "Private Excel saved to My Excels."
+            : "Excel saved for the congregation.",
+      )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save Excel")
     } finally {
