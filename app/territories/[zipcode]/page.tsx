@@ -18,6 +18,7 @@ type Segment = {
   updated_at: string
   conflict_segment_ids?: number[]
   package_id?: number | null
+  package_visibility?: "shared" | "private" | null
   is_mine?: boolean
 }
 
@@ -289,7 +290,8 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                         const isOwner      = workspaceSlug
                           ? Boolean(seg.is_mine)
                           : Boolean(userName && seg.owner.toLowerCase().trim() === userName.toLowerCase().trim())
-                        const isAvailablePackage = Boolean(seg.package_id && !seg.owner_user_id)
+                        const isAvailablePackage = Boolean(seg.package_id && seg.package_visibility === "shared" && !seg.owner_user_id)
+                        const isPrivatePackage = Boolean(seg.package_id && seg.package_visibility === "private" && !seg.owner_user_id)
                         const canEdit      = canManage && !isAvailablePackage
                         const isEditing    = !!editing[seg.id]
                         const isSaving     = saving.has(seg.id)
@@ -477,6 +479,8 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                 )
                               ) : isAvailablePackage ? (
                                 <span className="text-xs font-semibold text-muted-foreground">Available Excel</span>
+                              ) : isPrivatePackage ? (
+                                <span className="text-xs font-semibold text-muted-foreground">Private Excel</span>
                               ) : null}
                             </td>
                           </tr>

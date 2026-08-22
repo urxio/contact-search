@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       `SELECT s.id, s.page_start, s.page_end, s.owner, s.owner_user_id,
               s.stopped_at_page, s.status, s.notes, s.updated_at,
               (s.owner_user_id = $3) AS is_mine,
-              cp.id AS package_id,
+              cp.id AS package_id, cp.visibility AS package_visibility,
               COALESCE(ARRAY(
                 SELECT other.id FROM zt_segments other
                 WHERE other.congregation_id = s.congregation_id
