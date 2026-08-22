@@ -54,6 +54,14 @@ function activityLevel(seconds: number) {
   return 4
 }
 
+const activityLevelClasses = [
+  "border-border bg-muted/40 text-foreground",
+  "border-primary/20 bg-primary/20 text-primary",
+  "border-primary/30 bg-primary/30 text-primary",
+  "border-primary/40 bg-primary/60 text-primary-foreground",
+  "border-primary bg-primary text-primary-foreground",
+] as const
+
 function monthDays(month: string, activity: DailyActivity[]) {
   const [year, monthNumber] = month.split("-").map(Number)
   const first = new Date(Date.UTC(year, monthNumber - 1, 1))
@@ -145,7 +153,7 @@ export function PersonalStatsDashboard({ slug }: { slug: string }) {
                   {days.map((day, index) => day ? (
                     <Tooltip key={day.date}>
                       <TooltipTrigger asChild>
-                        <span tabIndex={0} role="gridcell" aria-label={`${day.date}: ${formatDuration(day.activeSeconds)}`} className={cn("flex h-10 items-center justify-center rounded-xl border text-xs font-semibold transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", `activity-level-${activityLevel(day.activeSeconds)}`)}>{day.day}</span>
+                        <span tabIndex={0} role="gridcell" aria-label={`${day.date}: ${formatDuration(day.activeSeconds)}`} className={cn("flex h-10 items-center justify-center rounded-xl border text-xs font-semibold transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", activityLevelClasses[activityLevel(day.activeSeconds)])}>{day.day}</span>
                       </TooltipTrigger>
                       <TooltipContent>{new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {formatDuration(day.activeSeconds)}</TooltipContent>
                     </Tooltip>

@@ -311,38 +311,40 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
                                     <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm">{seg.owner || "Unassigned"}</span>
                                   </div>
 
-                                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1fr)_minmax(180px,.6fr)_auto] lg:items-end">
-                                    <fieldset>
-                                      <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Page range</legend>
-                                      <div className="flex items-center gap-2">
-                                        <label htmlFor={`segment-${seg.id}-start`} className="sr-only">Start page</label>
-                                        <input id={`segment-${seg.id}-start`} type="number" value={e.page_start}
-                                          onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_start: ev.target.value } }))}
-                                          className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                          placeholder="Start" />
-                                        <span className="text-muted-foreground" aria-hidden="true">–</span>
-                                        <label htmlFor={`segment-${seg.id}-end`} className="sr-only">End page</label>
-                                        <input id={`segment-${seg.id}-end`} type="number" value={e.page_end}
-                                          onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_end: ev.target.value } }))}
-                                          className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                          placeholder="End" />
-                                      </div>
-                                    </fieldset>
+                                  <div className="space-y-4">
+                                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.65fr)]">
+                                      <fieldset className="min-w-0">
+                                        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Page range</legend>
+                                        <div className="flex items-center gap-2">
+                                          <label htmlFor={`segment-${seg.id}-start`} className="sr-only">Start page</label>
+                                          <input id={`segment-${seg.id}-start`} type="number" value={e.page_start}
+                                            onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_start: ev.target.value } }))}
+                                            className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                            placeholder="Start" />
+                                          <span className="shrink-0 text-muted-foreground" aria-hidden="true">–</span>
+                                          <label htmlFor={`segment-${seg.id}-end`} className="sr-only">End page</label>
+                                          <input id={`segment-${seg.id}-end`} type="number" value={e.page_end}
+                                            onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], page_end: ev.target.value } }))}
+                                            className="admin-field h-11 min-w-0 flex-1 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                            placeholder="End" />
+                                        </div>
+                                      </fieldset>
 
-                                    <div>
-                                      <label htmlFor={`segment-${seg.id}-status`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
-                                      <select id={`segment-${seg.id}-status`} value={e.status}
-                                        onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], status: ev.target.value } }))}
-                                        className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                                        <option>Not started</option>
-                                        <option>In progress</option>
-                                        <option>Completed</option>
-                                      </select>
+                                      <div className="min-w-0">
+                                        <label htmlFor={`segment-${seg.id}-status`} className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
+                                        <select id={`segment-${seg.id}-status`} value={e.status}
+                                          onChange={ev => setEditing(prev => ({ ...prev, [seg.id]: { ...prev[seg.id], status: ev.target.value } }))}
+                                          className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                          <option>Not started</option>
+                                          <option>In progress</option>
+                                          <option>Completed</option>
+                                        </select>
+                                      </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 sm:justify-end">
-                                      <button type="button" onClick={() => cancelEdit(seg.id)} className="min-h-11 rounded-xl border bg-background px-4 text-sm font-semibold text-muted-foreground transition-all duration-150 ease-out hover:bg-muted">Cancel</button>
-                                      <button type="button" onClick={() => saveEdit(seg.id)} disabled={isSaving} className="admin-primary-button min-h-11 rounded-xl px-5 text-sm font-semibold text-white transition-all duration-150 ease-out disabled:opacity-50">
+                                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                      <button type="button" onClick={() => cancelEdit(seg.id)} className="min-h-11 w-full rounded-xl border bg-background px-4 text-sm font-semibold text-muted-foreground transition-all duration-150 ease-out hover:bg-muted sm:w-auto">Cancel</button>
+                                      <button type="button" onClick={() => saveEdit(seg.id)} disabled={isSaving} className="admin-primary-button min-h-11 w-full rounded-xl px-5 text-sm font-semibold text-white transition-all duration-150 ease-out disabled:opacity-50 sm:w-auto">
                                         {isSaving ? "Saving…" : "Save changes"}
                                       </button>
                                     </div>
