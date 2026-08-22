@@ -39,9 +39,18 @@ export type AdminReviewContact = {
 type Props = {
   submissionId: number
   initialContacts: AdminReviewContact[]
+  initialReviewStatus: SubmissionReviewStatus
   apiUrl: string
   children?: ReactNode
 }
+
+export type SubmissionReviewStatus = "pending" | "in_review" | "reviewed"
+
+const SUBMISSION_STATUSES: { value: SubmissionReviewStatus; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "in_review", label: "In review" },
+  { value: "reviewed", label: "Reviewed" },
+]
 
 const STATUS_COLORS: Record<string, string> = {
   "Potentially French": "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300",
@@ -61,8 +70,10 @@ function normalizeSurname(lastName: string) {
     .replace(/[\u0300-\u036f]/g, "")
 }
 
-export function AdminContactReview({ submissionId, initialContacts, apiUrl, children }: Props) {
+export function AdminContactReview({ submissionId, initialContacts, initialReviewStatus, apiUrl, children }: Props) {
   const [contacts, setContacts] = useState(initialContacts)
+  const [reviewStatus, setReviewStatus] = useState(initialReviewStatus)
+  const [savingReviewStatus, setSavingReviewStatus] = useState(false)
   const [busy, setBusy] = useState<Record<string, boolean>>({})
   const [searchText, setSearchText] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -112,6 +123,28 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
         delete next[key]
         return next
       })
+    }
+  }
+
+  async function changeReviewStatus(nextStatus: SubmissionReviewStatus) {
+    if (nextStatus === reviewStatus || savingReviewStatus) return
+    const previousStatus = reviewStatus
+    setReviewStatus(nextStatus)
+    setSavingReviewStatus(true)
+    try {
+      const response = await fetch(apiUrl, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: submissionId, review_status: nextStatus }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result?.error || "Unable to update submission status")
+      toast.success(`Submission marked ${SUBMISSION_STATUSES.find((status) => status.value === nextStatus)?.label.toLowerCase()}.`)
+    } catch (error) {
+      setReviewStatus(previousStatus)
+      toast.error(error instanceof Error ? error.message : "Unable to update submission status")
+    } finally {
+      setSavingReviewStatus(false)
     }
   }
 
@@ -187,7 +220,7 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
 
       {children}
 
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full sm:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
@@ -204,13 +237,25 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
             </button>
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
-          <Label htmlFor={`contact-status-filter-${submissionId}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</Label>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Label htmlFor={`submission-status-${submissionId}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Submission</Label>
+          <select
+            id={`submission-status-${submissionId}`}
+            value={reviewStatus}
+            disabled={savingReviewStatus}
+            onChange={(event) => void changeReviewStatus(event.target.value as SubmissionReviewStatus)}
+            className="admin-field h-10 min-w-32 rounded-md px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            aria-label="Submission status"
+          >
+            {SUBMISSION_STATUSES.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+          </select>
+          <Label htmlFor={`contact-status-filter-${submissionId}`} className="ml-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contacts</Label>
           <select
             id={`contact-status-filter-${submissionId}`}
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="admin-field h-10 min-w-44 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="admin-field h-10 min-w-40 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Filter contacts by status"
           >
             <option value="all">All statuses</option>
             {availableStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -271,13 +316,14 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                             <span>
                               <Button
                                 type="button"
-                                size="sm"
+                                size="icon"
                                 variant={contact.checkedOnForebears ? "secondary" : "outline"}
                                 disabled={forebearsDisabled}
                                 onClick={() => research(contact, "forebears")}
-                                className={contact.checkedOnForebears ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400" : ""}
+                                aria-label="Search surname on Forebears"
+                                className={`h-10 w-10 ${contact.checkedOnForebears ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400" : ""}`}
                               >
-                                <Globe aria-hidden="true" />Forebears
+                                <Globe className="h-4 w-4" aria-hidden="true" />
                               </Button>
                             </span>
                           </TooltipTrigger>
@@ -288,13 +334,14 @@ export function AdminContactReview({ submissionId, initialContacts, apiUrl, chil
                             <span>
                               <Button
                                 type="button"
-                                size="sm"
+                                size="icon"
                                 variant={contact.checkedOnTPS ? "secondary" : "outline"}
                                 disabled={tpsDisabled}
                                 onClick={() => research(contact, "truePeopleSearch")}
-                                className={contact.checkedOnTPS ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400" : ""}
+                                aria-label="Search name and ZIP on TruePeopleSearch"
+                                className={`h-10 w-10 ${contact.checkedOnTPS ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400" : ""}`}
                               >
-                                <Search aria-hidden="true" />TruePeople
+                                <Search className="h-4 w-4" aria-hidden="true" />
                               </Button>
                             </span>
                           </TooltipTrigger>

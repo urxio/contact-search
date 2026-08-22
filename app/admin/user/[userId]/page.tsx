@@ -114,7 +114,7 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        <AdminContactReview key={targetId} submissionId={Number(targetId)} initialContacts={contacts} apiUrl="/api/admin/submissions">
+        <AdminContactReview key={targetId} submissionId={Number(targetId)} initialContacts={contacts} initialReviewStatus={submission.review_status || "pending"} apiUrl="/api/admin/submissions">
           {submission.global_notes && (
             <div className="admin-material mb-6 rounded-2xl p-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Territory notes</h2>

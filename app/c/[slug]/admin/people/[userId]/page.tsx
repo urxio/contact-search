@@ -28,7 +28,7 @@ export default async function CongregationPersonPage({
   const displayName = decodeURIComponent(params.userId)
   const submissions = await pool.query(
     `SELECT id, submitted_at, contact_count, territory_zipcode, territory_page_range,
-            global_notes, contacts
+            global_notes, contacts, review_status
      FROM submissions
      WHERE congregation_id = $1 AND user_id = $2
      ORDER BY submitted_at DESC`,
@@ -83,6 +83,7 @@ export default async function CongregationPersonPage({
         key={submission.id}
         submissionId={Number(submission.id)}
         initialContacts={contacts}
+        initialReviewStatus={submission.review_status || "pending"}
         apiUrl={`/api/c/${params.slug}/admin/submissions`}
       >
         {submission.global_notes ? (
