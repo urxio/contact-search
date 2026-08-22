@@ -17,6 +17,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const result = await pool.query(
       `${PACKAGE_SELECT}
         WHERE cp.congregation_id=$1
+          AND s.status <> 'Completed'
           AND ($2::boolean OR cp.visibility='shared' OR cp.uploaded_by_user_id=$3 OR s.owner_user_id=$3)
         ORDER BY cp.created_at DESC,cp.id DESC`,
       [auth.congregation.id, manageAll, auth.user.id],

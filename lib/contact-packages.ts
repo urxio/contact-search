@@ -117,6 +117,7 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
 }
 
 export function isPackageBrowsable(row: any, viewerUserId: number, includedPackageId?: number | null) {
+  if (row.status === "Completed") return false
   if (row.visibility !== "shared") return true
   if (row.owner_user_id == null) return true
   return Number(row.id) === includedPackageId && Number(row.owner_user_id) === viewerUserId

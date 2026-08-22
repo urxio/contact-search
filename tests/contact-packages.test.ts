@@ -58,4 +58,12 @@ describe("contact packages", () => {
     expect(isPackageBrowsable(assigned, 99, 14)).toBe(false)
     expect(isPackageBrowsable({ ...assigned, owner_user_id: null }, 99)).toBe(true)
   })
+
+  it("hides submitted Excels from browsing for every viewer", () => {
+    const submitted = { id: 14, visibility: "shared", owner_user_id: 22, status: "Completed" }
+    expect(isPackageBrowsable(submitted, 22)).toBe(false)
+    expect(isPackageBrowsable(submitted, 22, 14)).toBe(false)
+    expect(isPackageBrowsable({ ...submitted, visibility: "private" }, 22)).toBe(false)
+    expect(isPackageBrowsable({ ...submitted, owner_user_id: null }, 99)).toBe(false)
+  })
 })
