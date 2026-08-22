@@ -327,11 +327,24 @@ export default function AdminDashboard() {
           >
             Review queue
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("potentiallyFrench")
+              setVisitedTabs((visited) => new Set(visited).add("potentiallyFrench"))
+            }}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out ${
+              activeTab === "potentiallyFrench"
+                ? "bg-muted/70 text-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+            }`}
+          >
+            Potential Frenchs
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  activeTab !== "submissions"
+                  activeTab === "dictionaryScan" || activeTab === "names" || activeTab === "otm"
                     ? "bg-muted/70 text-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
                 }`}
@@ -346,7 +359,6 @@ export default function AdminDashboard() {
               {([
                 ["dictionaryScan", "Find missed French contacts"],
                 ["names", "Manage name dictionary"],
-                ["potentiallyFrench", "Review French contacts"],
                 ["otm", "Database Duplicates Check"],
               ] as const).map(([tab, label]) => (
                 <DropdownMenuItem
@@ -1978,7 +1990,7 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Review French contacts</h2>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Potential Frenchs</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {totalCount} contact{totalCount !== 1 ? "s" : ""} across all users
             {duplicateCount > 0 && (
