@@ -1774,7 +1774,7 @@ export default function SearchHelper({
 
             <div className="flex items-baseline gap-1.5 min-w-0">
               <span className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate">
-                Search Helper
+                Name Search
               </span>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 shrink-0">
                 v2
@@ -2320,7 +2320,7 @@ export default function SearchHelper({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              👋 Welcome to OTMRT Helper!
+              👋 Welcome to Name Search!
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-500 mt-1">
               It looks like this is your first time here. Would you like a quick tour of all the features before you get started?

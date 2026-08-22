@@ -191,7 +191,7 @@ export function PersonalSettings({
           <Card className="admin-card rounded-2xl">
             <CardHeader>
               <CardTitle className="text-base font-semibold">Preferences</CardTitle>
-              <CardDescription>Choose how Search Helper looks and where congregation links open.</CardDescription>
+              <CardDescription>Choose how Name Search looks and where congregation links open.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
               <fieldset className="space-y-3">

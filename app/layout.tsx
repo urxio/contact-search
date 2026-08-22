@@ -8,11 +8,11 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
   title: {
-    default: "Search Helper",
-    template: "%s · Search Helper",
+    default: "Name Search",
+    template: "%s · Name Search",
   },
   description: "A private congregation workspace for contact search and team progress.",
-  generator: "Search Helper",
+  generator: "Name Search",
 }
 
 export default function RootLayout({

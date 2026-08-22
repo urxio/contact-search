@@ -11,7 +11,7 @@ export default function CongregationError({ reset }: { error: Error & { digest?:
         <div className="admin-icon-well mx-auto flex h-12 w-12 items-center justify-center rounded-xl text-primary">
           <AlertCircle className="h-6 w-6" aria-hidden="true" />
         </div>
-        <h1 className="mt-4 text-2xl font-bold leading-tight">Search Helper did not finish loading</h1>
+        <h1 className="mt-4 text-2xl font-bold leading-tight">Name Search did not finish loading</h1>
         <p className="mt-2 text-sm font-normal leading-relaxed text-muted-foreground">
           Your saved work is safe. Retry the connection to reopen this congregation workspace.
         </p>

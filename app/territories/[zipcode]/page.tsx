@@ -174,18 +174,18 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* OTMRT Helper link */}
+            {/* Name Search link */}
             <Link
               href="/"
               className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
-              title="Open OTMRT Helper site"
+              title="Open Name Search"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
                 <line x1="10" y1="14" x2="21" y2="3"/>
               </svg>
-              OTMRT
+              Name Search
             </Link>
             {/* Dark mode toggle */}
             <ThemeSwitcher className="h-9 w-9 rounded-lg shadow-none hover:translate-y-0 hover:bg-gray-100 dark:hover:bg-gray-800" />

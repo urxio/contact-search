@@ -13,7 +13,7 @@ export default function SignInPage() {
     <ThemeSwitcher className="admin-material absolute right-4 top-4" />
     <section className="admin-material w-full max-w-sm rounded-3xl p-8" aria-labelledby="signin-title">
       <div className="admin-icon-well mb-6 flex h-12 w-12 items-center justify-center rounded-2xl text-primary"><LockKeyhole className="h-5 w-5" aria-hidden /></div>
-      <h1 id="signin-title" className="text-2xl font-bold tracking-tight">Welcome back</h1><p className="mb-6 mt-1 text-sm text-muted-foreground">Sign in to Search Helper.</p>
+      <h1 id="signin-title" className="text-2xl font-bold tracking-tight">Welcome back</h1><p className="mb-6 mt-1 text-sm text-muted-foreground">Sign in to Name Search.</p>
       <form onSubmit={submit} className="space-y-4">
         <label className="block text-sm font-medium" htmlFor="email">Email</label><input id="email" type="email" autoComplete="email" className="admin-field h-11 w-full rounded-xl px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={email} onChange={e=>setEmail(e.target.value)} required />
         <label className="block text-sm font-medium" htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" className="admin-field h-11 w-full rounded-xl px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={password} onChange={e=>setPassword(e.target.value)} required />

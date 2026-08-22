@@ -200,7 +200,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                 <Settings2 className="h-5 w-5" aria-hidden="true" />
               </div>
               <CardTitle className="text-base font-semibold">General</CardTitle>
-              <CardDescription>Update the congregation name and its address in Search Helper.</CardDescription>
+              <CardDescription>Update the congregation name and its address in Name Search.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">

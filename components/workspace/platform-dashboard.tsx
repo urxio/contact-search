@@ -151,7 +151,7 @@ export function PlatformDashboard() {
     return (
       <div className="space-y-6">
         <div className="flex justify-end">{createButton}</div>
-        <EmptyState icon={Building2} title="Create the first congregation" description="Each congregation gets a private Search Helper and Team Progress workspace with isolated members and data." />
+        <EmptyState icon={Building2} title="Create the first congregation" description="Each congregation gets a private Name Search and Team Progress workspace with isolated members and data." />
       </div>
     )
   }
