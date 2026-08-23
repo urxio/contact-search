@@ -948,8 +948,7 @@ function OtmPanel() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Database Duplicates Check</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-          Upload an Excel or CSV file containing known database addresses. The tool scans all non-archived submissions
-          and flags Potentially French contacts whose address matches the file.
+          Upload an Excel or CSV file of known congregation addresses. This tool compares it with Potentially French contacts in every non-archived submission and flags exact or possible address matches. Removing a match deletes that duplicate contact from its submission; clearing a result only hides it from this report.
         </p>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -1474,7 +1473,7 @@ function DictionaryFeedbackPanel() {
       <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white">Manage name dictionary</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Last names from "Potentially French" contacts missing from the dictionary, and names marked "Not French" that are still in it.
+          Control the surnames used to detect Potentially French contacts. Add suggestions are surnames manually marked Potentially French but missing from the dictionary; remove suggestions are dictionary surnames found on contacts marked Not French. Applying a change affects future detection, while Dismiss only hides the suggestion.
         </p>
       </div>
 
@@ -2548,8 +2547,7 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Find missed French contacts</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Contacts not marked "Potentially French" whose last name is already in the dictionary — likely missed or
-            outdated classifications. Scanned {totalScanned} contact{totalScanned !== 1 ? "s" : ""}.
+            Scan non-archived submissions for contacts not marked Potentially French whose surname is already in the dictionary. Research each match, mark it Potentially French, remove an incorrect surname from the shared dictionary, or dismiss the suggestion without changing the contact. Scanned {totalScanned} contact{totalScanned !== 1 ? "s" : ""}.
           </p>
           {reviewedNotice && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">{reviewedNotice}</p>
