@@ -292,7 +292,9 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
           <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle className="text-base font-semibold">Members</CardTitle>
-              <CardDescription className="mt-2">Memberships and roles are managed only inside this congregation.</CardDescription>
+              <CardDescription className="mt-2 max-w-3xl leading-relaxed">
+                Manage roles and access for this congregation. Admin grants settings and member-management permissions; Deactivate removes access without deleting past work. Reset link copies a secure, one-hour URL the member can use to choose a new password.
+              </CardDescription>
             </div>
             <div className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary">
               <UsersRound className="h-5 w-5" aria-hidden="true" />
