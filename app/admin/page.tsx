@@ -354,22 +354,23 @@ export default function AdminDashboard() {
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="admin-material w-56 rounded-2xl p-2">
+            <DropdownMenuContent align="start" className="admin-material w-80 rounded-2xl p-2">
               <DropdownMenuLabel>Review tools</DropdownMenuLabel>
               {([
-                ["dictionaryScan", "Find missed French contacts"],
-                ["names", "Manage name dictionary"],
-                ["otm", "Database Duplicates Check"],
-              ] as const).map(([tab, label]) => (
+                ["dictionaryScan", "Find missed French contacts", "Find contacts whose surnames match the dictionary but were not flagged."],
+                ["names", "Manage name dictionary", "Add or remove surnames used for automatic French detection."],
+                ["otm", "Database Duplicates Check", "Compare submitted addresses with an uploaded congregation database."],
+              ] as const).map(([tab, label, description]) => (
                 <DropdownMenuItem
                   key={tab}
                   onSelect={() => {
                     setActiveTab(tab)
                     setVisitedTabs((visited) => new Set(visited).add(tab))
                   }}
-                  className={activeTab === tab ? "bg-accent" : ""}
+                  className={`flex-col items-start gap-0.5 py-2.5 ${activeTab === tab ? "bg-accent" : ""}`}
                 >
-                  {label}
+                  <span className="font-medium">{label}</span>
+                  <span className="text-xs font-normal leading-relaxed text-muted-foreground">{description}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
