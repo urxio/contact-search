@@ -9,8 +9,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     const auth = await requireCongregationAdmin(params.slug)
     const result = await pool.query(
       `SELECT i.id, i.email, i.role, i.expires_at AS "expiresAt", i.accepted_at AS "acceptedAt",
-              i.created_at AS "createdAt", l.display_name AS "legacyDisplayName"
-       FROM invitations i LEFT JOIN legacy_identities l ON l.id = i.legacy_identity_id
+              i.revoked_at AS "revokedAt", i.created_at AS "createdAt",
+              l.display_name AS "legacyDisplayName", u.display_name AS "createdByDisplayName"
+       FROM invitations i
+       LEFT JOIN legacy_identities l ON l.id = i.legacy_identity_id
+       LEFT JOIN users u ON u.id = i.created_by_user_id
        WHERE i.congregation_id = $1 ORDER BY i.created_at DESC`,
       [auth.congregation.id],
     )
@@ -65,7 +68,9 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     const id = integer(req.nextUrl.searchParams.get("id"))
     if (!id) return NextResponse.json({ error: "Invalid invitation id." }, { status: 400 })
     const result = await pool.query(
-      `DELETE FROM invitations WHERE id = $1 AND congregation_id = $2 AND accepted_at IS NULL RETURNING id`,
+      `UPDATE invitations SET revoked_at = NOW()
+       WHERE id = $1 AND congregation_id = $2 AND accepted_at IS NULL AND revoked_at IS NULL
+       RETURNING id`,
       [id, auth.congregation.id],
     )
     if (!result.rows[0]) return NextResponse.json({ error: "Invitation not found." }, { status: 404 })

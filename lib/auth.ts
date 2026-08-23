@@ -153,7 +153,7 @@ export async function consumeInvitation(token: string, input: { displayName?: st
   const client = await pool.connect()
   try {
     await client.query("BEGIN")
-    const invitation = await client.query(`SELECT i.*,c.slug FROM invitations i JOIN congregations c ON c.id=i.congregation_id WHERE token_hash=$1 AND accepted_at IS NULL AND expires_at>NOW() FOR UPDATE OF i`, [tokenHash(token)])
+    const invitation = await client.query(`SELECT i.*,c.slug FROM invitations i JOIN congregations c ON c.id=i.congregation_id WHERE token_hash=$1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>NOW() FOR UPDATE OF i`, [tokenHash(token)])
     if (!invitation.rowCount) throw new AuthError(404, "Invitation is invalid or expired")
     const invite = invitation.rows[0]
     const existing = await client.query(`SELECT id,password_hash FROM users WHERE email=$1`, [invite.email])

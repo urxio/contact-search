@@ -7,7 +7,7 @@ const digest = (token: string) => createHash("sha256").update(token).digest("hex
 
 export async function GET(_: NextRequest, { params }: { params: { token: string } }) {
   await ensureSchema()
-  const result = await pool.query(`SELECT i.email,i.role,i.expires_at,c.name congregation_name FROM invitations i JOIN congregations c ON c.id=i.congregation_id WHERE i.token_hash=$1 AND i.accepted_at IS NULL AND i.expires_at>NOW()`, [digest(params.token)])
+  const result = await pool.query(`SELECT i.email,i.role,i.expires_at,c.name congregation_name FROM invitations i JOIN congregations c ON c.id=i.congregation_id WHERE i.token_hash=$1 AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>NOW()`, [digest(params.token)])
   if (!result.rowCount) return NextResponse.json({ error: "Invitation is invalid or expired" }, { status: 404 })
   return NextResponse.json(result.rows[0])
 }

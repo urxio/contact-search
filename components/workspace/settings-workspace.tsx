@@ -1,9 +1,21 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { Check, Copy, Loader2, MailPlus, MapPinned, Save, Settings2, UserRound, UsersRound } from "lucide-react"
+import { Check, Clock3, Copy, Loader2, MailPlus, MapPinned, Save, Settings2, Trash2, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -29,6 +41,18 @@ type InvitationResult = {
   url?: string
   inviteUrl?: string
   token?: string
+}
+
+type Invitation = {
+  id: number
+  email: string
+  role: "member" | "admin"
+  createdAt: string
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  legacyDisplayName: string | null
+  createdByDisplayName: string | null
 }
 
 type Member = {
@@ -60,6 +84,9 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member")
   const [inviteUrl, setInviteUrl] = useState("")
   const [inviting, setInviting] = useState(false)
+  const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [invitationsLoading, setInvitationsLoading] = useState(true)
+  const [revokingInvitationId, setRevokingInvitationId] = useState<number | null>(null)
   const [legacyIdentityId, setLegacyIdentityId] = useState("")
   const [members, setMembers] = useState<Member[]>([])
   const [legacyIdentities, setLegacyIdentities] = useState<LegacyIdentity[]>([])
@@ -96,6 +123,17 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   }
 
   useEffect(loadMembers, [slug])
+
+  function loadInvitations() {
+    setInvitationsLoading(true)
+    fetch(`/api/c/${slug}/invitations`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setInvitations(data?.invitations ?? []))
+      .catch(() => setInvitations([]))
+      .finally(() => setInvitationsLoading(false))
+  }
+
+  useEffect(loadInvitations, [slug])
 
   async function saveSettings(event: FormEvent) {
     event.preventDefault()
@@ -140,6 +178,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
       const path = result.url ?? result.inviteUrl ?? (result.token ? `/join/${result.token}` : "")
       const absoluteUrl = path.startsWith("http") ? path : `${window.location.origin}${path}`
       setInviteUrl(absoluteUrl)
+      loadInvitations()
       toast.success("Invitation link created")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Invitation could not be created")
@@ -151,6 +190,31 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   async function copyInvitation() {
     await navigator.clipboard.writeText(inviteUrl)
     toast.success("Invitation link copied")
+  }
+
+  async function revokeInvitation(invitation: Invitation) {
+    setRevokingInvitationId(invitation.id)
+    try {
+      const response = await fetch(`/api/c/${slug}/invitations?id=${invitation.id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Invitation could not be revoked")
+      toast.success(`Invitation for ${invitation.email} revoked`)
+      loadInvitations()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invitation could not be revoked")
+    } finally {
+      setRevokingInvitationId(null)
+    }
+  }
+
+  function invitationStatus(invitation: Invitation) {
+    if (invitation.acceptedAt) return "Accepted"
+    if (invitation.revokedAt) return "Revoked"
+    if (new Date(invitation.expiresAt).getTime() <= Date.now()) return "Expired"
+    return "Pending"
+  }
+
+  function formatDate(value: string) {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value))
   }
 
   async function updateMember(member: Member, changes: Partial<Pick<Member, "role" | "status">>) {
@@ -281,7 +345,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <CardTitle className="text-base font-semibold">Invitations</CardTitle>
             <CardDescription>Create a secure link to copy and share manually.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <Dialog onOpenChange={(open) => !open && setInviteUrl("")}>
               <DialogTrigger asChild>
                 <Button className="admin-primary-button min-h-11 rounded-xl">
@@ -345,6 +409,70 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                 )}
               </DialogContent>
             </Dialog>
+            <div className="border-t pt-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold">Invitation history</h3>
+                <p className="mt-1 text-sm font-normal text-muted-foreground">A record of links created for this congregation.</p>
+              </div>
+              {invitationsLoading ? (
+                <div className="h-28 animate-pulse rounded-xl bg-muted" aria-label="Loading invitations" aria-busy="true" />
+              ) : invitations.length ? (
+                <ul className="divide-y rounded-xl border" aria-label="Invitation history">
+                  {invitations.map((invitation) => {
+                    const status = invitationStatus(invitation)
+                    return (
+                      <li key={invitation.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+                        <span className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary">
+                          <Clock3 className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold">{invitation.email}</p>
+                            <Badge variant={status === "Pending" ? "default" : "secondary"}>{status}</Badge>
+                            <Badge variant="outline" className="capitalize">{invitation.role}</Badge>
+                          </div>
+                          <p className="mt-1 text-xs font-normal text-muted-foreground">
+                            Created {formatDate(invitation.createdAt)}{invitation.createdByDisplayName ? ` by ${invitation.createdByDisplayName}` : ""}
+                            {status === "Accepted" && invitation.acceptedAt ? ` · Accepted ${formatDate(invitation.acceptedAt)}` : null}
+                            {status === "Revoked" && invitation.revokedAt ? ` · Revoked ${formatDate(invitation.revokedAt)}` : null}
+                            {status === "Pending" || status === "Expired" ? ` · Expires ${formatDate(invitation.expiresAt)}` : null}
+                          </p>
+                          {invitation.legacyDisplayName ? <p className="mt-1 text-xs font-normal text-muted-foreground">Historical work: {invitation.legacyDisplayName}</p> : null}
+                        </div>
+                        {status === "Pending" ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button type="button" variant="ghost" className="min-h-11 rounded-xl text-destructive hover:text-destructive">
+                                <Trash2 aria-hidden="true" />
+                                Revoke
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-2xl sm:max-w-md">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>
+                                <AlertDialogDescription>The link for {invitation.email} will stop working. The invitation will remain in the history as revoked.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction disabled={revokingInvitationId === invitation.id} onClick={() => revokeInvitation(invitation)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  {revokingInvitationId === invitation.id ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+                                  Revoke invitation
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <div className="rounded-xl border border-dashed px-6 py-8 text-center">
+                  <p className="text-sm font-semibold">No invitations yet</p>
+                  <p className="mt-1 text-sm font-normal text-muted-foreground">New invitations will appear here after they are created.</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </TabsContent>

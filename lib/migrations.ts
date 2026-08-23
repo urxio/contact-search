@@ -147,6 +147,11 @@ const migrations: Migration[] = [{
       )
     }
   }
+},{
+  version:9,name:"invitation revocation history",async run(client){
+    await client.query(`ALTER TABLE invitations ADD COLUMN revoked_at TIMESTAMPTZ`)
+    await client.query(`CREATE INDEX invitations_tenant_date_idx ON invitations(congregation_id,created_at DESC)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
