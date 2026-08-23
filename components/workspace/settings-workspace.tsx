@@ -482,7 +482,9 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
           <Card className="admin-card rounded-2xl">
             <CardHeader>
               <CardTitle className="text-base font-semibold">Search territory ZIPs</CardTitle>
-              <CardDescription>Contacts outside these ZIP codes are excluded from congregation search results.</CardDescription>
+              <CardDescription className="max-w-3xl leading-relaxed">
+                These ZIP codes define your congregation&apos;s search territory. When a member edits a contact&apos;s ZIP code to one not listed here, the app shows an &quot;Outside territory&quot; warning and marks the contact as &quot;Different territory.&quot; The contact remains visible and can still be reviewed or submitted.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
