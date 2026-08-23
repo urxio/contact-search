@@ -7,6 +7,7 @@ import {
   Archive,
   ArchiveRestore,
   ArrowUpDown,
+  BookOpen,
   CheckCircle2,
   ChevronDown,
   Filter as FilterIcon,
@@ -102,6 +103,7 @@ export default function AdminDashboard() {
   const workspace = useWorkspaceRuntime()
   const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
   const adminPeopleBase = workspace ? `/c/${workspace.slug}/admin/people` : "/admin/user"
+  const toolsHelpHref = workspace ? `/c/${workspace.slug}/admin/tools-help` : "/admin/tools-help"
   const [activeTab, setActiveTab] = useState<"submissions" | "otm" | "names" | "potentiallyFrench" | "dictionaryScan">("submissions")
   // Tabs mount lazily on first visit, then stay mounted (just hidden via
   // CSS) — switching back to an already-visited tab no longer re-runs its
@@ -373,6 +375,16 @@ export default function AdminDashboard() {
                   <span className="text-xs font-normal leading-relaxed text-muted-foreground">{description}</span>
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild className="py-2.5">
+                <Link href={toolsHelpHref} className="flex items-start gap-2">
+                  <BookOpen className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    <span className="block font-medium">Tools FAQ</span>
+                    <span className="block text-xs font-normal leading-relaxed text-muted-foreground">Learn what every tool and action button does.</span>
+                  </span>
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
