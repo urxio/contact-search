@@ -72,13 +72,13 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     if (!userId) return NextResponse.json({ error: "Invalid user id." }, { status: 400 })
     if (userId === auth.user.id) return NextResponse.json({ error: "You cannot remove yourself." }, { status: 400 })
     const result = await pool.query(
-      `UPDATE congregation_memberships SET status = 'inactive', updated_at = NOW()
-       WHERE congregation_id = $1 AND user_id = $2 AND status <> 'inactive' RETURNING id`,
+      `DELETE FROM congregation_memberships
+       WHERE congregation_id = $1 AND user_id = $2 RETURNING id`,
       [auth.congregation.id, userId],
     )
     if (!result.rows[0]) return NextResponse.json({ error: "Member not found." }, { status: 404 })
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
-      action: "membership.removed", targetType: "user", targetId: String(userId) })
+      action: "membership.deleted", targetType: "user", targetId: String(userId) })
     return NextResponse.json({ success: true })
   } catch (error) {
     return apiError(error)

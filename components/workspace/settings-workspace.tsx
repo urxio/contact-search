@@ -517,6 +517,17 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     loadMembers()
   }
 
+  async function deleteMember(member: Member) {
+    const response = await fetch(`/api/c/${slug}/members?userId=${member.userId}`, { method: "DELETE" })
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}))
+      toast.error(result.error || "Member could not be permanently deleted")
+      return
+    }
+    toast.success(`${member.congregationDisplayName || member.displayName} permanently removed`)
+    loadMembers()
+  }
+
   async function copyPasswordReset(member: Member) {
     const response = await fetch(`/api/c/${slug}/members/${member.userId}/password-reset`, { method: "POST" })
     if (!response.ok) {
@@ -579,7 +590,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <div>
               <CardTitle className="text-base font-semibold">Members</CardTitle>
               <CardDescription className="mt-2 max-w-3xl leading-relaxed">
-                Manage roles and access for this congregation. Admin grants settings and member-management permissions; Deactivate removes access without deleting past work. Reset link copies a secure, one-hour URL the member can use to choose a new password.
+                Manage roles and access for this congregation. Admin grants settings and member-management permissions; Deactivate removes access without deleting past work. Permanently deleting a member removes their congregation access and saved membership preferences, but preserves their account and past work. Reset link copies a secure, one-hour URL the member can use to choose a new password.
               </CardDescription>
             </div>
             <div className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary">
@@ -613,6 +624,26 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                         <Copy aria-hidden="true" />
                         Reset link
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button type="button" variant="ghost" className="min-h-11 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                            <Trash2 aria-hidden="true" />
+                            Delete permanently
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-2xl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Permanently delete {member.congregationDisplayName || member.displayName}?</AlertDialogTitle>
+                            <AlertDialogDescription>This removes their access and membership preferences for this congregation. Their account and past work will be preserved. This cannot be undone.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="min-h-11 rounded-xl">Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="min-h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={(event) => { event.preventDefault(); void deleteMember(member) }}>
+                              Delete permanently
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </li>
                 ))}
