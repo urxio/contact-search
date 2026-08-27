@@ -33,6 +33,31 @@ export const AREA_COLOR_OPTIONS = [
 
 export const AREA_COLOR_VALUES = AREA_COLOR_OPTIONS.map((option) => option.value)
 
+const AREA_COLOR_HEX: Record<string, string> = {
+  sky: "#0ea5e9",
+  violet: "#8b5cf6",
+  emerald: "#10b981",
+  amber: "#f59e0b",
+  rose: "#f43f5e",
+  cyan: "#06b6d4",
+  orange: "#f97316",
+  fuchsia: "#d946ef",
+}
+
+export function isAreaCardHexColor(color: string) {
+  return /^#[0-9a-f]{6}$/i.test(color)
+}
+
+export function areaCardPickerValue(selectedColor?: string) {
+  if (selectedColor && isAreaCardHexColor(selectedColor)) return selectedColor
+  return selectedColor ? AREA_COLOR_HEX[selectedColor] ?? "#e2e8f0" : "#e2e8f0"
+}
+
+export function areaCardColorStyle(selectedColor?: string) {
+  if (!selectedColor || !isAreaCardHexColor(selectedColor)) return undefined
+  return { backgroundColor: selectedColor, borderColor: selectedColor }
+}
+
 /** Returns a stable, accessible background color for a named territory area. */
 export function areaColorClass(area: string | undefined, areaOrder: string[]) {
   if (!area) return ""
@@ -44,6 +69,7 @@ export function areaColorClass(area: string | undefined, areaOrder: string[]) {
 /** Returns a stable card accent for a named territory area. */
 export function areaCardColorClass(area: string, areaOrder: string[], selectedColor?: string) {
   if (area.toLocaleLowerCase() === "unassigned") return "border-border bg-muted/40"
+  if (selectedColor && isAreaCardHexColor(selectedColor)) return ""
   const explicitColorIndex = AREA_COLOR_VALUES.indexOf(selectedColor as typeof AREA_COLOR_VALUES[number])
   if (explicitColorIndex >= 0) return AREA_CARD_COLOR_CLASSES[explicitColorIndex]
   const areaIndex = areaOrder.findIndex((value) => value.localeCompare(area, undefined, { sensitivity: "accent" }) === 0)

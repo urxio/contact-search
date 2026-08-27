@@ -32,8 +32,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { areaCardColorClass } from "@/lib/area-colors"
-import { AREA_COLOR_OPTIONS } from "@/lib/area-colors"
+import { areaCardColorClass, areaCardColorStyle, areaCardPickerValue } from "@/lib/area-colors"
 
 type SettingsWorkspaceProps = {
   slug: string
@@ -899,6 +898,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                     key={area}
                     aria-labelledby={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                     className={`flex h-96 flex-col overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ease-out hover:shadow-md ${areaCardColorClass(area, territoryAreas, selectedAreaColor(area))}`}
+                    style={areaCardColorStyle(selectedAreaColor(area))}
                   >
                     <div className="flex items-start justify-between gap-3 border-b border-current/10 p-4">
                       <div className="min-w-0">
@@ -906,21 +906,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                         <h3 id={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="mt-1 truncate text-base font-semibold">{area}</h3>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        {!isUnassignedArea(area) && (
-                          <Select value={selectedAreaColor(area)} onValueChange={(color) => updateAreaColor(area, color)} disabled={areaColorSaving === area}>
-                            <SelectTrigger aria-label={`Change ${area} card color`} className="h-9 w-24 rounded-lg bg-background/80 text-xs font-semibold">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="auto">Auto</SelectItem>
-                              {AREA_COLOR_OPTIONS.map((color) => (
-                                <SelectItem key={color.value} value={color.value}>
-                                  <span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${color.swatchClass}`} aria-hidden="true" />{color.label}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
                         <Badge variant="outline" className="bg-background/80 font-normal">
                           {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
                         </Badge>
@@ -1034,7 +1019,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <DialogHeader>
               <DialogTitle className="text-base font-semibold">Manage Team Progress areas</DialogTitle>
               <DialogDescription className="text-sm font-normal leading-relaxed">
-                Rename areas, change their display order, or remove an area. Removing an area moves its ZIPs to Unassigned and keeps all Team Progress history.
+              Set each card&apos;s color, rename areas, change their display order, or remove an area. Removing an area moves its ZIPs to Unassigned and keeps all Team Progress history.
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
@@ -1072,7 +1057,18 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                         {isUnassigned ? (
                           <p className="text-xs font-normal text-muted-foreground">Always last</p>
                         ) : (
-                          <div className="flex shrink-0 items-center gap-1">
+                          <div className="flex shrink-0 items-center gap-2">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                              <span>Card color</span>
+                              <input
+                                type="color"
+                                value={areaCardPickerValue(selectedAreaColor(area))}
+                                onChange={(event) => updateAreaColor(area, event.target.value)}
+                                disabled={areaColorSaving === area}
+                                aria-label={`Choose ${area} card color`}
+                                className="h-9 w-12 cursor-pointer rounded-lg border bg-background p-1 disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            </label>
                             <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving || firstMovable} onClick={() => moveArea(area, -1)} aria-label={`Move ${area} up`} className="rounded-xl">
                               <ArrowUp aria-hidden="true" />
                             </Button>

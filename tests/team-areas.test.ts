@@ -124,13 +124,13 @@ describe("Team Progress area management route", () => {
     const response = await PATCH(new NextRequest("https://search.example/api/c/central/settings/territory-areas", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
-      body: JSON.stringify({ action: "set-color", area: "North", color: "rose" }),
+      body: JSON.stringify({ action: "set-color", area: "North", color: "#ef4444" }),
     }), { params: { slug: "central" } })
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ success: true, areas: ["North", "Unassigned"], areaColors: { North: "rose" } })
+    expect(await response.json()).toEqual({ success: true, areas: ["North", "Unassigned"], areaColors: { North: "#ef4444" } })
     const settingsCall = mocks.clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE congregations SET settings"))
-    expect(JSON.parse(settingsCall?.[1][1])).toEqual({ teamProgressAreaColors: { North: "rose" } })
+    expect(JSON.parse(settingsCall?.[1][1])).toEqual({ teamProgressAreaColors: { North: "#ef4444" } })
     expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "team.area.color_updated" }))
   })
 

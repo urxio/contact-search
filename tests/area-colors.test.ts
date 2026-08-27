@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { areaCardColorClass, areaColorClass } from "@/lib/area-colors"
+import { areaCardColorClass, areaCardColorStyle, areaCardPickerValue, areaColorClass } from "@/lib/area-colors"
 
 describe("areaColorClass", () => {
   const areas = ["Central", "East", "West"]
@@ -21,7 +21,9 @@ describe("areaColorClass", () => {
     expect(areaCardColorClass("Unknown", areas)).toContain("border-border")
   })
 
-  it("honors a selected color over the automatic area color", () => {
-    expect(areaCardColorClass("Central", areas, "rose")).toContain("rose")
+  it("uses an explicitly selected hex color as the card fill", () => {
+    expect(areaCardColorClass("Central", areas, "#ef4444")).toBe("")
+    expect(areaCardColorStyle("#ef4444")).toEqual({ backgroundColor: "#ef4444", borderColor: "#ef4444" })
+    expect(areaCardPickerValue("rose")).toBe("#f43f5e")
   })
 })

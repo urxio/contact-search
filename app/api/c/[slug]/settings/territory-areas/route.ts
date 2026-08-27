@@ -4,7 +4,7 @@ import type { PoolClient } from "pg"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
 import { pool } from "@/lib/db"
 import { orderedTeamAreas, UNASSIGNED_TEAM_AREA } from "@/lib/team-areas"
-import { AREA_COLOR_VALUES } from "@/lib/area-colors"
+import { AREA_COLOR_VALUES, isAreaCardHexColor } from "@/lib/area-colors"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
 async function loadLockedAreas(client: PoolClient, congregationId: number) {
@@ -121,7 +121,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
           await client.query("ROLLBACK")
           return NextResponse.json({ error: "Unassigned has no area color." }, { status: 400 })
         }
-        if (color !== "auto" && !AREA_COLOR_VALUES.includes(color as typeof AREA_COLOR_VALUES[number])) {
+        if (color !== "auto" && !AREA_COLOR_VALUES.includes(color as typeof AREA_COLOR_VALUES[number]) && !isAreaCardHexColor(color)) {
           await client.query("ROLLBACK")
           return NextResponse.json({ error: "Choose a valid area color." }, { status: 400 })
         }
