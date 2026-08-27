@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
 
@@ -125,6 +126,9 @@ export default function AdminDashboard() {
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [importUserName, setImportUserName] = useState("")
+  const [importPayload, setImportPayload] = useState<unknown>(null)
+  const [importFileName, setImportFileName] = useState("")
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -190,7 +194,7 @@ export default function AdminDashboard() {
     setBusy(b => ({ ...b, [id]: false }))
   }, [adminApiBase])
 
-  const importSubmissions = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const selectImportFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ""
     if (!file) return
@@ -202,14 +206,26 @@ export default function AdminDashboard() {
       setImportMessage("That file is too large. Choose a JSON file under 10 MB.")
       return
     }
+    setImportMessage(null)
+    try {
+      setImportPayload(JSON.parse(await file.text()))
+      setImportFileName(file.name)
+      setImportUserName("")
+      setImportDialogOpen(true)
+    } catch {
+      setImportMessage("The selected file is not valid JSON.")
+    }
+  }, [])
+
+  const importSubmissions = useCallback(async () => {
+    if (!importPayload || !importUserName.trim()) return
     setImporting(true)
     setImportMessage(null)
     try {
-      const payload = JSON.parse(await file.text())
       const response = await fetch(`${adminApiBase}/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionImport: payload, ...(importUserName.trim() ? { userId: importUserName.trim() } : {}) }),
+        body: JSON.stringify({ submissionImport: importPayload, userId: importUserName.trim() }),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -217,13 +233,15 @@ export default function AdminDashboard() {
         return
       }
       setImportMessage(`Imported ${result.imported} submission${result.imported === 1 ? "" : "s"}.`)
+      setImportDialogOpen(false)
+      setImportPayload(null)
       await fetchSubmissions()
     } catch {
-      setImportMessage("The selected file is not valid JSON.")
+      setImportMessage("Could not import the submission. Check your connection and try again.")
     } finally {
       setImporting(false)
     }
-  }, [adminApiBase, fetchSubmissions, importUserName])
+  }, [adminApiBase, fetchSubmissions, importPayload, importUserName])
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -451,7 +469,7 @@ export default function AdminDashboard() {
 
         {/* ── Review queue ── */}
         <div className={activeTab === "submissions" ? "" : "hidden"}>
-          <input ref={importFileRef} type="file" accept="application/json,.json" onChange={importSubmissions} className="sr-only" />
+          <input ref={importFileRef} type="file" accept="application/json,.json" onChange={selectImportFile} className="sr-only" />
           <div className="mb-6 flex flex-col gap-4 border-y py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid grid-cols-3 divide-x">
               <QueueMetric icon={Inbox} label="Pending" value={totalPending} />
@@ -459,17 +477,6 @@ export default function AdminDashboard() {
               <QueueMetric icon={CheckCircle2} label="Reviewed" value={totalReviewed} />
             </div>
             <div className="flex w-fit flex-wrap items-center gap-2">
-              <label className="sr-only" htmlFor="import-user-name">Import submission for</label>
-              <input
-                id="import-user-name"
-                type="text"
-                value={importUserName}
-                onChange={(event) => setImportUserName(event.target.value)}
-                placeholder="Import for (optional)"
-                maxLength={255}
-                disabled={importing}
-                className="admin-field h-9 w-44 rounded-full px-3 text-sm outline-none transition-all duration-150 ease-out placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-              />
               <button
                 type="button"
                 onClick={() => importFileRef.current?.click()}
@@ -498,6 +505,50 @@ export default function AdminDashboard() {
           {importMessage && (
             <p role="status" className="-mt-4 mb-4 text-sm text-muted-foreground">{importMessage}</p>
           )}
+          <Dialog open={importDialogOpen} onOpenChange={(open) => {
+            if (!importing) setImportDialogOpen(open)
+          }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Assign imported submission</DialogTitle>
+                <DialogDescription>
+                  Enter the name to display for {importFileName}. This person does not need to be a congregation member.
+                </DialogDescription>
+              </DialogHeader>
+              <label className="block" htmlFor="import-user-name">
+                <span className="mb-2 block text-sm font-medium">User</span>
+                <input
+                  id="import-user-name"
+                  type="text"
+                  value={importUserName}
+                  onChange={(event) => setImportUserName(event.target.value)}
+                  placeholder="e.g. Marie Martin"
+                  maxLength={255}
+                  autoFocus
+                  disabled={importing}
+                  className="admin-field h-10 w-full rounded-md px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                />
+              </label>
+              <DialogFooter>
+                <button
+                  type="button"
+                  onClick={() => setImportDialogOpen(false)}
+                  disabled={importing}
+                  className="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={importSubmissions}
+                  disabled={importing || !importUserName.trim()}
+                  className="admin-primary-button inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-white disabled:opacity-60"
+                >
+                  {importing ? "Importing…" : "Import submission"}
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {visible.length === 0 && (
             <div className="border-y px-6 py-12 text-center">
