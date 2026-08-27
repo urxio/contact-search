@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { areaCardColorClass } from "@/lib/area-colors"
+import { AREA_COLOR_OPTIONS } from "@/lib/area-colors"
 
 type SettingsWorkspaceProps = {
   slug: string
@@ -118,6 +119,8 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [membersLoading, setMembersLoading] = useState(true)
   const [territoryRows, setTerritoryRows] = useState<TerritoryZipRow[]>([])
   const [territoryAreas, setTerritoryAreas] = useState<string[]>([])
+  const [areaColors, setAreaColors] = useState<Record<string, string>>({})
+  const [areaColorSaving, setAreaColorSaving] = useState<string | null>(null)
   const [territoryRowsLoading, setTerritoryRowsLoading] = useState(true)
   const [territorySearch, setTerritorySearch] = useState("")
   const [editingTerritoryRow, setEditingTerritoryRow] = useState<TerritoryZipRow | null>(null)
@@ -147,6 +150,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
       const rows = Array.isArray(data.rows) ? data.rows as TerritoryZipRow[] : []
       setTerritoryRows(rows)
       setTerritoryAreas(Array.isArray(data.areas) ? data.areas : [])
+      setAreaColors(typeof data.areaColors === "object" && data.areaColors !== null ? data.areaColors : {})
       setSearchZipcodes(rows.filter((row) => row.inCoverage).map((row) => row.zipcode).join("\n"))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Territory ZIP mappings could not be loaded")
@@ -285,6 +289,37 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     setMappingArea(!row.area || isUnassignedArea(row.area) ? "Unassigned" : row.area)
     setCreatingMappingArea(false)
     setMappingTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
+  }
+
+  function selectedAreaColor(area: string) {
+    const key = Object.keys(areaColors).find((value) => value.toLocaleLowerCase() === area.toLocaleLowerCase())
+    return key ? areaColors[key] : "auto"
+  }
+
+  async function updateAreaColor(area: string, color: string) {
+    const previousColors = areaColors
+    const nextColors = { ...areaColors }
+    const existingKey = Object.keys(nextColors).find((value) => value.toLocaleLowerCase() === area.toLocaleLowerCase())
+    if (existingKey) delete nextColors[existingKey]
+    if (color !== "auto") nextColors[area] = color
+    setAreaColors(nextColors)
+    setAreaColorSaving(area)
+    try {
+      const response = await fetch(`/api/c/${slug}/settings/territory-areas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set-color", area, color }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Area color could not be saved")
+      setAreaColors(typeof result.areaColors === "object" && result.areaColors !== null ? result.areaColors : nextColors)
+      toast.success(`${area} color updated`)
+    } catch (error) {
+      setAreaColors(previousColors)
+      toast.error(error instanceof Error ? error.message : "Area color could not be saved")
+    } finally {
+      setAreaColorSaving(null)
+    }
   }
 
   async function saveTerritoryMapping(event: FormEvent) {
@@ -863,16 +898,33 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                   <section
                     key={area}
                     aria-labelledby={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                    className={`flex h-96 flex-col overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ease-out hover:shadow-md ${areaCardColorClass(area, territoryAreas)}`}
+                    className={`flex h-96 flex-col overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ease-out hover:shadow-md ${areaCardColorClass(area, territoryAreas, selectedAreaColor(area))}`}
                   >
                     <div className="flex items-start justify-between gap-3 border-b border-current/10 p-4">
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area</p>
                         <h3 id={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="mt-1 truncate text-base font-semibold">{area}</h3>
                       </div>
-                      <Badge variant="outline" className="shrink-0 bg-background/80 font-normal">
-                        {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!isUnassignedArea(area) && (
+                          <Select value={selectedAreaColor(area)} onValueChange={(color) => updateAreaColor(area, color)} disabled={areaColorSaving === area}>
+                            <SelectTrigger aria-label={`Change ${area} card color`} className="h-9 w-24 rounded-lg bg-background/80 text-xs font-semibold">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="auto">Auto</SelectItem>
+                              {AREA_COLOR_OPTIONS.map((color) => (
+                                <SelectItem key={color.value} value={color.value}>
+                                  <span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${color.swatchClass}`} aria-hidden="true" />{color.label}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <Badge variant="outline" className="bg-background/80 font-normal">
+                          {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="flex-1 space-y-2 overflow-y-auto p-3">
                       {rows.map((row) => (

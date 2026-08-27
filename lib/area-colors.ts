@@ -20,6 +20,19 @@ const AREA_CARD_COLOR_CLASSES = [
   "border-fuchsia-200 bg-fuchsia-50/80 dark:border-fuchsia-800/60 dark:bg-fuchsia-950/25",
 ]
 
+export const AREA_COLOR_OPTIONS = [
+  { value: "sky", label: "Blue", swatchClass: "bg-sky-500" },
+  { value: "violet", label: "Purple", swatchClass: "bg-violet-500" },
+  { value: "emerald", label: "Green", swatchClass: "bg-emerald-500" },
+  { value: "amber", label: "Gold", swatchClass: "bg-amber-500" },
+  { value: "rose", label: "Rose", swatchClass: "bg-rose-500" },
+  { value: "cyan", label: "Teal", swatchClass: "bg-cyan-500" },
+  { value: "orange", label: "Orange", swatchClass: "bg-orange-500" },
+  { value: "fuchsia", label: "Pink", swatchClass: "bg-fuchsia-500" },
+] as const
+
+export const AREA_COLOR_VALUES = AREA_COLOR_OPTIONS.map((option) => option.value)
+
 /** Returns a stable, accessible background color for a named territory area. */
 export function areaColorClass(area: string | undefined, areaOrder: string[]) {
   if (!area) return ""
@@ -29,8 +42,10 @@ export function areaColorClass(area: string | undefined, areaOrder: string[]) {
 }
 
 /** Returns a stable card accent for a named territory area. */
-export function areaCardColorClass(area: string, areaOrder: string[]) {
+export function areaCardColorClass(area: string, areaOrder: string[], selectedColor?: string) {
   if (area.toLocaleLowerCase() === "unassigned") return "border-border bg-muted/40"
+  const explicitColorIndex = AREA_COLOR_VALUES.indexOf(selectedColor as typeof AREA_COLOR_VALUES[number])
+  if (explicitColorIndex >= 0) return AREA_CARD_COLOR_CLASSES[explicitColorIndex]
   const areaIndex = areaOrder.findIndex((value) => value.localeCompare(area, undefined, { sensitivity: "accent" }) === 0)
   return areaIndex < 0 ? "border-border bg-card" : AREA_CARD_COLOR_CLASSES[areaIndex % AREA_CARD_COLOR_CLASSES.length]
 }

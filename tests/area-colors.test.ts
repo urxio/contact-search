@@ -20,4 +20,8 @@ describe("areaColorClass", () => {
     expect(areaCardColorClass("East", areas)).toContain("violet")
     expect(areaCardColorClass("Unknown", areas)).toContain("border-border")
   })
+
+  it("honors a selected color over the automatic area color", () => {
+    expect(areaCardColorClass("Central", areas, "rose")).toContain("rose")
+  })
 })

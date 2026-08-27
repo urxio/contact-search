@@ -39,6 +39,9 @@ async function loadTerritoryZipState(congregationId: number) {
       }
     }),
     areas: orderedTeamAreas(teamRows.rows.map((row) => String(row.area)), settings.teamProgressAreaOrder),
+    areaColors: typeof settings.teamProgressAreaColors === "object" && settings.teamProgressAreaColors !== null
+      ? settings.teamProgressAreaColors
+      : {},
     coverage,
     teamByZip,
   }
@@ -49,7 +52,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     assertMultiTenantEnabled()
     const auth = await requireCongregationAdmin(params.slug)
     const state = await loadTerritoryZipState(auth.congregation.id)
-    return NextResponse.json({ rows: state.rows, areas: state.areas })
+    return NextResponse.json({ rows: state.rows, areas: state.areas, areaColors: state.areaColors })
   } catch (error) {
     return apiError(error)
   }
