@@ -110,6 +110,27 @@ describe("congregation admin contact review route", () => {
     ]))
   })
 
+  it("allows an admin to assign an import to a non-member name", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 83 }] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({
+        userId: "Guest researcher",
+        submissionImport: { user_id: "Someone else", contacts: [{ id: "a", status: "Not checked" }] },
+      }),
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    expect(mocks.clientQuery).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO submissions"), expect.arrayContaining([
+      34, "Guest researcher",
+    ]))
+  })
+
   it("rejects malformed submission imports", async () => {
     const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
     const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {

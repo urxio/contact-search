@@ -124,6 +124,7 @@ export default function AdminDashboard() {
   const importFileRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [importUserName, setImportUserName] = useState("")
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ export default function AdminDashboard() {
       const response = await fetch(`${adminApiBase}/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ submissionImport: payload, ...(importUserName.trim() ? { userId: importUserName.trim() } : {}) }),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -222,7 +223,7 @@ export default function AdminDashboard() {
     } finally {
       setImporting(false)
     }
-  }, [adminApiBase, fetchSubmissions])
+  }, [adminApiBase, fetchSubmissions, importUserName])
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -457,7 +458,18 @@ export default function AdminDashboard() {
               <QueueMetric icon={Users} label="Contacts" value={totalContacts} />
               <QueueMetric icon={CheckCircle2} label="Reviewed" value={totalReviewed} />
             </div>
-            <div className="flex w-fit items-center gap-2">
+            <div className="flex w-fit flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="import-user-name">Import submission for</label>
+              <input
+                id="import-user-name"
+                type="text"
+                value={importUserName}
+                onChange={(event) => setImportUserName(event.target.value)}
+                placeholder="Import for (optional)"
+                maxLength={255}
+                disabled={importing}
+                className="admin-field h-9 w-44 rounded-full px-3 text-sm outline-none transition-all duration-150 ease-out placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              />
               <button
                 type="button"
                 onClick={() => importFileRef.current?.click()}

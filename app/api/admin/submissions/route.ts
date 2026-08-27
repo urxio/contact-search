@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   try {
-    const imported = parseSubmissionImport(await req.json())
+    const body = await req.json()
+    const imported = parseSubmissionImport(body?.submissionImport ?? body, body?.userId)
     if (!imported) {
       return NextResponse.json({ error: "Upload a valid submission JSON file with at most 100 submissions." }, { status: 400 })
     }
