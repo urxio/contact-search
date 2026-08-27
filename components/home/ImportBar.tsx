@@ -18,6 +18,8 @@ interface ImportBarProps {
   onSubmitForReview?: () => void
   packagesEnabled?: boolean
   onBrowsePackages?: () => void
+  assignedPackages?: Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number }>
+  onOpenAssignedPackage?: (packageId: number) => void
 }
 
 export function ImportBar({
@@ -33,6 +35,8 @@ export function ImportBar({
   onSubmitForReview,
   packagesEnabled = false,
   onBrowsePackages,
+  assignedPackages = [],
+  onOpenAssignedPackage,
 }: ImportBarProps) {
   return (
     <div className="admin-card mb-4 overflow-hidden rounded-2xl">
@@ -98,6 +102,23 @@ export function ImportBar({
           </Button>
         </div>
       </div>
+
+      {assignedPackages.length > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-indigo-100 bg-indigo-50/70 px-5 py-3 text-indigo-950 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-100 sm:flex-row sm:items-center">
+          <PackageOpen className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-300 sm:mt-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{assignedPackages.length === 1 ? "An Excel has been assigned to you" : `${assignedPackages.length} Excels have been assigned to you`}</p>
+            <p className="mt-0.5 text-xs text-indigo-800/80 dark:text-indigo-200/80">Open an assigned Excel to begin or continue reviewing its contacts.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {assignedPackages.map((item) => (
+              <Button key={item.id} type="button" size="sm" variant="outline" className="border-indigo-200 bg-background text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/10 dark:text-indigo-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
+                Open {item.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Error banner */}
       {error && (

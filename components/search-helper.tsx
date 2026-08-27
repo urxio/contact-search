@@ -132,6 +132,7 @@ export default function SearchHelper({
   const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
+  const [assignedPackages, setAssignedPackages] = useState<Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number }>>([])
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
@@ -200,6 +201,20 @@ export default function SearchHelper({
     const browsePackages = new URLSearchParams(window.location.search).get("browse") === "excels"
     if (Number.isSafeInteger(packageId) && packageId > 0) setPreferredPackageId(packageId)
     if ((Number.isSafeInteger(packageId) && packageId > 0) || browsePackages) setPackageBrowserOpen(true)
+  }, [workspaceSlug])
+
+  useEffect(() => {
+    if (!workspaceSlug) return
+    let cancelled = false
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/packages?assigned=mine`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { packages: [] })
+      .then((result) => {
+        if (!cancelled) setAssignedPackages(Array.isArray(result.packages) ? result.packages : [])
+      })
+      .catch(() => {
+        if (!cancelled) setAssignedPackages([])
+      })
+    return () => { cancelled = true }
   }, [workspaceSlug])
   const storagePrefix = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
@@ -2101,6 +2116,11 @@ export default function SearchHelper({
           onSubmitForReview={sendForReview}
           packagesEnabled={Boolean(workspaceSlug)}
           onBrowsePackages={() => setPackageBrowserOpen(true)}
+          assignedPackages={assignedPackages}
+          onOpenAssignedPackage={(packageId) => {
+            setPreferredPackageId(packageId)
+            setPackageBrowserOpen(true)
+          }}
         />
 
         {/* ── Territory / General Notes ── */}
