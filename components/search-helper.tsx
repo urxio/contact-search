@@ -133,6 +133,7 @@ export default function SearchHelper({
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
   const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number; isMine: boolean }>>([])
+  const [dismissedPackageNotifications, setDismissedPackageNotifications] = useState<Set<number>>(new Set())
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
@@ -202,6 +203,27 @@ export default function SearchHelper({
     if (Number.isSafeInteger(packageId) && packageId > 0) setPreferredPackageId(packageId)
     if ((Number.isSafeInteger(packageId) && packageId > 0) || browsePackages) setPackageBrowserOpen(true)
   }, [workspaceSlug])
+  const packageNotificationStorageKey = workspaceSlug
+    ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}:dismissed-package-notifications`
+    : null
+
+  useEffect(() => {
+    if (!packageNotificationStorageKey) return
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(packageNotificationStorageKey) ?? "[]")
+      setDismissedPackageNotifications(new Set(Array.isArray(stored) ? stored.filter(Number.isSafeInteger) : []))
+    } catch {
+      setDismissedPackageNotifications(new Set())
+    }
+  }, [packageNotificationStorageKey])
+
+  const dismissPackageNotification = useCallback((packageId: number) => {
+    setDismissedPackageNotifications((current) => {
+      const next = new Set(current).add(packageId)
+      if (packageNotificationStorageKey) sessionStorage.setItem(packageNotificationStorageKey, JSON.stringify([...next]))
+      return next
+    })
+  }, [packageNotificationStorageKey])
 
   useEffect(() => {
     if (!workspaceSlug) return
@@ -2116,9 +2138,10 @@ export default function SearchHelper({
           onSubmitForReview={sendForReview}
           packagesEnabled={Boolean(workspaceSlug)}
           onBrowsePackages={() => setPackageBrowserOpen(true)}
-          ownActivePackages={activePackages.filter((item) => item.isMine)}
-          assignedPackages={activePackages.filter((item) => !item.isMine)}
+          ownActivePackages={activePackages.filter((item) => item.isMine && !dismissedPackageNotifications.has(item.id))}
+          assignedPackages={activePackages.filter((item) => !item.isMine && !dismissedPackageNotifications.has(item.id))}
           onOpenAssignedPackage={(packageId) => {
+            dismissPackageNotification(packageId)
             setPreferredPackageId(packageId)
             setPackageBrowserOpen(true)
           }}
