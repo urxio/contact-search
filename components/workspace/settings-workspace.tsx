@@ -156,6 +156,24 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     return territoryRows.filter((row) => [row.zipcode, row.city, row.area].some((value) => value.toLocaleLowerCase().includes(query)))
   }, [territoryRows, territorySearch])
 
+  const territoryRowsByArea = useMemo(() => {
+    const groups = new Map<string, TerritoryZipRow[]>()
+    for (const row of filteredTerritoryRows) {
+      const area = row.area.trim() || "Unassigned"
+      const rows = groups.get(area)
+      if (rows) rows.push(row)
+      else groups.set(area, [row])
+    }
+    return Array.from(groups, ([area, rows]) => ({
+      area,
+      rows: rows.sort((a, b) => a.zipcode.localeCompare(b.zipcode, undefined, { numeric: true })),
+    })).sort((a, b) => {
+      if (a.area === "Unassigned") return 1
+      if (b.area === "Unassigned") return -1
+      return a.area.localeCompare(b.area)
+    })
+  }, [filteredTerritoryRows])
+
   const mappingAreaOptions = useMemo(() => {
     const currentArea = editingTerritoryRow?.area?.trim()
     const areas = new Set(["Unassigned", ...territoryAreas])
@@ -714,38 +732,48 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                       <tr className="border-b">
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">ZIP</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">City</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Progress</th>
                         <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {filteredTerritoryRows.map((row) => (
-                        <tr key={row.zipcode} className="transition-colors duration-150 ease-out hover:bg-muted/30">
-                          <td className="px-4 py-3">
-                            <p className="font-mono text-sm font-semibold">{row.zipcode}</p>
-                            {!row.inCoverage ? <p className="mt-1 text-xs font-normal text-muted-foreground">Outside coverage</p> : null}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-normal">{row.city || <span className="text-muted-foreground">Not linked</span>}</td>
-                          <td className="px-4 py-3 text-sm font-normal">{row.area || <span className="text-muted-foreground">Not linked</span>}</td>
-                          <td className="px-4 py-3">
-                            {!row.inTeamProgress ? (
-                              <Badge variant="outline">Not created</Badge>
-                            ) : row.totalPages === 0 ? (
-                              <Badge variant="secondary">Page total needed</Badge>
-                            ) : (
-                              <Badge variant="secondary">{row.totalPages?.toLocaleString()} pages</Badge>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Button type="button" variant="ghost" onClick={() => openMappingEditor(row)} className="min-h-10 rounded-xl">
-                              <Pencil aria-hidden="true" />
-                              {row.inTeamProgress ? "Edit" : "Link"}
-                            </Button>
-                          </td>
+                    {territoryRowsByArea.map(({ area, rows }) => (
+                      <tbody key={area} className="border-b last:border-b-0">
+                        <tr className="bg-muted/30">
+                          <th scope="rowgroup" colSpan={4} className="px-4 py-3 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">{area}</span>
+                              <Badge variant="outline" className="bg-background font-normal">
+                                {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
+                              </Badge>
+                            </div>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
+                        {rows.map((row) => (
+                          <tr key={row.zipcode} className="border-t transition-colors duration-150 ease-out hover:bg-muted/30">
+                            <td className="px-4 py-3">
+                              <p className="font-mono text-sm font-semibold">{row.zipcode}</p>
+                              {!row.inCoverage ? <p className="mt-1 text-xs font-normal text-muted-foreground">Outside coverage</p> : null}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-normal">{row.city || <span className="text-muted-foreground">Not linked</span>}</td>
+                            <td className="px-4 py-3">
+                              {!row.inTeamProgress ? (
+                                <Badge variant="outline">Not created</Badge>
+                              ) : row.totalPages === 0 ? (
+                                <Badge variant="secondary">Page total needed</Badge>
+                              ) : (
+                                <Badge variant="secondary">{row.totalPages?.toLocaleString()} pages</Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button type="button" variant="ghost" onClick={() => openMappingEditor(row)} className="min-h-10 rounded-xl">
+                                <Pencil aria-hidden="true" />
+                                {row.inTeamProgress ? "Edit" : "Link"}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    ))}
                   </table>
                 </div>
               </div>
