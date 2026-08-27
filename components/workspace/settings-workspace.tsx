@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -95,6 +96,7 @@ type ZipImportRow = {
 }
 
 const tabClassName = "min-h-11 rounded-lg px-4 text-sm data-[state=active]:shadow-sm"
+const createAreaValue = "__create_new_area__"
 
 export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps) {
   const [name, setName] = useState(initialName)
@@ -119,6 +121,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [editingTerritoryRow, setEditingTerritoryRow] = useState<TerritoryZipRow | null>(null)
   const [mappingCity, setMappingCity] = useState("")
   const [mappingArea, setMappingArea] = useState("")
+  const [creatingMappingArea, setCreatingMappingArea] = useState(false)
   const [mappingTotalPages, setMappingTotalPages] = useState("")
   const [mappingSaving, setMappingSaving] = useState(false)
   const territoryImportRef = useRef<HTMLInputElement>(null)
@@ -152,6 +155,17 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     if (!query) return territoryRows
     return territoryRows.filter((row) => [row.zipcode, row.city, row.area].some((value) => value.toLocaleLowerCase().includes(query)))
   }, [territoryRows, territorySearch])
+
+  const mappingAreaOptions = useMemo(() => {
+    const currentArea = editingTerritoryRow?.area?.trim()
+    const areas = new Set(["Unassigned", ...territoryAreas])
+    if (currentArea) areas.add(currentArea)
+    return Array.from(areas).sort((a, b) => {
+      if (a === "Unassigned") return -1
+      if (b === "Unassigned") return 1
+      return a.localeCompare(b)
+    })
+  }, [editingTerritoryRow, territoryAreas])
 
   useEffect(() => {
     fetch(`/api/c/${slug}/settings`, { cache: "no-store" })
@@ -236,6 +250,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     setEditingTerritoryRow(row)
     setMappingCity(row.city)
     setMappingArea(row.area || "Unassigned")
+    setCreatingMappingArea(false)
     setMappingTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
   }
 
@@ -760,10 +775,36 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mapping-area">Area</Label>
-                <Input id="mapping-area" value={mappingArea} onChange={(event) => setMappingArea(event.target.value)} maxLength={100} list="territory-area-options" className="h-11 rounded-xl" placeholder="Unassigned" />
-                <datalist id="territory-area-options">
-                  {territoryAreas.map((area) => <option key={area} value={area} />)}
-                </datalist>
+                <Select
+                  value={creatingMappingArea ? createAreaValue : mappingArea}
+                  onValueChange={(value) => {
+                    const creatingArea = value === createAreaValue
+                    setCreatingMappingArea(creatingArea)
+                    setMappingArea(creatingArea ? "" : value)
+                  }}
+                >
+                  <SelectTrigger id="mapping-area" className="h-11 rounded-xl">
+                    <SelectValue placeholder="Choose an area" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mappingAreaOptions.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}
+                    <SelectItem value={createAreaValue}>Create new area…</SelectItem>
+                  </SelectContent>
+                </Select>
+                {creatingMappingArea ? (
+                  <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+                    <Label htmlFor="mapping-new-area">New area name</Label>
+                    <Input
+                      id="mapping-new-area"
+                      value={mappingArea}
+                      onChange={(event) => setMappingArea(event.target.value)}
+                      maxLength={100}
+                      className="h-11 rounded-xl bg-background"
+                      placeholder="Enter an area name"
+                      required
+                    />
+                  </div>
+                ) : null}
                 <p className="text-xs font-normal text-muted-foreground">Changing the area moves this ZIP without changing its Team Progress history.</p>
               </div>
               <div className="space-y-2">
@@ -773,7 +814,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" disabled={mappingSaving} onClick={() => setEditingTerritoryRow(null)} className="min-h-11 rounded-xl">Cancel</Button>
-                <Button type="submit" disabled={mappingSaving || !mappingCity.trim()} className="admin-primary-button min-h-11 rounded-xl">
+                <Button type="submit" disabled={mappingSaving || !mappingCity.trim() || !mappingArea.trim()} className="admin-primary-button min-h-11 rounded-xl">
                   {mappingSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
                   Save mapping
                 </Button>
