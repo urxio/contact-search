@@ -225,8 +225,22 @@ export default function ZipcodePage({ params }: { params: { zipcode: string } })
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-0.5">
                 {zipcodeInfo.city} — {zipcode}
               </h1>
-              <p className="text-base text-gray-400">{zipcodeInfo.total_pages.toLocaleString()} total pages in A-Z</p>
+              <p className={`text-base ${zipcodeInfo.total_pages === 0 ? "font-semibold text-amber-600 dark:text-amber-400" : "text-gray-400"}`}>
+                {zipcodeInfo.total_pages === 0 ? "Page total needed before assignments can be created" : `${zipcodeInfo.total_pages.toLocaleString()} total pages in A-Z`}
+              </p>
             </div>
+
+            {zipcodeInfo.total_pages === 0 ? (
+              <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-base font-semibold">Team Progress setup is incomplete</p>
+                  <p className="mt-1 text-sm font-normal leading-relaxed text-amber-800 dark:text-amber-200/80">An admin must enter the total A–Z pages for this ZIP before assigning page ranges.</p>
+                </div>
+              </div>
+            ) : null}
 
             {/* ── Progress bar ── */}
             {segments.length > 0 && (

@@ -59,6 +59,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     )
     const zip = zipResult.rows[0]
     if (!zip) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Zipcode not found." }, { status: 404 }) }
+    if (Number(zip.total_pages) < 1) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "An admin must configure this ZIP code's page total before creating assignments." }, { status: 409 })
+    }
     if (pageEnd > Number(zip.total_pages)) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Page range exceeds this territory." }, { status: 400 })

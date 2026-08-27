@@ -876,10 +876,14 @@ export default function Home() {
                             <div className="flex items-start justify-between mb-3">
                               <div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{z.zipcode}</p>
-                                <p className="text-sm text-gray-400">{z.total_pages.toLocaleString()} pages</p>
+                                <p className={`text-sm ${z.total_pages === 0 ? "font-semibold text-amber-600 dark:text-amber-400" : "text-gray-400"}`}>
+                                  {z.total_pages === 0 ? "Page total needed" : `${z.total_pages.toLocaleString()} pages`}
+                                </p>
                               </div>
                               {allDone ? (
                                 <span className="text-sm font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">✓ Done</span>
+                              ) : z.total_pages === 0 ? (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Setup</span>
                               ) : z.segment_count === 0 ? (
                                 <span className="text-sm font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Open</span>
                               ) : (

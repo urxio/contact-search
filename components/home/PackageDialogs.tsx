@@ -376,14 +376,14 @@ export function PackageDialogs({
               <Label>ZIP code</Label>
               <Select value={zipcode} onValueChange={setZipcode}>
                 <SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue placeholder="Choose a configured ZIP" /></SelectTrigger>
-                <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode}>{item.zipcode} · {item.city}</SelectItem>)}</SelectContent>
+                <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode} disabled={item.total_pages < 1}>{item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label htmlFor="package-page-start">Start page</Label><Input id="package-page-start" type="number" min={1} max={selectedZip?.total_pages} value={pageStart} onChange={(event) => setPageStart(event.target.value)} className="admin-field h-11 rounded-xl" /></div>
               <div className="space-y-2"><Label htmlFor="package-page-end">End page</Label><Input id="package-page-end" type="number" min={1} max={selectedZip?.total_pages} value={pageEnd} onChange={(event) => setPageEnd(event.target.value)} className="admin-field h-11 rounded-xl" /></div>
             </div>
-            {selectedZip ? <p className="text-xs font-normal text-muted-foreground">Available pages: 1–{selectedZip.total_pages.toLocaleString()}</p> : null}
+            {selectedZip ? <p className={`text-xs font-normal ${selectedZip.total_pages < 1 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>{selectedZip.total_pages < 1 ? "An admin must enter this ZIP’s page total before assignments can be created." : `Available pages: 1–${selectedZip.total_pages.toLocaleString()}`}</p> : null}
           </div>
 
           <fieldset className="space-y-3">
