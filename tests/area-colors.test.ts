@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { areaColorClass } from "@/lib/area-colors"
+import { areaCardColorClass, areaColorClass } from "@/lib/area-colors"
 
 describe("areaColorClass", () => {
   const areas = ["Central", "East", "West"]
@@ -13,5 +13,11 @@ describe("areaColorClass", () => {
   it("does not color ZIP codes without a configured area", () => {
     expect(areaColorClass(undefined, areas)).toBe("")
     expect(areaColorClass("Unknown", areas)).toBe("")
+  })
+
+  it("uses matching stable accents for area cards", () => {
+    expect(areaCardColorClass("Central", areas)).toContain("sky")
+    expect(areaCardColorClass("East", areas)).toContain("violet")
+    expect(areaCardColorClass("Unknown", areas)).toContain("border-border")
   })
 })

@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { areaCardColorClass } from "@/lib/area-colors"
 
 type SettingsWorkspaceProps = {
   slug: string
@@ -857,57 +858,50 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             {territoryRowsLoading ? (
               <div className="h-40 animate-pulse rounded-xl bg-muted" aria-label="Loading ZIP mappings" aria-busy="true" />
             ) : filteredTerritoryRows.length ? (
-              <div className="overflow-hidden rounded-xl border">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-sm">
-                    <thead className="bg-muted/50">
-                      <tr className="border-b">
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">ZIP</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">City</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Progress</th>
-                        <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
-                      </tr>
-                    </thead>
-                    {territoryRowsByArea.map(({ area, rows }) => (
-                      <tbody key={area} className="border-b last:border-b-0">
-                        <tr className="bg-muted/30">
-                          <th scope="rowgroup" colSpan={4} className="px-4 py-3 text-left">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold">{area}</span>
-                              <Badge variant="outline" className="bg-background font-normal">
-                                {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
-                              </Badge>
-                            </div>
-                          </th>
-                        </tr>
-                        {rows.map((row) => (
-                          <tr key={row.zipcode} className="border-t transition-colors duration-150 ease-out hover:bg-muted/30">
-                            <td className="px-4 py-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {territoryRowsByArea.map(({ area, rows }) => (
+                  <section
+                    key={area}
+                    aria-labelledby={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    className={`flex h-96 flex-col overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ease-out hover:shadow-md ${areaCardColorClass(area, territoryAreas)}`}
+                  >
+                    <div className="flex items-start justify-between gap-3 border-b border-current/10 p-4">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area</p>
+                        <h3 id={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="mt-1 truncate text-base font-semibold">{area}</h3>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 bg-background/80 font-normal">
+                        {rows.length} {rows.length === 1 ? "ZIP" : "ZIPs"}
+                      </Badge>
+                    </div>
+                    <div className="flex-1 space-y-2 overflow-y-auto p-3">
+                      {rows.map((row) => (
+                        <div key={row.zipcode} className="rounded-xl border bg-background/80 p-3 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
                               <p className="font-mono text-sm font-semibold">{row.zipcode}</p>
+                              <p className="mt-1 truncate text-sm font-normal text-muted-foreground">{row.city || "Not linked"}</p>
                               {!row.inCoverage ? <p className="mt-1 text-xs font-normal text-muted-foreground">Outside coverage</p> : null}
-                            </td>
-                            <td className="px-4 py-3 text-sm font-normal">{row.city || <span className="text-muted-foreground">Not linked</span>}</td>
-                            <td className="px-4 py-3">
-                              {!row.inTeamProgress ? (
-                                <Badge variant="outline">Not created</Badge>
-                              ) : row.totalPages === 0 ? (
-                                <Badge variant="secondary">Page total needed</Badge>
-                              ) : (
-                                <Badge variant="secondary">{row.totalPages?.toLocaleString()} pages</Badge>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button type="button" variant="ghost" onClick={() => openMappingEditor(row)} className="min-h-10 rounded-xl">
-                                <Pencil aria-hidden="true" />
-                                {row.inTeamProgress ? "Edit" : "Link"}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    ))}
-                  </table>
-                </div>
+                            </div>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => openMappingEditor(row)} className="min-h-10 shrink-0 rounded-xl">
+                              <Pencil aria-hidden="true" />
+                              {row.inTeamProgress ? "Edit" : "Link"}
+                            </Button>
+                          </div>
+                          <div className="mt-3">
+                            {!row.inTeamProgress ? (
+                              <Badge variant="outline">Not created</Badge>
+                            ) : row.totalPages === 0 ? (
+                              <Badge variant="secondary">Page total needed</Badge>
+                            ) : (
+                              <Badge variant="secondary">{row.totalPages?.toLocaleString()} pages</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
             ) : (
               <div className="rounded-xl border border-dashed px-6 py-10 text-center">
