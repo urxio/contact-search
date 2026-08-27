@@ -14,6 +14,7 @@ import {
   ChevronDown, ChevronRight,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
+import { areaColorClass } from "@/lib/area-colors"
 
 interface ContactTableProps {
   contacts: EnhancedContact[]
@@ -30,6 +31,9 @@ interface ContactTableProps {
   onTerritoryStatusChange: (id: string, v: boolean) => void
   onSearchForebears: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
+  colorByArea?: boolean
+  areaByZipcode?: Map<string, string>
+  areaOrder?: string[]
 }
 
 export function ContactTable({
@@ -47,6 +51,9 @@ export function ContactTable({
   onTerritoryStatusChange,
   onSearchForebears,
   onSearchTPS,
+  colorByArea = false,
+  areaByZipcode = new Map(),
+  areaOrder = [],
 }: ContactTableProps) {
   return (
     <ScrollArea className="rounded-md border">
@@ -70,7 +77,7 @@ export function ContactTable({
         </TableHeader>
         <TableBody>
           {contacts.map((contact) => {
-            const rowColorClass =
+            const statusColorClass =
               contact.status === "Potentially French"
                 ? "bg-green-50 dark:bg-green-900/20"
                 : contact.status === "Duplicate"
@@ -80,6 +87,8 @@ export function ContactTable({
                     : contact.status === "Not French"
                       ? "bg-red-50 dark:bg-red-900/20"
                       : ""
+            const area = areaByZipcode.get(contact.zipcode.trim())
+            const rowColorClass = colorByArea ? areaColorClass(area, areaOrder) : statusColorClass
 
             return (
               <React.Fragment key={contact.id}>
@@ -100,6 +109,11 @@ export function ContactTable({
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {contact.fullName}
+                      {colorByArea && area && (
+                        <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          {area}
+                        </span>
+                      )}
                       {contact.id === lastVerifiedId && (
                         <Tooltip>
                           <TooltipTrigger><Clock className="h-4 w-4 text-green-500" /></TooltipTrigger>

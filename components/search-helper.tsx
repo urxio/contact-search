@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   LayoutGrid, LayoutList, RefreshCw, FileJson, FileSpreadsheet,
   Import, Plus, Send, UserCircle, ShieldCheck, BookOpen, Clock,
-  CheckCircle2, XCircle, CircleSlash, MapPin,
+  CheckCircle2, XCircle, CircleSlash, MapPin, Palette,
 } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
@@ -143,6 +143,9 @@ export default function SearchHelper({
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [showUpdateNeeded, setShowUpdateNeeded] = useState(false)
   const [viewType, setViewType] = useState<ViewType>("list")
+  const [colorByArea, setColorByArea] = useState(false)
+  const [areaByZipcode, setAreaByZipcode] = useState<Map<string, string>>(new Map())
+  const [areaOrder, setAreaOrder] = useState<string[]>([])
 
   // Add this new state variable with the other state variables
   const [lastVerifiedId, setLastVerifiedId] = useState<string | null>(null)
@@ -205,6 +208,10 @@ export default function SearchHelper({
   const chooseViewType = useCallback((view: ViewType) => {
     localStorage.setItem(storageKey("viewTypeExplicit"), "true")
     setViewType(view)
+  }, [storageKey])
+  const chooseAreaColoring = useCallback((enabled: boolean) => {
+    localStorage.setItem(storageKey("colorByArea"), String(enabled))
+    setColorByArea(enabled)
   }, [storageKey])
 
   // Update the memoized filtered contacts
@@ -279,6 +286,7 @@ export default function SearchHelper({
     const savedZipcode = localStorage.getItem(storageKey("territoryZipcode"))
     const savedPageRange = localStorage.getItem(storageKey("territoryPageRange"))
     const savedViewType = localStorage.getItem(storageKey("viewType")) as ViewType | null
+    const savedAreaColoring = localStorage.getItem(storageKey("colorByArea"))
     const hasExplicitViewType = localStorage.getItem(storageKey("viewTypeExplicit")) === "true"
 
     if (savedContacts) {
@@ -308,6 +316,7 @@ export default function SearchHelper({
     } else if (savedViewType === "list" || savedViewType === "grid") {
       setViewType(savedViewType)
     }
+    setColorByArea(savedAreaColoring === "true")
 
     // Load saved user ID from localStorage, or prompt them to enter one
     const savedUserId = authenticatedDisplayName || localStorage.getItem(storageKey("userId"))
@@ -371,6 +380,29 @@ export default function SearchHelper({
         if (Array.isArray(zipcodes)) setConfiguredTerritoryZipcodes(new Set(zipcodes.map(String)))
       })
       .catch(() => undefined)
+  }, [workspaceSlug])
+
+  useEffect(() => {
+    if (!workspaceSlug) return
+    let cancelled = false
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/team/zipcodes`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : [])
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return
+        const nextAreas: string[] = []
+        const nextAreaByZipcode = new Map<string, string>()
+        for (const row of rows) {
+          const area = String(row?.territory ?? "").trim()
+          const zipcode = String(row?.zipcode ?? "").trim()
+          if (!area || !zipcode) continue
+          nextAreaByZipcode.set(zipcode, area)
+          if (!nextAreas.some((value) => value.localeCompare(area, undefined, { sensitivity: "accent" }) === 0)) nextAreas.push(area)
+        }
+        setAreaByZipcode(nextAreaByZipcode)
+        setAreaOrder(nextAreas)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
   }, [workspaceSlug])
 
   // Save contacts to localStorage whenever they change
@@ -2132,6 +2164,23 @@ export default function SearchHelper({
                   </TooltipTrigger>
                   <TooltipContent>Gallery View (Ctrl+G)</TooltipContent>
                 </Tooltip>
+                {workspaceSlug && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => chooseAreaColoring(!colorByArea)}
+                        aria-pressed={colorByArea}
+                        className={colorByArea ? "bg-muted" : ""}
+                      >
+                        <Palette className="h-4 w-4 sm:mr-1" aria-hidden="true" />
+                        <span className="hidden sm:inline">Areas</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Color contacts by their configured area</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -2211,6 +2260,9 @@ export default function SearchHelper({
                   onTerritoryStatusChange={handleTerritoryStatusChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
+                  colorByArea={colorByArea}
+                  areaByZipcode={areaByZipcode}
+                  areaOrder={areaOrder}
                 />
               )}
               {/* Grid View */}
@@ -2229,6 +2281,9 @@ export default function SearchHelper({
                   onTerritoryStatusChange={handleTerritoryStatusChange}
                   onSearchForebears={searchOnForebears}
                   onSearchTPS={searchOnTruePeopleSearch}
+                  colorByArea={colorByArea}
+                  areaByZipcode={areaByZipcode}
+                  areaOrder={areaOrder}
                 />
               )}
             </CardContent>

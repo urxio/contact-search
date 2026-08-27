@@ -13,6 +13,7 @@ import {
   CheckCircle2, XCircle, RefreshCw, CircleSlash,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
+import { areaColorClass } from "@/lib/area-colors"
 
 interface ContactGridProps {
   contacts: EnhancedContact[]
@@ -28,6 +29,9 @@ interface ContactGridProps {
   onTerritoryStatusChange: (id: string, v: boolean) => void
   onSearchForebears: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
+  colorByArea?: boolean
+  areaByZipcode?: Map<string, string>
+  areaOrder?: string[]
 }
 
 function getStatusIcon(status: EnhancedContact["status"]) {
@@ -63,6 +67,9 @@ export function ContactGrid({
   onTerritoryStatusChange,
   onSearchForebears,
   onSearchTPS,
+  colorByArea = false,
+  areaByZipcode = new Map(),
+  areaOrder = [],
 }: ContactGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -70,7 +77,7 @@ export function ContactGrid({
         <Card
           key={contact.id}
           id={`contact-row-${contact.id}`}
-          className={`overflow-hidden cursor-pointer ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""}`}
+          className={`overflow-hidden cursor-pointer ${colorByArea ? areaColorClass(areaByZipcode.get(contact.zipcode.trim()), areaOrder) : ""} ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""}`}
           onClick={() => onToggleExpanded(contact.id)}
         >
           <CardHeader className="pb-2">
@@ -84,6 +91,11 @@ export function ContactGrid({
                   />
                   <CardTitle className="text-base">{contact.fullName}</CardTitle>
                 </div>
+                {colorByArea && areaByZipcode.get(contact.zipcode.trim()) && (
+                  <span className="mt-1 inline-block rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {areaByZipcode.get(contact.zipcode.trim())}
+                  </span>
+                )}
                 <CardDescription className="mt-1">{contact.address}</CardDescription>
               </div>
               <Badge className={getStatusColor(contact.status)}>
