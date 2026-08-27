@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, requireMembership, validateMutationOrigin } from "@/lib/auth"
+import { orderedTeamAreas } from "@/lib/team-areas"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../../_shared"
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
-    const result = await pool.query(
+    const [result, congregation] = await Promise.all([pool.query(
       `SELECT z.id, z.city, z.zipcode, z.total_pages, z.territory,
         COUNT(s.id)::int AS segment_count,
         COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'Completed'), 0)::int AS completed,
@@ -26,9 +27,19 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
          ON s.zipcode_id = z.id AND s.congregation_id = z.congregation_id
        WHERE z.congregation_id = $1
        GROUP BY z.id
-       ORDER BY z.territory, z.city, z.zipcode`,
+       ORDER BY z.city, z.zipcode`,
       [auth.congregation.id],
-    )
+    ), pool.query(`SELECT settings FROM congregations WHERE id = $1`, [auth.congregation.id])])
+    const settings = congregation.rows[0]?.settings ?? {}
+    const areas = orderedTeamAreas(result.rows.map((row) => String(row.territory)), settings.teamProgressAreaOrder)
+    const areaIndex = new Map(areas.map((area, index) => [area.toLocaleLowerCase(), index]))
+    result.rows.sort((a, b) => {
+      const areaDifference = (areaIndex.get(String(a.territory).toLocaleLowerCase()) ?? areas.length)
+        - (areaIndex.get(String(b.territory).toLocaleLowerCase()) ?? areas.length)
+      if (areaDifference) return areaDifference
+      const cityDifference = String(a.city).localeCompare(String(b.city))
+      return cityDifference || String(a.zipcode).localeCompare(String(b.zipcode), undefined, { numeric: true })
+    })
     return NextResponse.json(result.rows)
   } catch (error) {
     return apiError(error)

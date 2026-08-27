@@ -1,7 +1,7 @@
 "use client"
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Check, Clock3, Copy, FileSpreadsheet, Loader2, MailPlus, MapPinned, Pencil, Save, Search, Settings2, Trash2, UserRound, UsersRound } from "lucide-react"
+import { ArrowDown, ArrowUp, Check, Clock3, Copy, FileSpreadsheet, Loader2, MailPlus, MapPinned, Pencil, Save, Search, Settings2, Trash2, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -97,6 +97,7 @@ type ZipImportRow = {
 
 const tabClassName = "min-h-11 rounded-lg px-4 text-sm data-[state=active]:shadow-sm"
 const createAreaValue = "__create_new_area__"
+const isUnassignedArea = (area: string) => area.toLocaleLowerCase() === "unassigned"
 
 export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps) {
   const [name, setName] = useState(initialName)
@@ -130,6 +131,11 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importPreviewLoading, setImportPreviewLoading] = useState(false)
   const [importApplying, setImportApplying] = useState(false)
+  const [areaManagerOpen, setAreaManagerOpen] = useState(false)
+  const [areaDraftOrder, setAreaDraftOrder] = useState<string[]>([])
+  const [renamingArea, setRenamingArea] = useState<string | null>(null)
+  const [areaRenameValue, setAreaRenameValue] = useState("")
+  const [areaManagerSaving, setAreaManagerSaving] = useState(false)
 
   async function loadTerritoryRows() {
     setTerritoryRowsLoading(true)
@@ -164,26 +170,34 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
       if (rows) rows.push(row)
       else groups.set(area, [row])
     }
+    const areaIndex = new Map(territoryAreas.map((area, index) => [area.toLocaleLowerCase(), index]))
     return Array.from(groups, ([area, rows]) => ({
       area,
       rows: rows.sort((a, b) => a.zipcode.localeCompare(b.zipcode, undefined, { numeric: true })),
     })).sort((a, b) => {
-      if (a.area === "Unassigned") return 1
-      if (b.area === "Unassigned") return -1
-      return a.area.localeCompare(b.area)
+      if (isUnassignedArea(a.area)) return 1
+      if (isUnassignedArea(b.area)) return -1
+      const orderDifference = (areaIndex.get(a.area.toLocaleLowerCase()) ?? territoryAreas.length)
+        - (areaIndex.get(b.area.toLocaleLowerCase()) ?? territoryAreas.length)
+      return orderDifference || a.area.localeCompare(b.area)
     })
-  }, [filteredTerritoryRows])
+  }, [filteredTerritoryRows, territoryAreas])
 
   const mappingAreaOptions = useMemo(() => {
     const currentArea = editingTerritoryRow?.area?.trim()
-    const areas = new Set(["Unassigned", ...territoryAreas])
-    if (currentArea) areas.add(currentArea)
-    return Array.from(areas).sort((a, b) => {
-      if (a === "Unassigned") return -1
-      if (b === "Unassigned") return 1
-      return a.localeCompare(b)
-    })
+    const areas = territoryAreas.filter((area) => !isUnassignedArea(area))
+    if (currentArea && !isUnassignedArea(currentArea) && !areas.includes(currentArea)) areas.push(currentArea)
+    return [...areas, "Unassigned"]
   }, [editingTerritoryRow, territoryAreas])
+
+  const areaZipCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of territoryRows) {
+      const area = row.area.trim() || "Unassigned"
+      counts.set(area, (counts.get(area) ?? 0) + 1)
+    }
+    return counts
+  }, [territoryRows])
 
   useEffect(() => {
     fetch(`/api/c/${slug}/settings`, { cache: "no-store" })
@@ -267,7 +281,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   function openMappingEditor(row: TerritoryZipRow) {
     setEditingTerritoryRow(row)
     setMappingCity(row.city)
-    setMappingArea(row.area || "Unassigned")
+    setMappingArea(!row.area || isUnassignedArea(row.area) ? "Unassigned" : row.area)
     setCreatingMappingArea(false)
     setMappingTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
   }
@@ -346,6 +360,89 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
       toast.error(error instanceof Error ? error.message : "The ZIP mappings could not be imported")
     } finally {
       setImportApplying(false)
+    }
+  }
+
+  function openAreaManager() {
+    setAreaDraftOrder(territoryAreas)
+    setRenamingArea(null)
+    setAreaRenameValue("")
+    setAreaManagerOpen(true)
+  }
+
+  function moveArea(area: string, direction: -1 | 1) {
+    setAreaDraftOrder((current) => {
+      const index = current.indexOf(area)
+      const target = index + direction
+      if (index < 0 || target < 0 || target >= current.length || isUnassignedArea(current[target])) return current
+      const next = [...current]
+      const targetArea = next[target]
+      next[target] = next[index]
+      next[index] = targetArea
+      return next
+    })
+  }
+
+  async function saveManagedAreaOrder() {
+    setAreaManagerSaving(true)
+    try {
+      const response = await fetch(`/api/c/${slug}/settings/territory-areas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reorder", areas: areaDraftOrder }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Area order could not be saved")
+      setTerritoryAreas(result.areas)
+      setAreaDraftOrder(result.areas)
+      toast.success("Area order saved")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Area order could not be saved")
+    } finally {
+      setAreaManagerSaving(false)
+    }
+  }
+
+  async function renameManagedArea(event: FormEvent) {
+    event.preventDefault()
+    if (!renamingArea || !areaRenameValue.trim()) return
+    setAreaManagerSaving(true)
+    try {
+      const response = await fetch(`/api/c/${slug}/settings/territory-areas`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rename", area: renamingArea, name: areaRenameValue.trim() }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Area could not be renamed")
+      setTerritoryAreas(result.areas)
+      setAreaDraftOrder(result.areas)
+      setRenamingArea(null)
+      setAreaRenameValue("")
+      await loadTerritoryRows()
+      toast.success(`${renamingArea} renamed to ${areaRenameValue.trim()}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Area could not be renamed")
+    } finally {
+      setAreaManagerSaving(false)
+    }
+  }
+
+  async function deleteManagedArea(area: string) {
+    setAreaManagerSaving(true)
+    try {
+      const response = await fetch(`/api/c/${slug}/settings/territory-areas?area=${encodeURIComponent(area)}`, { method: "DELETE" })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Area could not be deleted")
+      setTerritoryAreas(result.areas)
+      setAreaDraftOrder(result.areas)
+      setRenamingArea(null)
+      await loadTerritoryRows()
+      toast.success(`${area} deleted; ${result.count} ZIP${result.count === 1 ? "" : "s"} moved to Unassigned`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Area could not be deleted")
+    } finally {
+      setAreaManagerSaving(false)
     }
   }
 
@@ -702,7 +799,11 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                 Connect each territory ZIP to a city and Team Progress area. Reassigning an area keeps its page totals, segments, and history.
               </CardDescription>
             </div>
-            <div className="shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" onClick={openAreaManager} className="min-h-11 rounded-xl">
+                <Settings2 aria-hidden="true" />
+                Manage areas
+              </Button>
               <input ref={territoryImportRef} type="file" accept=".xlsx,.xls" onChange={previewTerritoryImport} className="sr-only" />
               <Button type="button" variant="outline" disabled={importPreviewLoading} onClick={() => territoryImportRef.current?.click()} className="min-h-11 rounded-xl">
                 {importPreviewLoading ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet aria-hidden="true" />}
@@ -848,6 +949,108 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={areaManagerOpen} onOpenChange={(open) => { if (!areaManagerSaving) setAreaManagerOpen(open) }}>
+          <DialogContent className="admin-material max-h-[85vh] overflow-hidden rounded-2xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">Manage Team Progress areas</DialogTitle>
+              <DialogDescription className="text-sm font-normal leading-relaxed">
+                Rename areas, change their display order, or remove an area. Removing an area moves its ZIPs to Unassigned and keeps all Team Progress history.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+              {areaDraftOrder.length ? areaDraftOrder.map((area, index) => {
+                const isUnassigned = isUnassignedArea(area)
+                const firstMovable = index === 0
+                const nextArea = areaDraftOrder[index + 1]
+                const lastMovable = nextArea === undefined || isUnassignedArea(nextArea)
+                const count = areaZipCounts.get(area) ?? 0
+                return (
+                  <div key={area} className="rounded-xl border bg-background p-3">
+                    {renamingArea === area ? (
+                      <form onSubmit={renameManagedArea} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Label htmlFor="area-rename">Area name</Label>
+                          <Input id="area-rename" value={areaRenameValue} onChange={(event) => setAreaRenameValue(event.target.value)} maxLength={100} className="h-11 rounded-xl" autoFocus required />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" disabled={areaManagerSaving} onClick={() => setRenamingArea(null)} className="min-h-11 rounded-xl">Cancel</Button>
+                          <Button type="submit" disabled={areaManagerSaving || !areaRenameValue.trim()} className="admin-primary-button min-h-11 rounded-xl">
+                            {areaManagerSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                            Rename
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold">{area}</p>
+                            {isUnassigned ? <Badge variant="secondary">Protected</Badge> : null}
+                          </div>
+                          <p className="mt-1 text-xs font-normal text-muted-foreground">{count} {count === 1 ? "ZIP" : "ZIPs"}</p>
+                        </div>
+                        {isUnassigned ? (
+                          <p className="text-xs font-normal text-muted-foreground">Always last</p>
+                        ) : (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving || firstMovable} onClick={() => moveArea(area, -1)} aria-label={`Move ${area} up`} className="rounded-xl">
+                              <ArrowUp aria-hidden="true" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving || lastMovable} onClick={() => moveArea(area, 1)} aria-label={`Move ${area} down`} className="rounded-xl">
+                              <ArrowDown aria-hidden="true" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving} onClick={() => { setRenamingArea(area); setAreaRenameValue(area) }} aria-label={`Rename ${area}`} className="rounded-xl">
+                              <Pencil aria-hidden="true" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving} aria-label={`Delete ${area}`} className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                  <Trash2 aria-hidden="true" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="rounded-2xl sm:max-w-md">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete {area}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {count} {count === 1 ? "ZIP" : "ZIPs"} will move to Unassigned. Page totals, assignments, segments, and history will be preserved.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel disabled={areaManagerSaving}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction disabled={areaManagerSaving} onClick={() => deleteManagedArea(area)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Delete area
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              }) : (
+                <div className="rounded-xl border border-dashed px-6 py-8 text-center">
+                  <p className="text-sm font-semibold">No areas yet</p>
+                  <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">Link a ZIP or import an Excel file to create the first area.</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={areaManagerSaving} onClick={() => setAreaManagerOpen(false)} className="min-h-11 rounded-xl">Close</Button>
+              <Button
+                type="button"
+                disabled={areaManagerSaving || !!renamingArea || JSON.stringify(areaDraftOrder) === JSON.stringify(territoryAreas)}
+                onClick={saveManagedAreaOrder}
+                className="admin-primary-button min-h-11 rounded-xl"
+              >
+                {areaManagerSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                Save order
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

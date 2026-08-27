@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
 import { pool } from "@/lib/db"
+import { orderedTeamAreas } from "@/lib/team-areas"
 import { parseTerritoryZipWorkbook, UNASSIGNED_AREA } from "@/lib/territory-zip-import"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
@@ -37,7 +38,7 @@ async function loadTerritoryZipState(congregationId: number) {
         inTeamProgress: !!team,
       }
     }),
-    areas: Array.from(new Set(teamRows.rows.map((row) => String(row.area)).filter(Boolean))).sort(),
+    areas: orderedTeamAreas(teamRows.rows.map((row) => String(row.area)), settings.teamProgressAreaOrder),
     coverage,
     teamByZip,
   }
