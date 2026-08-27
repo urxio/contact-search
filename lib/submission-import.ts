@@ -23,7 +23,7 @@ function object(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-/** Parses JSON files produced by the admin submission download endpoint. */
+/** Parses admin submission downloads and Search Helper template exports. */
 export function parseSubmissionImport(value: unknown): ImportedSubmission[] | null {
   const root = object(value)
   const entries = Array.isArray(value) ? value : Array.isArray(root?.submissions) ? root.submissions : [value]
@@ -34,14 +34,17 @@ export function parseSubmissionImport(value: unknown): ImportedSubmission[] | nu
     const submission = object(entry)
     if (!submission || !Array.isArray(submission.contacts) || submission.contacts.length > MAX_CONTACTS_PER_SUBMISSION) return null
     const contacts = submission.contacts.map(object)
-    const userId = text(submission.user_id ?? submission.userId, 255)
+    // Search Helper template exports intentionally do not include a user. Keep
+    // them identifiable in the queue without requiring an admin to edit JSON.
+    const isTemplate = submission.exportDate !== undefined || submission.version !== undefined
+    const userId = text(submission.user_id ?? submission.userId, 255) || (isTemplate ? "Imported template" : "")
     if (!userId || contacts.some((contact) => !contact)) return null
 
     const reviewStatus = submission.review_status ?? submission.reviewStatus
     if (reviewStatus !== undefined && reviewStatus !== "pending" && reviewStatus !== "in_review" && reviewStatus !== "reviewed") return null
     if (submission.archived !== undefined && typeof submission.archived !== "boolean") return null
 
-    const submittedAtValue = submission.submitted_at ?? submission.submittedAt
+    const submittedAtValue = submission.submitted_at ?? submission.submittedAt ?? submission.exportDate
     const submittedAt = typeof submittedAtValue === "string" && !Number.isNaN(Date.parse(submittedAtValue))
       ? submittedAtValue
       : null

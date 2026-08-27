@@ -88,6 +88,28 @@ describe("congregation admin contact review route", () => {
     expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "submission.imported", metadata: { count: 1 } }))
   })
 
+  it("imports a Search Helper template export without a user id", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 82 }] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({
+        contacts: [{ id: "a", status: "Detected" }],
+        exportDate: "2026-08-27T13:01:34.412Z",
+        version: "1.0",
+      }),
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    expect(mocks.clientQuery).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO submissions"), expect.arrayContaining([
+      34, "Imported template", "2026-08-27T13:01:34.412Z", 1,
+    ]))
+  })
+
   it("rejects malformed submission imports", async () => {
     const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
     const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {
