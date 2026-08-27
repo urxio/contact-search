@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   adminCookie: "secret",
   auditEvent: vi.fn(),
   clientQuery: vi.fn(),
+  poolQuery: vi.fn(),
   release: vi.fn(),
   requireCongregationAdmin: vi.fn(),
   updateSubmissionContact: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("@/lib/db", () => ({
   ensureSchema: vi.fn(),
   pool: {
     connect: vi.fn(async () => ({ query: mocks.clientQuery, release: mocks.release })),
-    query: vi.fn(),
+    query: mocks.poolQuery,
   },
 }))
 
@@ -56,6 +57,7 @@ beforeEach(() => {
   mocks.adminCookie = "secret"
   mocks.auditEvent.mockReset().mockResolvedValue(undefined)
   mocks.clientQuery.mockReset().mockResolvedValue({ rows: [] })
+  mocks.poolQuery.mockReset().mockResolvedValue({ rows: [] })
   mocks.release.mockReset()
   mocks.requireCongregationAdmin.mockReset().mockResolvedValue({
     user: { id: 12 },
@@ -67,6 +69,36 @@ beforeEach(() => {
 })
 
 describe("congregation admin contact review route", () => {
+  it("imports an exported submission and recalculates its counters", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 81 }] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({ user_id: "Marie", contact_count: 999, contacts: [{ id: "a", status: "Not French" }] }),
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    expect(mocks.clientQuery).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO submissions"), expect.arrayContaining([
+      34, "Marie", null, 1, 0, 1, 0, 0,
+    ]))
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "submission.imported", metadata: { count: 1 } }))
+  })
+
+  it("rejects malformed submission imports", async () => {
+    const { POST } = await import("@/app/api/c/[slug]/admin/submissions/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/admin/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({ user_id: "Marie", contacts: "not an array" }),
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(400)
+    expect(mocks.clientQuery).not.toHaveBeenCalled()
+  })
+
   it.each(["Potentially French", "Not French", "Duplicate"])("accepts the %s final status", async (status) => {
     const { PATCH } = await import("@/app/api/c/[slug]/admin/submissions/route")
     const response = await PATCH(patchRequest("https://search.example/api/c/central/admin/submissions", {

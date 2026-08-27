@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Search,
   Trash2,
+  Upload,
   Users,
   Wrench,
   X,
@@ -120,6 +121,9 @@ export default function AdminDashboard() {
   const [submissionStatus, setSubmissionStatus] = useState<"all" | ReviewStatus>("all")
   const [submissionProgress, setSubmissionProgress] = useState<"all" | "complete" | "incomplete" | "unchecked">("all")
   const [submissionSort, setSubmissionSort] = useState<SubmissionSort>("newest")
+  const importFileRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -184,6 +188,41 @@ export default function AdminDashboard() {
     setSubmissions(s => s.filter(sub => sub.id !== id))
     setBusy(b => ({ ...b, [id]: false }))
   }, [adminApiBase])
+
+  const importSubmissions = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      setImportMessage("Choose a .json submission export.")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setImportMessage("That file is too large. Choose a JSON file under 10 MB.")
+      return
+    }
+    setImporting(true)
+    setImportMessage(null)
+    try {
+      const payload = JSON.parse(await file.text())
+      const response = await fetch(`${adminApiBase}/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setImportMessage(result?.error ?? "Could not import the submission.")
+        return
+      }
+      setImportMessage(`Imported ${result.imported} submission${result.imported === 1 ? "" : "s"}.`)
+      await fetchSubmissions()
+    } catch {
+      setImportMessage("The selected file is not valid JSON.")
+    } finally {
+      setImporting(false)
+    }
+  }, [adminApiBase, fetchSubmissions])
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -411,13 +450,24 @@ export default function AdminDashboard() {
 
         {/* ── Review queue ── */}
         <div className={activeTab === "submissions" ? "" : "hidden"}>
+          <input ref={importFileRef} type="file" accept="application/json,.json" onChange={importSubmissions} className="sr-only" />
           <div className="mb-6 flex flex-col gap-4 border-y py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="grid grid-cols-3 divide-x">
               <QueueMetric icon={Inbox} label="Pending" value={totalPending} />
               <QueueMetric icon={Users} label="Contacts" value={totalContacts} />
               <QueueMetric icon={CheckCircle2} label="Reviewed" value={totalReviewed} />
             </div>
-            <div className="inline-flex w-fit rounded-full bg-muted/70 p-1 shadow-inner">
+            <div className="flex w-fit items-center gap-2">
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                disabled={importing}
+                className="admin-primary-button inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-medium text-white disabled:opacity-60"
+              >
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                {importing ? "Importing…" : "Import JSON"}
+              </button>
+              <div className="inline-flex rounded-full bg-muted/70 p-1 shadow-inner">
               <button
                 onClick={() => setShowArchived(false)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150 ease-out ${!showArchived ? "bg-background text-foreground shadow-sm dark:bg-white/10" : "text-muted-foreground hover:text-foreground"}`}
@@ -430,8 +480,12 @@ export default function AdminDashboard() {
               >
                 Archived{archivedCount > 0 ? ` (${archivedCount})` : ""}
               </button>
+              </div>
             </div>
           </div>
+          {importMessage && (
+            <p role="status" className="-mt-4 mb-4 text-sm text-muted-foreground">{importMessage}</p>
+          )}
 
           {visible.length === 0 && (
             <div className="border-y px-6 py-12 text-center">

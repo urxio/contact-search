@@ -8,6 +8,58 @@ import {
   parseAdminContactEdits,
   updateSubmissionContact,
 } from "@/lib/submission-contacts"
+import { parseSubmissionImport, submissionCounts } from "@/lib/submission-import"
+
+export async function POST(req: NextRequest, { params }: RouteContext) {
+  try {
+    assertMultiTenantEnabled()
+    validateMutationOrigin(req)
+    const auth = await requireCongregationAdmin(params.slug)
+    const imported = parseSubmissionImport(await req.json())
+    if (!imported) {
+      return NextResponse.json({ error: "Upload a valid submission JSON file with at most 100 submissions." }, { status: 400 })
+    }
+
+    const client = await pool.connect()
+    const ids: number[] = []
+    try {
+      await client.query("BEGIN")
+      for (const submission of imported) {
+        const counts = submissionCounts(submission.contacts)
+        const result = await client.query(
+          `INSERT INTO submissions
+            (congregation_id, user_id, submitted_at, contact_count, potentially_french,
+             not_french, duplicate, not_checked, global_notes, territory_zipcode,
+             territory_page_range, contacts, review_status, archived)
+           VALUES ($1,$2,COALESCE($3::timestamptz,NOW()),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           RETURNING id`,
+          [auth.congregation.id, submission.userId, submission.submittedAt, counts.contactCount,
+            counts.potentiallyFrench, counts.notFrench, counts.duplicate, counts.notChecked,
+            submission.globalNotes, submission.territoryZipcode, submission.territoryPageRange,
+            JSON.stringify(submission.contacts), submission.reviewStatus, submission.archived],
+        )
+        ids.push(Number(result.rows[0].id))
+      }
+      await client.query("COMMIT")
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
+    }
+    await auditEvent({
+      actorUserId: auth.user.id,
+      congregationId: auth.congregation.id,
+      action: "submission.imported",
+      targetType: "submission",
+      targetId: ids.join(","),
+      metadata: { count: ids.length },
+    })
+    return NextResponse.json({ success: true, imported: ids.length, ids }, { status: 201 })
+  } catch (error) {
+    return apiError(error)
+  }
+}
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {

@@ -7,6 +7,52 @@ import {
   parseAdminContactEdits,
   updateSubmissionContact,
 } from "@/lib/submission-contacts"
+import { parseSubmissionImport, submissionCounts } from "@/lib/submission-import"
+
+export async function POST(req: NextRequest) {
+  const adminSession = cookies().get("admin_session")
+  if (adminSession?.value !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  try {
+    const imported = parseSubmissionImport(await req.json())
+    if (!imported) {
+      return NextResponse.json({ error: "Upload a valid submission JSON file with at most 100 submissions." }, { status: 400 })
+    }
+    await ensureSchema()
+    const client = await pool.connect()
+    const ids: number[] = []
+    try {
+      await client.query("BEGIN")
+      for (const submission of imported) {
+        const counts = submissionCounts(submission.contacts)
+        const result = await client.query(
+          `INSERT INTO submissions
+            (user_id, submitted_at, contact_count, potentially_french, not_french,
+             duplicate, not_checked, global_notes, territory_zipcode, territory_page_range,
+             contacts, review_status, archived)
+           VALUES ($1,COALESCE($2::timestamptz,NOW()),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           RETURNING id`,
+          [submission.userId, submission.submittedAt, counts.contactCount, counts.potentiallyFrench,
+            counts.notFrench, counts.duplicate, counts.notChecked, submission.globalNotes,
+            submission.territoryZipcode, submission.territoryPageRange, JSON.stringify(submission.contacts),
+            submission.reviewStatus, submission.archived],
+        )
+        ids.push(Number(result.rows[0].id))
+      }
+      await client.query("COMMIT")
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
+    }
+    return NextResponse.json({ success: true, imported: ids.length, ids }, { status: 201 })
+  } catch (err) {
+    console.error("Submission import error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
 
 export async function GET(req: NextRequest) {
   // Verify admin session cookie
