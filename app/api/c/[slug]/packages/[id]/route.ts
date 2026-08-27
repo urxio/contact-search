@@ -72,7 +72,8 @@ export async function POST(req: NextRequest, { params }: Context) {
       if (!manageAll && ownerUserId !== auth.user.id && Number(row.uploaded_by_user_id) !== auth.user.id) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Excel not found." }, { status: 404 }) }
       if (row.status === "Completed" && !manageAll) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Only an admin can release completed work." }, { status: 409 }) }
       await client.query(`UPDATE zt_segments SET owner='',owner_user_id=NULL,status='Not started',stopped_at_page=NULL,notes='',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[row.segment_id,auth.congregation.id])
-      await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.released",packageId:id,metadata:{previousOwnerUserId:ownerUserId}})
+      await client.query(`UPDATE contact_packages SET visibility='shared',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[id,auth.congregation.id])
+      await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.released",packageId:id,metadata:{previousOwnerUserId:ownerUserId,visibility:"shared"}})
     } else {
       await client.query("ROLLBACK"); return NextResponse.json({ error: "Unknown Excel action." }, { status: 400 })
     }
