@@ -14,18 +14,18 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const auth = await requireMembership(params.slug)
     const manageAll = canManageAll(auth)
     const includedPackageId = integer(req.nextUrl.searchParams.get("include"))
-    const assignedToMe = req.nextUrl.searchParams.get("assigned") === "mine"
+    const activeForMe = req.nextUrl.searchParams.get("active") === "mine"
     const result = await pool.query(
       `${PACKAGE_SELECT}
         WHERE cp.congregation_id=$1
           AND s.status <> 'Completed'
           AND ($4::boolean AND s.owner_user_id=$3 OR NOT $4::boolean AND ($2::boolean OR cp.visibility='shared' OR cp.uploaded_by_user_id=$3 OR s.owner_user_id=$3))
         ORDER BY cp.created_at DESC,cp.id DESC`,
-      [auth.congregation.id, manageAll, auth.user.id, assignedToMe],
+      [auth.congregation.id, manageAll, auth.user.id, activeForMe],
     )
     return NextResponse.json({
       packages: result.rows
-        .filter(row => assignedToMe || isPackageBrowsable(row, auth.user.id, includedPackageId))
+        .filter(row => activeForMe || isPackageBrowsable(row, auth.user.id, includedPackageId))
         .map(row => serializePackage(row, auth.user.id, manageAll)),
     })
   } catch (error) { return apiError(error) }

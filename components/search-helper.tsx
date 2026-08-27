@@ -132,7 +132,7 @@ export default function SearchHelper({
   const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
-  const [assignedPackages, setAssignedPackages] = useState<Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number }>>([])
+  const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number; isMine: boolean }>>([])
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
@@ -206,13 +206,13 @@ export default function SearchHelper({
   useEffect(() => {
     if (!workspaceSlug) return
     let cancelled = false
-    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/packages?assigned=mine`, { cache: "no-store" })
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/packages?active=mine`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : { packages: [] })
       .then((result) => {
-        if (!cancelled) setAssignedPackages(Array.isArray(result.packages) ? result.packages : [])
+        if (!cancelled) setActivePackages(Array.isArray(result.packages) ? result.packages : [])
       })
       .catch(() => {
-        if (!cancelled) setAssignedPackages([])
+        if (!cancelled) setActivePackages([])
       })
     return () => { cancelled = true }
   }, [workspaceSlug])
@@ -2116,7 +2116,8 @@ export default function SearchHelper({
           onSubmitForReview={sendForReview}
           packagesEnabled={Boolean(workspaceSlug)}
           onBrowsePackages={() => setPackageBrowserOpen(true)}
-          assignedPackages={assignedPackages}
+          ownActivePackages={activePackages.filter((item) => item.isMine)}
+          assignedPackages={activePackages.filter((item) => !item.isMine)}
           onOpenAssignedPackage={(packageId) => {
             setPreferredPackageId(packageId)
             setPackageBrowserOpen(true)

@@ -20,10 +20,10 @@ beforeEach(() => {
   })
 })
 
-describe("assigned package alerts", () => {
-  it("returns only the viewer's active assignments for the assigned-mine request", async () => {
+describe("active package alerts", () => {
+  it("returns only the viewer's active Excels so the UI can distinguish own uploads from assignments", async () => {
     const { GET } = await import("@/app/api/c/[slug]/packages/route")
-    const response = await GET(new NextRequest("https://search.example/api/c/central/packages?assigned=mine"), { params: { slug: "central" } })
+    const response = await GET(new NextRequest("https://search.example/api/c/central/packages?active=mine"), { params: { slug: "central" } })
 
     expect(response.status).toBe(200)
     expect(mocks.poolQuery).toHaveBeenCalledWith(expect.stringContaining("s.owner_user_id=$3"), [34, false, 12, true])
