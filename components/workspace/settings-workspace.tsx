@@ -32,7 +32,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { areaCardColorClass, areaCardColorStyle, areaCardPickerValue } from "@/lib/area-colors"
 
 type SettingsWorkspaceProps = {
   slug: string
@@ -118,8 +117,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [membersLoading, setMembersLoading] = useState(true)
   const [territoryRows, setTerritoryRows] = useState<TerritoryZipRow[]>([])
   const [territoryAreas, setTerritoryAreas] = useState<string[]>([])
-  const [areaColors, setAreaColors] = useState<Record<string, string>>({})
-  const [areaColorSaving, setAreaColorSaving] = useState<string | null>(null)
   const [territoryRowsLoading, setTerritoryRowsLoading] = useState(true)
   const [territorySearch, setTerritorySearch] = useState("")
   const [editingTerritoryRow, setEditingTerritoryRow] = useState<TerritoryZipRow | null>(null)
@@ -149,7 +146,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
       const rows = Array.isArray(data.rows) ? data.rows as TerritoryZipRow[] : []
       setTerritoryRows(rows)
       setTerritoryAreas(Array.isArray(data.areas) ? data.areas : [])
-      setAreaColors(typeof data.areaColors === "object" && data.areaColors !== null ? data.areaColors : {})
       setSearchZipcodes(rows.filter((row) => row.inCoverage).map((row) => row.zipcode).join("\n"))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Territory ZIP mappings could not be loaded")
@@ -288,37 +284,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     setMappingArea(!row.area || isUnassignedArea(row.area) ? "Unassigned" : row.area)
     setCreatingMappingArea(false)
     setMappingTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
-  }
-
-  function selectedAreaColor(area: string) {
-    const key = Object.keys(areaColors).find((value) => value.toLocaleLowerCase() === area.toLocaleLowerCase())
-    return key ? areaColors[key] : "auto"
-  }
-
-  async function updateAreaColor(area: string, color: string) {
-    const previousColors = areaColors
-    const nextColors = { ...areaColors }
-    const existingKey = Object.keys(nextColors).find((value) => value.toLocaleLowerCase() === area.toLocaleLowerCase())
-    if (existingKey) delete nextColors[existingKey]
-    if (color !== "auto") nextColors[area] = color
-    setAreaColors(nextColors)
-    setAreaColorSaving(area)
-    try {
-      const response = await fetch(`/api/c/${slug}/settings/territory-areas`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "set-color", area, color }),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Area color could not be saved")
-      setAreaColors(typeof result.areaColors === "object" && result.areaColors !== null ? result.areaColors : nextColors)
-      toast.success(`${area} color updated`)
-    } catch (error) {
-      setAreaColors(previousColors)
-      toast.error(error instanceof Error ? error.message : "Area color could not be saved")
-    } finally {
-      setAreaColorSaving(null)
-    }
   }
 
   async function saveTerritoryMapping(event: FormEvent) {
@@ -897,8 +862,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                   <section
                     key={area}
                     aria-labelledby={`area-${area.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                    className={`flex h-96 flex-col overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ease-out hover:shadow-md ${areaCardColorClass(area, territoryAreas, selectedAreaColor(area))}`}
-                    style={areaCardColorStyle(selectedAreaColor(area))}
+                    className="flex h-96 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow duration-150 ease-out hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-3 border-b border-current/10 p-4">
                       <div className="min-w-0">
@@ -1019,7 +983,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <DialogHeader>
               <DialogTitle className="text-base font-semibold">Manage Team Progress areas</DialogTitle>
               <DialogDescription className="text-sm font-normal leading-relaxed">
-              Set each card&apos;s color, rename areas, change their display order, or remove an area. Removing an area moves its ZIPs to Unassigned and keeps all Team Progress history.
+              Rename areas, change their display order, or remove an area. Removing an area moves its ZIPs to Unassigned and keeps all Team Progress history.
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
@@ -1057,18 +1021,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                         {isUnassigned ? (
                           <p className="text-xs font-normal text-muted-foreground">Always last</p>
                         ) : (
-                          <div className="flex shrink-0 items-center gap-2">
-                            <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                              <span>Card color</span>
-                              <input
-                                type="color"
-                                value={areaCardPickerValue(selectedAreaColor(area))}
-                                onChange={(event) => updateAreaColor(area, event.target.value)}
-                                disabled={areaColorSaving === area}
-                                aria-label={`Choose ${area} card color`}
-                                className="h-9 w-12 cursor-pointer rounded-lg border bg-background p-1 disabled:cursor-not-allowed disabled:opacity-50"
-                              />
-                            </label>
+                          <div className="flex shrink-0 items-center gap-1">
                             <Button type="button" variant="ghost" size="icon" disabled={areaManagerSaving || firstMovable} onClick={() => moveArea(area, -1)} aria-label={`Move ${area} up`} className="rounded-xl">
                               <ArrowUp aria-hidden="true" />
                             </Button>

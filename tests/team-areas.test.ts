@@ -85,7 +85,7 @@ describe("Team Progress area management route", () => {
     }), { params: { slug: "central" } })
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ success: true, areas: ["South", "Central", "Unassigned"], count: 2, areaColors: {} })
+    expect(await response.json()).toEqual({ success: true, areas: ["South", "Central", "Unassigned"], count: 2 })
     expect(mocks.clientQuery).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE zt_zipcodes SET territory"),
       [34, "North", "Central"],
@@ -113,26 +113,6 @@ describe("Team Progress area management route", () => {
     expect(JSON.parse(settingsCall?.[1][1])).toEqual({ teamProgressAreaOrder: ["South", "North", "Unassigned"] })
   })
 
-  it("saves an explicit card color for an area", async () => {
-    mocks.clientQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ settings: {} }] })
-      .mockResolvedValueOnce({ rows: [{ territory: "North" }, { territory: "Unassigned" }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-    const { PATCH } = await import("@/app/api/c/[slug]/settings/territory-areas/route")
-    const response = await PATCH(new NextRequest("https://search.example/api/c/central/settings/territory-areas", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
-      body: JSON.stringify({ action: "set-color", area: "North", color: "#ef4444" }),
-    }), { params: { slug: "central" } })
-
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ success: true, areas: ["North", "Unassigned"], areaColors: { North: "#ef4444" } })
-    const settingsCall = mocks.clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE congregations SET settings"))
-    expect(JSON.parse(settingsCall?.[1][1])).toEqual({ teamProgressAreaColors: { North: "#ef4444" } })
-    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "team.area.color_updated" }))
-  })
 
   it("deletes an area by moving its ZIPs to Unassigned", async () => {
     mocks.clientQuery
