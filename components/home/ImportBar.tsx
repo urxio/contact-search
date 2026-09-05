@@ -80,12 +80,6 @@ export function ImportBar({
           </span>
         )}
 
-        {currentActivePackage ? (
-          <p className="min-w-0 max-w-full truncate text-xs font-semibold text-sky-700 dark:text-sky-300" title={currentActivePackage.name}>
-            Reviewing: {currentActivePackage.name}
-          </p>
-        ) : null}
-
         {/* Column hint */}
         <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
           Columns: First Name · Last Name · Address · City · Zipcode · Phone
@@ -115,6 +109,13 @@ export function ImportBar({
           </Button>
         </div>
       </div>
+
+      {currentActivePackage ? (
+        <div className="flex min-w-0 items-center gap-3 border-t border-sky-100 bg-sky-50/70 px-5 py-3 text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+          <PackageOpen className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-300" aria-hidden="true" />
+          <p className="min-w-0 truncate text-sm font-semibold" title={currentActivePackage.name}>Excel: {currentActivePackage.name}</p>
+        </div>
+      ) : null}
 
       {continuablePackages.length > 0 ? (
         <div className="flex flex-col gap-3 border-t border-sky-100 bg-sky-50/70 px-5 py-3 text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100 sm:flex-row sm:items-center">

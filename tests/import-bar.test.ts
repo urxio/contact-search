@@ -21,13 +21,13 @@ function text(markup: string) {
 }
 
 describe("ImportBar Excel progress notification", () => {
-  it("keeps only the Excel name in the top bar while it is already being reviewed", () => {
+  it("keeps only the Excel name in a compact notification while it is already being reviewed", () => {
     const markup = text(renderBar({
       ownActivePackages: [{ id: 18, name: "Alexandria North — pages 541–582" }],
       currentPackageId: 18,
     }))
 
-    expect(markup).toContain("Reviewing: Alexandria North — pages 541–582")
+    expect(markup).toContain("Excel: Alexandria North — pages 541–582")
     expect(markup).not.toContain("Your Excel is in progress")
     expect(markup).not.toContain("Reviewing now")
   })
