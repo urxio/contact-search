@@ -468,6 +468,7 @@ export function PackageDialogs({
                         const contactCount = value<number>(row, "contactCount", "contact_count") || 0
                         const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
                         const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
+                        const isAssignedToViewer = Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer"))
                         const assignedOwner = row.segment?.owner || value<string>(row, "ownerName", "owner_name")
                         const uploader = row.uploader?.displayName || row.uploaderName
                         const attribution = assignedOwner
@@ -484,7 +485,7 @@ export function PackageDialogs({
                             <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
                             <div className="min-w-0 flex-1">
                               <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
-                              <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge><Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+                              <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
                               <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
                               <p className="mt-1 text-xs font-normal text-muted-foreground">{attribution}</p>
                             </div>
