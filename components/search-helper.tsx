@@ -132,7 +132,7 @@ export default function SearchHelper({
   const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
-  const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number; isMine: boolean }>>([])
+  const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; state: "assigned" | "in_progress"; isMine: boolean }>>([])
   const [dismissedPackageNotifications, setDismissedPackageNotifications] = useState<Set<number>>(new Set())
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
@@ -227,19 +227,18 @@ export default function SearchHelper({
     })
   }, [packageNotificationStorageKey])
 
-  useEffect(() => {
+  const refreshActivePackages = useCallback(async () => {
     if (!workspaceSlug) return
-    let cancelled = false
-    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/packages?active=mine`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : { packages: [] })
-      .then((result) => {
-        if (!cancelled) setActivePackages(Array.isArray(result.packages) ? result.packages : [])
-      })
-      .catch(() => {
-        if (!cancelled) setActivePackages([])
-      })
-    return () => { cancelled = true }
+    try {
+      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/packages?active=mine`, { cache: "no-store" })
+      const result = response.ok ? await response.json() : { packages: [] }
+      setActivePackages(Array.isArray(result.packages) ? result.packages : [])
+    } catch {
+      setActivePackages([])
+    }
   }, [workspaceSlug])
+
+  useEffect(() => { void refreshActivePackages() }, [refreshActivePackages])
   const storagePrefix = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
@@ -705,7 +704,7 @@ export default function SearchHelper({
     reader.readAsBinaryString(file)
   }, [workspaceSlug])
 
-  const loadPackageDraft = useCallback((draft: any) => {
+  const loadPackageDraft = useCallback((draft: any, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => {
     activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
     activePackageIdRef.current = draft.packageId ?? null
     const nextContacts = Array.isArray(draft.contacts) ? draft.contacts : []
@@ -722,10 +721,17 @@ export default function SearchHelper({
     setPackageAssignmentLocked(true)
     setSelectedContacts([])
     setError(null)
+    if (packageRow?.id) {
+      setActivePackages((current) => [
+        { id: packageRow.id, name: packageRow.name, state: "in_progress", isMine: Boolean(packageRow.isMine) },
+        ...current.filter((item) => item.id !== packageRow.id),
+      ])
+    }
+    void refreshActivePackages()
     if (!draft.resumed) setTimeout(() => {
       try { ;(detectFrenchNames as any)?.(false, nextContacts) } catch (error) { console.warn("Unable to detect names", error) }
     }, 50)
-  }, [])
+  }, [refreshActivePackages])
 
   // Function to update last verified ID and record interaction time
   const updateLastInteraction = useCallback((id: string) => {
@@ -2161,10 +2167,12 @@ export default function SearchHelper({
           onSubmitForReview={sendForReview}
           packagesEnabled={Boolean(workspaceSlug)}
           onBrowsePackages={() => setPackageBrowserOpen(true)}
-          ownActivePackages={activePackages.filter((item) => item.isMine && !dismissedPackageNotifications.has(item.id))}
-          assignedPackages={activePackages.filter((item) => !item.isMine && !dismissedPackageNotifications.has(item.id))}
+          ownActivePackages={activePackages.filter((item) => item.state === "in_progress")}
+          assignedPackages={activePackages.filter((item) => item.state === "assigned" && !dismissedPackageNotifications.has(item.id))}
+          currentPackageId={activePackageIdRef.current}
           onOpenAssignedPackage={(packageId) => {
-            dismissPackageNotification(packageId)
+            const packageToOpen = activePackages.find((item) => item.id === packageId)
+            if (packageToOpen?.state === "assigned") dismissPackageNotification(packageId)
             setPreferredPackageId(packageId)
             setPackageBrowserOpen(true)
           }}

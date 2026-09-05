@@ -84,7 +84,7 @@ type Props = {
   preferredPackageId?: number | null
   onBrowseOpenChange: (open: boolean) => void
   onCancelUpload: () => void
-  onDraftLoaded: (draft: DraftPayload) => void
+  onDraftLoaded: (draft: DraftPayload, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => void
   onDraftConflict: (draft: DraftPayload) => void
 }
 
@@ -204,7 +204,7 @@ export function PackageDialogs({
 
   function applyDraft(result: any) {
     const draft = result.draft ?? result
-    onDraftLoaded(draft)
+    onDraftLoaded(draft, result.package)
   }
 
   async function savePackage(action: UploadAction) {

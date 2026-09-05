@@ -18,8 +18,9 @@ interface ImportBarProps {
   onSubmitForReview?: () => void
   packagesEnabled?: boolean
   onBrowsePackages?: () => void
-  ownActivePackages?: Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number }>
-  assignedPackages?: Array<{ id: number; name: string; zipcode: string; pageStart: number; pageEnd: number }>
+  ownActivePackages?: Array<{ id: number; name: string }>
+  assignedPackages?: Array<{ id: number; name: string }>
+  currentPackageId?: number | null
   onOpenAssignedPackage?: (packageId: number) => void
 }
 
@@ -38,6 +39,7 @@ export function ImportBar({
   onBrowsePackages,
   ownActivePackages = [],
   assignedPackages = [],
+  currentPackageId = null,
   onOpenAssignedPackage,
 }: ImportBarProps) {
   return (
@@ -111,11 +113,14 @@ export function ImportBar({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{ownActivePackages.length === 1 ? "Your Excel is in progress" : `${ownActivePackages.length} of your Excels are in progress`}</p>
             <p className="mt-0.5 text-xs text-sky-800/80 dark:text-sky-200/80">Continue reviewing an Excel you started.</p>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-sky-900 dark:text-sky-100">
+              {ownActivePackages.map((item) => <span key={item.id} className="font-semibold">Excel: {item.name}</span>)}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {ownActivePackages.map((item) => (
-              <Button key={item.id} type="button" size="sm" variant="outline" className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
-                Continue {item.name}
+              <Button key={item.id} type="button" size="sm" variant="outline" disabled={item.id === currentPackageId} className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
+                {item.id === currentPackageId ? "Reviewing now" : "Continue reviewing"}
               </Button>
             ))}
           </div>
