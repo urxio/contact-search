@@ -1816,6 +1816,7 @@ export default function SearchHelper({
           hasDraft={contacts.length > 0}
           browseOpen={packageBrowserOpen}
           preferredPackageId={preferredPackageId}
+          canManagePackages={workspace?.canManagePackages === true}
           onBrowseOpenChange={setPackageBrowserOpen}
           onCancelUpload={() => {
             setPendingPackageUpload(null)

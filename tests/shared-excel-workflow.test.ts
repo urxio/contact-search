@@ -193,6 +193,27 @@ describe("Excel upload and listing", () => {
     expect(packages).toHaveLength(1)
     expect(packages[0].isAssignedToViewer).toBe(true)
   })
+
+  it("does not expose the congregation Excel library to members", async () => {
+    const { GET } = await import("@/app/api/c/[slug]/packages/route")
+    const response = await GET(new NextRequest("https://search.example/api/c/central/packages?scope=library"), { params: { slug: "central" } })
+    expect(response.status).toBe(404)
+    expect(mocks.query).not.toHaveBeenCalled()
+  })
+
+  it("returns every active congregation Excel to an admin library without contacts", async () => {
+    membership.membership.role = "admin"
+    current = { ...row, visibility: "private", uploaded_by_user_id: 99, owner_user_id: 98, owner: "Assigned member", status: "In progress" }
+    const { GET } = await import("@/app/api/c/[slug]/packages/route")
+    const response = await GET(new NextRequest("https://search.example/api/c/central/packages?scope=library"), { params: { slug: "central" } })
+    const result = await response.json()
+    expect(response.status).toBe(200)
+    expect(result.packages).toHaveLength(1)
+    expect(result.packages[0]).not.toHaveProperty("contacts")
+    expect(result.packages[0].uploader.id).toBe(99)
+    expect(result.packages[0].segment.owner).toBe("Assigned member")
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("s.status <> 'Completed'"), [34])
+  })
 })
 
 describe("member draft progress", () => {

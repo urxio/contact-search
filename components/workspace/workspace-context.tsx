@@ -6,6 +6,7 @@ type WorkspaceRuntime = {
   slug: string
   authenticatedUserId?: number
   authenticatedDisplayName?: string
+  canManagePackages?: boolean
   embedded?: boolean
 }
 
@@ -15,11 +16,12 @@ export function WorkspaceRuntimeProvider({
   slug,
   authenticatedUserId,
   authenticatedDisplayName,
+  canManagePackages = false,
   embedded = true,
   children,
 }: WorkspaceRuntime & { children: React.ReactNode }) {
   return (
-    <WorkspaceContext.Provider value={{ slug, authenticatedUserId, authenticatedDisplayName, embedded }}>
+    <WorkspaceContext.Provider value={{ slug, authenticatedUserId, authenticatedDisplayName, canManagePackages, embedded }}>
       {children}
     </WorkspaceContext.Provider>
   )

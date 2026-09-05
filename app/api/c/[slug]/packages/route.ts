@@ -15,17 +15,22 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const auth = await requireMembership(params.slug)
     const manageAll = canManageAll(auth)
     const activeForMe = req.nextUrl.searchParams.get("active") === "mine"
-    const result = await pool.query(
-      `${PACKAGE_SELECT}
+    const library = req.nextUrl.searchParams.get("scope") === "library"
+    if (library && !manageAll) return NextResponse.json({ error: "Excel library not found." }, { status: 404 })
+    const result = await pool.query(library
+      ? `${PACKAGE_SELECT}
+        WHERE cp.congregation_id=$1
+          AND s.status <> 'Completed'
+        ORDER BY cp.created_at DESC,cp.id DESC`
+      : `${PACKAGE_SELECT}
         WHERE cp.congregation_id=$1
           AND s.status <> 'Completed'
           AND ($4::boolean AND s.owner_user_id=$3 OR NOT $4::boolean AND ($2::boolean OR cp.visibility='shared' OR cp.uploaded_by_user_id=$3 OR s.owner_user_id=$3))
         ORDER BY cp.created_at DESC,cp.id DESC`,
-      [auth.congregation.id, manageAll, auth.user.id, activeForMe],
-    )
+      library ? [auth.congregation.id] : [auth.congregation.id, manageAll, auth.user.id, activeForMe])
     return NextResponse.json({
       packages: result.rows
-        .filter(row => activeForMe || isPackageBrowsable(row, auth.user.id))
+        .filter(row => library || activeForMe || isPackageBrowsable(row, auth.user.id))
         .map(row => serializePackage(row, auth.user.id, manageAll)),
     })
   } catch (error) { return apiError(error) }

@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { BaseContact } from "@/types/contact"
 import { packageNameForSegment } from "@/lib/package-name"
 
@@ -43,6 +44,8 @@ type PackageRow = {
   can_open?: boolean
   canAssign?: boolean
   hasSavedProgress?: boolean
+  updatedAt?: string | Date
+  updated_at?: string | Date
   isMine?: boolean
   is_mine?: boolean
   isAssignedToViewer?: boolean
@@ -85,6 +88,7 @@ type Props = {
   hasDraft: boolean
   browseOpen: boolean
   preferredPackageId?: number | null
+  canManagePackages?: boolean
   onBrowseOpenChange: (open: boolean) => void
   onCancelUpload: () => void
   onDraftLoaded: (draft: DraftPayload, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => void
@@ -108,6 +112,7 @@ export function PackageDialogs({
   hasDraft,
   browseOpen,
   preferredPackageId,
+  canManagePackages = false,
   onBrowseOpenChange,
   onCancelUpload,
   onDraftLoaded,
@@ -116,6 +121,10 @@ export function PackageDialogs({
   const api = `/api/c/${encodeURIComponent(slug)}/packages`
   const [zipcodes, setZipcodes] = useState<ZipcodeRow[]>([])
   const [packages, setPackages] = useState<PackageRow[]>([])
+  const [libraryPackages, setLibraryPackages] = useState<PackageRow[]>([])
+  const [librarySearch, setLibrarySearch] = useState("")
+  const [libraryStatus, setLibraryStatus] = useState("all")
+  const [libraryVisibility, setLibraryVisibility] = useState("all")
   const [name, setName] = useState("")
   const [zipcode, setZipcode] = useState("")
   const [pageStart, setPageStart] = useState("")
@@ -154,6 +163,18 @@ export function PackageDialogs({
       rows: packages.filter((row) => row.visibility === "shared" && !value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer")),
     },
   ], [packages])
+  const filteredLibraryPackages = useMemo(() => {
+    const query = librarySearch.trim().toLocaleLowerCase()
+    return libraryPackages.filter((row) => {
+      const state = row.state ?? ""
+      if (libraryStatus !== "all" && state !== libraryStatus) return false
+      if (libraryVisibility !== "all" && row.visibility !== libraryVisibility) return false
+      if (!query) return true
+      const searchable = [row.name, row.originalFilename, row.original_filename, row.uploader?.displayName, row.uploaderName,
+        row.segment?.owner, row.segment?.zipcode, row.segment?.city, row.zipcode].filter(Boolean).join(" ").toLocaleLowerCase()
+      return searchable.includes(query)
+    })
+  }, [libraryPackages, librarySearch, libraryStatus, libraryVisibility])
   const packageToOpenIsClaim = Boolean(packageToOpen && isClaimableByViewer(packageToOpen))
 
   useEffect(() => {
@@ -187,6 +208,14 @@ export function PackageDialogs({
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to load Excels")
       setPackages(Array.isArray(result) ? result : result.packages ?? [])
+      if (canManagePackages) {
+        const libraryResponse = await fetch(`${api}?scope=library`, { cache: "no-store" })
+        const libraryResult = await libraryResponse.json()
+        if (!libraryResponse.ok) throw new Error(libraryResult.error || "Unable to load the Excel library")
+        setLibraryPackages(Array.isArray(libraryResult) ? libraryResult : libraryResult.packages ?? [])
+      } else {
+        setLibraryPackages([])
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load Excels")
     } finally {
@@ -196,7 +225,7 @@ export function PackageDialogs({
 
   useEffect(() => {
     if (browseOpen) void refreshPackages()
-  }, [browseOpen])
+  }, [browseOpen, canManagePackages])
 
   useEffect(() => {
     if (!preferredPackageId || handledPreferredPackage.current === preferredPackageId || loadingPackages) return
@@ -365,6 +394,38 @@ export function PackageDialogs({
     }
   }
 
+  function renderPackageCard(row: PackageRow, library = false) {
+    const contactCount = value<number>(row, "contactCount", "contact_count") || 0
+    const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
+    const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
+    const isAssignedToViewer = Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer"))
+    const assignedOwner = row.segment?.owner || value<string>(row, "ownerName", "owner_name")
+    const uploader = row.uploader?.displayName || row.uploaderName || "Uploader unavailable"
+    const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
+    const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
+    const isClaim = isClaimableByViewer(row)
+    const packageStatus = row.state ? row.state.replace("_", " ") : row.status
+    const assignedToAnotherMember = library && row.segment?.ownerUserId != null && !isAssignedToViewer
+    const updatedAt = value<string | Date>(row, "updatedAt", "updated_at")
+    const updatedLabel = updatedAt ? new Date(updatedAt).toLocaleDateString() : null
+
+    return (
+      <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+        <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
+        <div className="min-w-0 flex-1">
+          <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+          <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · Updated ${updatedLabel}` : ""}</p>
+          {library ? <div className="mt-1 space-y-0.5 text-xs font-normal text-muted-foreground"><p>Uploaded by {uploader}</p><p>{assignedOwner ? `Assigned to ${assignedOwner}` : "Unassigned"}</p></div> : <p className="mt-1 text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>}
+        </div>
+        <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
+          {!assignedToAnotherMember ? <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : row.hasSavedProgress ? "Resume" : "Open"}</Button> : null}
+          {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <Dialog open={Boolean(pendingUpload)} onOpenChange={(open) => { if (!open && !busy) onCancelUpload() }}>
@@ -441,72 +502,27 @@ export function PackageDialogs({
         <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-semibold">Browse Excels</DialogTitle>
-            <DialogDescription>Your private and congregation Excels, kept separate.</DialogDescription>
+            <DialogDescription>Your Excels and, for admins, congregation-wide management.</DialogDescription>
           </DialogHeader>
           {loadingPackages ? (
             <p className="py-10 text-center text-sm font-normal leading-relaxed text-muted-foreground">Loading Excels…</p>
           ) : (
-            <div className="space-y-8 py-2">
-              {packageSections.map((section) => (
-                <section key={section.id} aria-labelledby={`${section.id}-title`} className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <span className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary">
-                      <section.icon className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 id={`${section.id}-title`} className="text-base font-semibold">{section.title}</h3>
-                        <Badge variant="secondary" aria-label={`${section.rows.length} ${section.title}`}>{section.rows.length}</Badge>
-                      </div>
-                      <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">{section.description}</p>
-                    </div>
-                  </div>
-
-                  {section.rows.length ? (
-                    <div className="space-y-3">
-                      {section.rows.map((row) => {
-                        const contactCount = value<number>(row, "contactCount", "contact_count") || 0
-                        const pageStartValue = row.segment?.pageStart ?? value<number>(row, "pageStart", "page_start")
-                        const pageEndValue = row.segment?.pageEnd ?? value<number>(row, "pageEnd", "page_end")
-                        const isAssignedToViewer = Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer"))
-                        const assignedOwner = row.segment?.owner || value<string>(row, "ownerName", "owner_name")
-                        const uploader = row.uploader?.displayName || row.uploaderName
-                        const attribution = assignedOwner
-                          ? `Assigned to ${assignedOwner}`
-                          : uploader
-                            ? `Uploaded by ${uploader}`
-                            : "Uploader unavailable"
-                        const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
-                        const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
-                        const isClaim = isClaimableByViewer(row)
-                        const packageStatus = row.state ? row.state.replace("_", " ") : row.status
-                        return (
-                          <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-                            <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
-                            <div className="min-w-0 flex-1">
-                              <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
-                              <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
-                              <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts</p>
-                              <p className="mt-1 text-xs font-normal text-muted-foreground">{attribution}</p>
-                            </div>
-                            <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : row.hasSavedProgress ? "Resume" : "Open"}</Button>
-                              {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center">
-                      <Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
-                      <p className="mt-3 text-base font-semibold">{section.emptyTitle}</p>
-                      <p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">{section.emptyDescription}</p>
-                    </div>
-                  )}
-                </section>
-              ))}
-            </div>
+            <Tabs defaultValue="mine" className="py-2">
+              <TabsList className="w-full sm:w-auto"><TabsTrigger value="mine" className="flex-1 sm:flex-none">My Excels</TabsTrigger>{canManagePackages ? <TabsTrigger value="library" className="flex-1 sm:flex-none">Congregation Library</TabsTrigger> : null}</TabsList>
+              <TabsContent value="mine" className="space-y-8 pt-4">
+                {packageSections.map((section) => (
+                  <section key={section.id} aria-labelledby={`${section.id}-title`} className="space-y-3">
+                    <div className="flex items-start gap-3"><span className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary"><section.icon className="h-5 w-5" aria-hidden="true" /></span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 id={`${section.id}-title`} className="text-base font-semibold">{section.title}</h3><Badge variant="secondary" aria-label={`${section.rows.length} ${section.title}`}>{section.rows.length}</Badge></div><p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">{section.description}</p></div></div>
+                    {section.rows.length ? <div className="space-y-3">{section.rows.map((row) => renderPackageCard(row))}</div> : <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">{section.emptyTitle}</p><p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">{section.emptyDescription}</p></div>}
+                  </section>
+                ))}
+              </TabsContent>
+              {canManagePackages ? <TabsContent value="library" className="space-y-4 pt-4">
+                <div><h3 className="text-base font-semibold">Congregation Excel Library</h3><p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">All active and available Excels, including private uploads. Completed work is not shown.</p></div>
+                <div className="grid gap-3 sm:grid-cols-3"><Input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Search Excels, people, ZIP…" className="admin-field h-11 sm:col-span-3" aria-label="Search congregation Excel library" /><Select value={libraryStatus} onValueChange={setLibraryStatus}><SelectTrigger className="admin-field h-11"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="available">Available</SelectItem><SelectItem value="assigned">Assigned</SelectItem><SelectItem value="in_progress">In progress</SelectItem></SelectContent></Select><Select value={libraryVisibility} onValueChange={setLibraryVisibility}><SelectTrigger className="admin-field h-11"><SelectValue placeholder="Visibility" /></SelectTrigger><SelectContent><SelectItem value="all">All visibility</SelectItem><SelectItem value="private">Private</SelectItem><SelectItem value="shared">Shared</SelectItem></SelectContent></Select></div>
+                {filteredLibraryPackages.length ? <div className="space-y-3">{filteredLibraryPackages.map((row) => renderPackageCard(row, true))}</div> : <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">No Excels match these filters</p><p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">Try another name, member, ZIP code, status, or visibility.</p></div>}
+              </TabsContent> : null}
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

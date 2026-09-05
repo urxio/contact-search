@@ -18,6 +18,7 @@ export default async function CongregationSearchPage({ params }: { params: { slu
       slug={params.slug}
       authenticatedUserId={access.user.id}
       authenticatedDisplayName={access.membership?.displayName || access.user.displayName}
+      canManagePackages={access.user.isPlatformAdmin || access.membership?.role === "admin"}
       embedded
     >
       <SearchHelper />
