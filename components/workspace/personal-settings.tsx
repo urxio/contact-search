@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { Check, KeyRound, Loader2, Moon, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
+import { Bug, Check, KeyRound, Loader2, Mail, MessageSquare, Moon, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 type PersonalSettingsProps = {
@@ -48,6 +49,8 @@ export function PersonalSettings({
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [supportType, setSupportType] = useState<"bug" | "feedback">("bug")
+  const [supportMessage, setSupportMessage] = useState("")
 
   useEffect(() => {
     setTheme(initialTheme)
@@ -141,6 +144,29 @@ export function PersonalSettings({
     }
   }
 
+  function emailPlatformAdmin(event: FormEvent) {
+    event.preventDefault()
+    const message = supportMessage.trim()
+    if (!message) {
+      toast.error("Please describe your bug or feedback")
+      return
+    }
+
+    const kind = supportType === "bug" ? "Bug report" : "Feedback"
+    const subject = `${kind} from ${displayName}`
+    const body = [
+      `${kind} from Name Search`,
+      "",
+      message,
+      "",
+      "---",
+      `Reporter: ${displayName}`,
+      `Email: ${email}`,
+      `Workspace: ${slug}`,
+    ].join("\n")
+    window.location.href = `mailto:borisnikaz@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }
+
   return (
     <Tabs defaultValue="profile" className="space-y-6">
       <div className="overflow-x-auto pb-1">
@@ -148,6 +174,7 @@ export function PersonalSettings({
           <TabsTrigger value="profile" className={tabClassName}>Profile</TabsTrigger>
           <TabsTrigger value="preferences" className={tabClassName}>Preferences</TabsTrigger>
           <TabsTrigger value="password" className={tabClassName}>Password</TabsTrigger>
+          <TabsTrigger value="support" className={tabClassName}>Help & feedback</TabsTrigger>
         </TabsList>
       </div>
 
@@ -263,6 +290,46 @@ export function PersonalSettings({
                   Change password
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </form>
+      </TabsContent>
+
+      <TabsContent value="support">
+        <form onSubmit={emailPlatformAdmin}>
+          <Card className="admin-card rounded-2xl">
+            <CardHeader>
+              <div className="admin-icon-well mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-primary">
+                <MessageSquare className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <CardTitle className="text-base font-semibold">Report a bug or share feedback</CardTitle>
+              <CardDescription>Send a message directly to the platform administrator. Your email and workspace are included automatically.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">What would you like to send?</legend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" aria-pressed={supportType === "bug"} onClick={() => setSupportType("bug")} className={cn(choiceClassName, supportType === "bug" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
+                    <Bug className="h-5 w-5" aria-hidden="true" />
+                    <span className="flex-1">Report a bug</span>
+                    {supportType === "bug" ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
+                  </button>
+                  <button type="button" aria-pressed={supportType === "feedback"} onClick={() => setSupportType("feedback")} className={cn(choiceClassName, supportType === "feedback" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
+                    <MessageSquare className="h-5 w-5" aria-hidden="true" />
+                    <span className="flex-1">Share feedback</span>
+                    {supportType === "feedback" ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
+                  </button>
+                </div>
+              </fieldset>
+              <div className="space-y-2">
+                <Label htmlFor="support-message">Message</Label>
+                <Textarea id="support-message" value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} placeholder={supportType === "bug" ? "What happened? Include the steps you took and what you expected instead." : "Tell us what is working well or what could be improved."} className="min-h-36 rounded-xl" maxLength={3000} required />
+              </div>
+              <Button type="submit" className="admin-primary-button min-h-11 rounded-xl">
+                <Mail aria-hidden="true" />
+                Email platform admin
+              </Button>
+              <p className="text-xs text-muted-foreground">This opens a pre-addressed message to borisnikaz@gmail.com in your email app. Review it and send when ready.</p>
             </CardContent>
           </Card>
         </form>
