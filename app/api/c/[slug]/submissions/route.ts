@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PACKAGE_SELECT } from "@/lib/contact-packages"
 import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { parseSegmentPageRange } from "@/lib/team-segments"
@@ -20,8 +21,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const client = await pool.connect()
     try {
       await client.query("BEGIN")
+      const linked = await client.query(`SELECT package_id FROM contact_drafts WHERE congregation_id=$1 AND user_id=$2`, [auth.congregation.id,auth.user.id])
+      let linkedPackage: any
+      if (linked.rows[0]?.package_id != null) {
+        const result = await client.query(`${PACKAGE_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2 FOR UPDATE OF cp,s`, [linked.rows[0].package_id,auth.congregation.id])
+        linkedPackage = result.rows[0]
+      }
       const draftResult = await client.query(
-        `SELECT contacts, global_notes, territory_zipcode, territory_page_range, revision
+        `SELECT contacts, global_notes, territory_zipcode, territory_page_range, revision, package_id, package_assignment_revision
          FROM contact_drafts
          WHERE congregation_id = $1 AND user_id = $2
          FOR UPDATE`,
@@ -40,6 +47,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         )
       }
 
+      if (draft.package_id != null && (!linkedPackage || Number(linkedPackage.id) !== Number(draft.package_id) ||
+          Number(linkedPackage.owner_user_id) !== auth.user.id || linkedPackage.status === "Completed" ||
+          linkedPackage.assignment_revision !== draft.package_assignment_revision)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "This Excel assignment changed. Reopen it before submitting." }, { status: 409 })
+      }
       const contacts = Array.isArray(draft.contacts) ? draft.contacts as Contact[] : []
       const count = (status: string) => contacts.filter((contact) => contact.status === status).length
       const displayName = auth.membership?.displayName || auth.user.displayName

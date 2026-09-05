@@ -108,6 +108,8 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 6, name: "contact package library" },
       { version: 7, name: "personal search activity" },
       { version: 8, name: "platform surname dictionary" },
+      { version: 9, name: "invitation revocation history" },
+      { version: 10, name: "Excel handoff progress" },
     ])
   })
 

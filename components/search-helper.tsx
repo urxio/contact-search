@@ -187,6 +187,8 @@ export default function SearchHelper({
   const [serverDraft, setServerDraft] = useState<any>(null)
   const draftReadyRef = useRef(false)
   const draftRevisionRef = useRef(0)
+  const activePackageIdRef = useRef<number | null>(null)
+  const activePackageRevisionRef = useRef<number | null>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -386,11 +388,14 @@ export default function SearchHelper({
         if (!response.ok) throw new Error("Unable to load the server draft")
         const draft = await response.json()
         if (cancelled) return
+        activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
+        activePackageIdRef.current = draft.packageId ?? null
+        setPackageAssignmentLocked(Boolean(draft.packageId))
         setContacts(Array.isArray(draft.contacts) ? draft.contacts : [])
         setGlobalNotes(draft.globalNotes || "")
         setTerritoryZipcode(draft.territoryZipcode || "")
         setTerritoryPageRange(draft.territoryPageRange || "")
-        setLastVerifiedId(draft.lastVerifiedContactId || null)
+        setLastVerifiedId(draft.lastVerifiedId || draft.lastVerifiedContactId || null)
         setDraftRevision(Number(draft.revision) || 0)
         draftRevisionRef.current = Number(draft.revision) || 0
         setDraftStatus("saved")
@@ -507,7 +512,9 @@ export default function SearchHelper({
             globalNotes,
             territoryZipcode,
             territoryPageRange,
-            lastVerifiedContactId: lastVerifiedId,
+            lastVerifiedId,
+            packageId: activePackageIdRef.current,
+            packageAssignmentRevision: activePackageRevisionRef.current,
           }),
         })
         const result = await response.json()
@@ -699,6 +706,8 @@ export default function SearchHelper({
   }, [workspaceSlug])
 
   const loadPackageDraft = useCallback((draft: any) => {
+    activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
+    activePackageIdRef.current = draft.packageId ?? null
     const nextContacts = Array.isArray(draft.contacts) ? draft.contacts : []
     setContacts(nextContacts)
     setGlobalNotes(draft.globalNotes || "")
@@ -713,7 +722,7 @@ export default function SearchHelper({
     setPackageAssignmentLocked(true)
     setSelectedContacts([])
     setError(null)
-    setTimeout(() => {
+    if (!draft.resumed) setTimeout(() => {
       try { ;(detectFrenchNames as any)?.(false, nextContacts) } catch (error) { console.warn("Unable to detect names", error) }
     }, 50)
   }, [])
@@ -1263,6 +1272,8 @@ export default function SearchHelper({
           throw new Error("Invalid data format")
         }
 
+        activePackageIdRef.current = null
+        setPackageAssignmentLocked(false)
         setContacts(importedData.contacts)
         if (importedData.globalNotes) setGlobalNotes(importedData.globalNotes)
         if (importedData.territoryZipcode) setTerritoryZipcode(importedData.territoryZipcode)
@@ -1495,7 +1506,9 @@ export default function SearchHelper({
             globalNotes,
             territoryZipcode,
             territoryPageRange,
-            lastVerifiedContactId: lastVerifiedId,
+            lastVerifiedId,
+            packageId: activePackageIdRef.current,
+            packageAssignmentRevision: activePackageRevisionRef.current,
           }),
         })
         const savedDraft = await saveResponse.json()
@@ -1545,6 +1558,8 @@ export default function SearchHelper({
   }, [contacts])
 
   const confirmNewSession = useCallback(() => {
+    // Package progress is retained independently of the personal draft.
+    activePackageIdRef.current = null
     // Clear all data
     setContacts([])
     setGlobalNotes("")
@@ -1732,11 +1747,14 @@ export default function SearchHelper({
 
   const reloadServerDraft = useCallback(() => {
     if (!serverDraft) return
+    activePackageRevisionRef.current = serverDraft.packageAssignmentRevision ?? null
+    activePackageIdRef.current = serverDraft.packageId ?? null
+    setPackageAssignmentLocked(Boolean(serverDraft.packageId))
     setContacts(Array.isArray(serverDraft.contacts) ? serverDraft.contacts : [])
     setGlobalNotes(serverDraft.globalNotes || "")
     setTerritoryZipcode(serverDraft.territoryZipcode || "")
     setTerritoryPageRange(serverDraft.territoryPageRange || "")
-    setLastVerifiedId(serverDraft.lastVerifiedContactId || null)
+    setLastVerifiedId(serverDraft.lastVerifiedId || serverDraft.lastVerifiedContactId || null)
     draftRevisionRef.current = Number(serverDraft.revision) || 0
     setDraftRevision(draftRevisionRef.current)
     setServerDraft(null)
@@ -1755,13 +1773,18 @@ export default function SearchHelper({
           globalNotes,
           territoryZipcode,
           territoryPageRange,
-          lastVerifiedContactId: lastVerifiedId,
+          lastVerifiedId,
+          packageId: serverDraft.packageId === activePackageIdRef.current ? activePackageIdRef.current : null,
+          packageAssignmentRevision: activePackageRevisionRef.current,
         }),
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to keep local draft")
       draftRevisionRef.current = result.revision
       setDraftRevision(result.revision)
+      activePackageRevisionRef.current = result.packageAssignmentRevision ?? null
+      activePackageIdRef.current = result.packageId ?? null
+      setPackageAssignmentLocked(Boolean(result.packageId))
       setServerDraft(null)
       setDraftStatus("saved")
     } catch {

@@ -197,18 +197,20 @@ describe("Excel upload and listing", () => {
 describe("member draft progress", () => {
   it("saves review progress and notes scoped to the signed-in member", async () => {
     const saved = { contacts: [{ ...contact, status: "Potentially French", notes: "Verified" }], global_notes: "Continue tomorrow", revision: 2 }
-    mocks.query.mockResolvedValueOnce({ rows: [saved] })
+    draft = { ...saved, revision: 1 }
+    const normal = mocks.query.getMockImplementation()!
+    mocks.query.mockImplementation((sql, args) => sql.includes("INSERT INTO contact_drafts") ? Promise.resolve({ rows: [saved] }) : normal(sql, args))
     const { PUT } = await import("@/app/api/c/[slug]/draft/route")
     const response = await PUT(new NextRequest("https://search.example/api/c/central/draft", {
       method: "PUT", body: JSON.stringify({ contacts: saved.contacts, globalNotes: saved.global_notes, territoryZipcode: "22301", territoryPageRange: "1-5", revision: 1 }),
     }), { params: { slug: "central" } })
     expect(response.status).toBe(200)
     expect((await response.json()).contacts[0].notes).toBe("Verified")
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE contact_drafts.revision = $8"), [12, 34, JSON.stringify(saved.contacts), saved.global_notes, "22301", "1-5", null, 1])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE contact_drafts.revision = $8"), [12, 34, JSON.stringify(saved.contacts), saved.global_notes, "22301", "1-5", null, 1, null, null])
   })
 
   it("returns the newer saved progress when an autosave is stale", async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ contacts: [{ notes: "Newer work" }], revision: 3 }] })
+    draft = { contacts: [{ notes: "Newer work" }], revision: 3 }
     const { PUT } = await import("@/app/api/c/[slug]/draft/route")
     const response = await PUT(new NextRequest("https://search.example/api/c/central/draft", {
       method: "PUT", body: JSON.stringify({ contacts: [], revision: 1 }),

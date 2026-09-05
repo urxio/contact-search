@@ -23,7 +23,7 @@ Test the shared Excel feature across upload, visibility, assignment, claiming, o
 ## Limits and next improvements
 
 - Route tests mock authentication and database responses. They check authorization decisions and scoped SQL calls, but do not prove deployment-level isolation or concurrent row-lock behavior. The existing full database suite needs a disposable `TEST_DATABASE_URL`; none was configured. No authenticated browser walkthrough or production data mutation was performed.
-- Opening an Excel intentionally creates a fresh draft from the original contacts. Release preserves the former member's separate draft but does not transfer their review statuses or notes to the next member. A future resume/handoff feature would require explicit saved-progress linkage to each Excel. The UI's “Continue” wording can imply more than this behavior provides.
+- Follow-up implemented: opening now restores saved progress across handoffs. See [Shared Excel progress handoffs](shared-excel-handoffs.md) for behavior, migration, and validation.
 - Team Progress's release UI does not check the response before dismissing its confirmation. Surface release failures and retain the confirmation on error.
 - Assignment alerts load once per workspace mount. Refresh them after assignment changes and when returning to the tab; review the one-time preferred-package handling so cancelling and reopening the same assignment remains predictable.
 - Repair the existing TypeScript errors and add automated build, type, and disposable-database checks to release validation.

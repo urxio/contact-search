@@ -67,15 +67,19 @@ export function serializeDraft(row: any) {
     territoryZipcode: row?.territory_zipcode || "", territoryPageRange: row?.territory_page_range || "",
     lastVerifiedId: row?.last_verified_contact_id || null, revision: row?.revision || 0,
     updatedAt: row?.updated_at || null,
+    packageId: row?.package_id == null ? null : Number(row.package_id),
+    packageAssignmentRevision: row?.package_id == null ? null : Number(row.package_assignment_revision),
   }
 }
 
 export async function replaceDraft(client: PoolClient, input: {
   userId: number; congregationId: number; contacts: PackageContact[];
-  zipcode: string; pageStart: number; pageEnd: number; expectedRevision: number
+  zipcode: string; pageStart: number; pageEnd: number; expectedRevision: number;
+  packageId?: number; assignmentRevision?: number;
+  savedProgress?: { contacts: unknown[]; globalNotes?: string; lastVerifiedId?: string | null } | null
 }) {
   const current = await client.query(
-    `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at
+    `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision
        FROM contact_drafts WHERE user_id=$1 AND congregation_id=$2 FOR UPDATE`,
     [input.userId, input.congregationId],
   )
@@ -85,24 +89,26 @@ export async function replaceDraft(client: PoolClient, input: {
   }
   const result = await client.query(
     `INSERT INTO contact_drafts(user_id,congregation_id,contacts,global_notes,territory_zipcode,
-       territory_page_range,last_verified_contact_id,revision,updated_at)
-     VALUES($1,$2,$3,'',$4,$5,NULL,1,NOW())
-     ON CONFLICT(user_id,congregation_id) DO UPDATE SET contacts=EXCLUDED.contacts,global_notes='',
+       territory_page_range,last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision)
+     VALUES($1,$2,$3,$7,$4,$5,$8,1,NOW(),$9,$10)
+     ON CONFLICT(user_id,congregation_id) DO UPDATE SET contacts=EXCLUDED.contacts,global_notes=EXCLUDED.global_notes,
        territory_zipcode=EXCLUDED.territory_zipcode,territory_page_range=EXCLUDED.territory_page_range,
-       last_verified_contact_id=NULL,revision=contact_drafts.revision+1,updated_at=NOW()
+       last_verified_contact_id=EXCLUDED.last_verified_contact_id,revision=contact_drafts.revision+1,updated_at=NOW(),
+       package_id=EXCLUDED.package_id,package_assignment_revision=EXCLUDED.package_assignment_revision
      WHERE contact_drafts.revision = $6
-     RETURNING contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at`,
-    [input.userId, input.congregationId, JSON.stringify(freshDraftContacts(input.contacts)), input.zipcode, `${input.pageStart}-${input.pageEnd}`, input.expectedRevision],
+     RETURNING contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision`,
+    [input.userId, input.congregationId, JSON.stringify(input.savedProgress?.contacts ?? freshDraftContacts(input.contacts)), input.zipcode, `${input.pageStart}-${input.pageEnd}`, input.expectedRevision,
+      input.savedProgress?.globalNotes ?? "", input.savedProgress?.lastVerifiedId ?? null, input.packageId ?? null, input.assignmentRevision ?? null],
   )
   if (!result.rows[0]) {
     const server = await client.query(
-      `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at
+      `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision
          FROM contact_drafts WHERE user_id=$1 AND congregation_id=$2`,
       [input.userId, input.congregationId],
     )
     throw new DraftConflictError(serializeDraft(server.rows[0]))
   }
-  return serializeDraft(result.rows[0])
+  return { ...serializeDraft(result.rows[0]), resumed: input.savedProgress != null }
 }
 
 export function serializePackage(row: any, viewerUserId: number, manageAll: boolean) {
@@ -120,6 +126,7 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
       pageStart: Number(row.page_start), pageEnd: Number(row.page_end), ownerUserId,
       owner: row.owner || "", status: row.status, stoppedAtPage: row.stopped_at_page == null ? null : Number(row.stopped_at_page),
     },
+    hasSavedProgress: row.saved_progress != null,
     state, canManage: manageAll || Number(row.uploaded_by_user_id) === viewerUserId, canAssign: manageAll,
     canOpen: row.status !== "Completed" && (manageAll || isAvailable || ownerUserId === viewerUserId),
   }
@@ -133,7 +140,7 @@ export function isPackageBrowsable(row: any, viewerUserId: number, includedPacka
 }
 
 export const PACKAGE_SELECT = `
-  SELECT cp.id,cp.name,cp.visibility,cp.original_filename,cp.contact_count,cp.contacts,
+  SELECT cp.id,cp.name,cp.visibility,cp.original_filename,cp.contact_count,cp.contacts,cp.saved_progress,cp.assignment_revision,
          cp.uploaded_by_user_id,cp.created_at,cp.updated_at,u.display_name uploader_name,
          s.id segment_id,s.page_start,s.page_end,s.owner,s.owner_user_id,s.stopped_at_page,s.status,
          s.zipcode_id,z.zipcode,z.city,z.total_pages

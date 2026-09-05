@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { storePackageProgress } from "@/lib/package-drafts"
 import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { apiError, assertMultiTenantEnabled, canManageAll, integer } from "../../../_shared"
@@ -49,8 +50,11 @@ export async function POST(req: NextRequest, { params }: Context) {
       await assertNoSegmentConflict(client,{congregationId:auth.congregation.id,zipcodeId:Number(row.zipcode_id),pageStart:Number(row.page_start),pageEnd:Number(row.page_end),excludeSegmentId:Number(row.segment_id)})
       const owner = auth.membership?.displayName || auth.user.displayName
       await client.query(`UPDATE zt_segments SET owner=$1,owner_user_id=$2,status='In progress',updated_at=NOW() WHERE id=$3 AND congregation_id=$4`, [owner,auth.user.id,row.segment_id,auth.congregation.id])
+      const assignmentRevision = Number(row.assignment_revision ?? 0) + 1
+      await client.query(`UPDATE contact_packages SET assignment_revision=$3 WHERE id=$1 AND congregation_id=$2`, [id,auth.congregation.id,assignmentRevision])
       const draft = await replaceDraft(client,{ userId:auth.user.id,congregationId:auth.congregation.id,contacts:row.contacts,
-        zipcode:row.zipcode,pageStart:Number(row.page_start),pageEnd:Number(row.page_end),expectedRevision:revision })
+        zipcode:row.zipcode,pageStart:Number(row.page_start),pageEnd:Number(row.page_end),expectedRevision:revision, packageId:id,assignmentRevision,savedProgress:row.saved_progress })
+      await storePackageProgress(client,id,auth.congregation.id,draft)
       await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.opened",packageId:id,
         metadata:{previousOwnerUserId:ownerUserId}})
       const packageData = await currentPackage(client,auth.congregation.id,id,auth.user.id,manageAll)
@@ -65,14 +69,15 @@ export async function POST(req: NextRequest, { params }: Context) {
       const member = await client.query(`SELECT COALESCE(m.display_name,u.display_name) display_name FROM congregation_memberships m JOIN users u ON u.id=m.user_id WHERE m.congregation_id=$1 AND m.user_id=$2 AND m.status='active'`,[auth.congregation.id,userId])
       if (!member.rows[0]) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Member not found." }, { status: 404 }) }
       await assertNoSegmentConflict(client,{congregationId:auth.congregation.id,zipcodeId:Number(row.zipcode_id),pageStart:Number(row.page_start),pageEnd:Number(row.page_end),excludeSegmentId:Number(row.segment_id)})
-      await client.query(`UPDATE zt_segments SET owner=$1,owner_user_id=$2,status='Not started',stopped_at_page=NULL,notes='',updated_at=NOW() WHERE id=$3 AND congregation_id=$4`,[member.rows[0].display_name,userId,row.segment_id,auth.congregation.id])
+      await client.query(`UPDATE zt_segments SET owner=$1,owner_user_id=$2,status='Not started',updated_at=NOW() WHERE id=$3 AND congregation_id=$4`,[member.rows[0].display_name,userId,row.segment_id,auth.congregation.id])
+      await client.query(`UPDATE contact_packages SET assignment_revision=assignment_revision+1,updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[id,auth.congregation.id])
       await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.assigned",packageId:id,metadata:{assignedToUserId:userId}})
     } else if (action === "release") {
       const ownerUserId = row.owner_user_id == null ? null : Number(row.owner_user_id)
       if (!manageAll && ownerUserId !== auth.user.id && Number(row.uploaded_by_user_id) !== auth.user.id) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Excel not found." }, { status: 404 }) }
       if (row.status === "Completed" && !manageAll) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Only an admin can release completed work." }, { status: 409 }) }
-      await client.query(`UPDATE zt_segments SET owner='',owner_user_id=NULL,status='Not started',stopped_at_page=NULL,notes='',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[row.segment_id,auth.congregation.id])
-      await client.query(`UPDATE contact_packages SET visibility='shared',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[id,auth.congregation.id])
+      await client.query(`UPDATE zt_segments SET owner='',owner_user_id=NULL,status='Not started',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[row.segment_id,auth.congregation.id])
+      await client.query(`UPDATE contact_packages SET visibility='shared',assignment_revision=assignment_revision+1,updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,[id,auth.congregation.id])
       await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.released",packageId:id,metadata:{previousOwnerUserId:ownerUserId,visibility:"shared"}})
     } else {
       await client.query("ROLLBACK"); return NextResponse.json({ error: "Unknown Excel action." }, { status: 400 })

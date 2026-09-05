@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { storePackageProgress } from "@/lib/package-drafts"
 import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { apiError, assertMultiTenantEnabled, canManageAll, integer, RouteContext } from "../../_shared"
@@ -84,7 +85,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     let draft
     if (startNow) {
       draft = await replaceDraft(client, { userId: auth.user.id, congregationId: auth.congregation.id, contacts,
-        zipcode, pageStart, pageEnd, expectedRevision: draftRevision })
+        zipcode, pageStart, pageEnd, expectedRevision: draftRevision, packageId, assignmentRevision: 0 })
+      await storePackageProgress(client, packageId, auth.congregation.id, draft)
     }
     await insertPackageAudit(client, { actorUserId: auth.user.id, congregationId: auth.congregation.id,
       action: startNow ? "contact_package.created_and_opened" : "contact_package.created", packageId,

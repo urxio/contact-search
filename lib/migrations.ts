@@ -152,6 +152,29 @@ const migrations: Migration[] = [{
     await client.query(`ALTER TABLE invitations ADD COLUMN revoked_at TIMESTAMPTZ`)
     await client.query(`CREATE INDEX invitations_tenant_date_idx ON invitations(congregation_id,created_at DESC)`)
   }
+},{
+  version:10,name:"Excel handoff progress",async run(client){
+    await client.query(`ALTER TABLE contact_packages
+      ADD COLUMN saved_progress JSONB,
+      ADD COLUMN assignment_revision INT NOT NULL DEFAULT 0,
+      ADD CONSTRAINT contact_packages_id_tenant_unique UNIQUE(id,congregation_id)`)
+    await client.query(`ALTER TABLE contact_drafts
+      ADD COLUMN package_id BIGINT,
+      ADD COLUMN package_assignment_revision INT,
+      ADD CONSTRAINT contact_drafts_package_tenant_fk FOREIGN KEY(package_id,congregation_id)
+        REFERENCES contact_packages(id,congregation_id) ON DELETE SET NULL (package_id)`)
+    await client.query(`CREATE INDEX contact_drafts_package_idx ON contact_drafts(package_id) WHERE package_id IS NOT NULL`)
+    // Recover only the current assignee's draft for this exact territory range.
+    await client.query(`UPDATE contact_drafts d SET package_id=cp.id,package_assignment_revision=cp.assignment_revision
+      FROM contact_packages cp JOIN zt_segments s ON s.id=cp.segment_id AND s.congregation_id=cp.congregation_id
+      JOIN zt_zipcodes z ON z.id=s.zipcode_id AND z.congregation_id=s.congregation_id
+      WHERE d.congregation_id=cp.congregation_id AND d.user_id=s.owner_user_id
+        AND s.status <> 'Completed' AND trim(d.territory_zipcode)=z.zipcode
+        AND trim(d.territory_page_range)=s.page_start::text || '-' || s.page_end::text`)
+    await client.query(`UPDATE contact_packages cp SET saved_progress=jsonb_build_object(
+      'contacts',d.contacts,'globalNotes',d.global_notes,'lastVerifiedId',d.last_verified_contact_id)
+      FROM contact_drafts d WHERE d.package_id=cp.id AND d.congregation_id=cp.congregation_id`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

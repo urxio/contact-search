@@ -41,6 +41,7 @@ type PackageRow = {
   canOpen?: boolean
   can_open?: boolean
   canAssign?: boolean
+  hasSavedProgress?: boolean
   isMine?: boolean
   is_mine?: boolean
   state?: "available" | "assigned" | "in_progress" | "completed"
@@ -63,6 +64,9 @@ type MemberRow = { userId: number; displayName: string; congregationDisplayName?
 type UploadAction = "start" | "save" | "share"
 
 type DraftPayload = {
+  packageId?: number | null
+  packageAssignmentRevision?: number | null
+  resumed?: boolean
   contacts?: unknown[]
   globalNotes?: string
   territoryZipcode?: string
@@ -481,7 +485,7 @@ export function PackageDialogs({
                               <p className="mt-1 text-xs font-normal text-muted-foreground">{attribution}</p>
                             </div>
                             <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : "Open"}</Button>
+                              <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : row.hasSavedProgress ? "Resume" : "Open"}</Button>
                               {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
                             </div>
                           </div>
@@ -503,7 +507,7 @@ export function PackageDialogs({
       </Dialog>
 
       <AlertDialog open={Boolean(packageToOpen)} onOpenChange={(open) => { if (!open) setPackageToOpen(null) }}>
-        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{packageToOpenIsClaim ? (hasDraft ? "Claim and replace your current search?" : "Claim this Excel?") : (hasDraft ? "Replace your current search?" : "Open this Excel?")}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current draft will be replaced with a fresh copy of this Excel. Submitted work is not affected." : packageToOpenIsClaim ? "This assigns the Excel to you and marks its segment in progress." : "This Excel will open as your active search."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? (packageToOpenIsClaim ? "Claiming…" : "Opening…") : (packageToOpenIsClaim ? "Claim Excel" : "Open Excel")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl"><AlertDialogHeader><AlertDialogTitle>{packageToOpenIsClaim ? (hasDraft ? "Claim and replace your current search?" : "Claim this Excel?") : (hasDraft ? "Replace your current search?" : "Open this Excel?")}</AlertDialogTitle><AlertDialogDescription>{hasDraft ? "Your current search will be replaced with this Excel’s saved progress. Saved contact reviews and notes stay with the Excel when it is handed to another member. Submitted work is not affected." : packageToOpenIsClaim ? "This assigns the Excel to you and restores any saved contact reviews, notes, and research checks." : "This Excel will open with its saved progress. Reviews and notes are preserved for the next member when you release it."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="min-h-11 rounded-xl" onClick={() => onBrowseOpenChange(true)}>Cancel</AlertDialogCancel><AlertDialogAction className="admin-primary-button min-h-11 rounded-xl" disabled={busy} onClick={(event) => { event.preventDefault(); if (packageToOpen) void openPackage(packageToOpen) }}>{busy ? (packageToOpenIsClaim ? "Claiming…" : "Opening…") : (packageToOpenIsClaim ? "Claim Excel" : "Open Excel")}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={Boolean(editingPackage)} onOpenChange={(open) => { if (!open) { setEditingPackage(null); onBrowseOpenChange(true) } }}>

@@ -184,6 +184,8 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     const client = await pool.connect()
     try {
       await client.query("BEGIN")
+      // Match the package-before-segment lock order used by opening and autosave.
+      await client.query(`SELECT id FROM contact_packages WHERE segment_id=$1 AND congregation_id=$2 FOR UPDATE`, [id,auth.congregation.id])
       const found = await client.query(
         `SELECT s.id, cp.id package_id FROM zt_segments s
          LEFT JOIN contact_packages cp ON cp.segment_id=s.id AND cp.congregation_id=s.congregation_id
@@ -196,11 +198,11 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
       if (!segment) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Segment not found." }, { status: 404 }) }
       if (segment.package_id) {
         await client.query(
-          `UPDATE contact_packages SET visibility='shared',updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,
+          `UPDATE contact_packages SET visibility='shared',assignment_revision=assignment_revision+1,updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,
           [segment.package_id, auth.congregation.id],
         )
         await client.query(
-          `UPDATE zt_segments SET owner='', owner_user_id=NULL, stopped_at_page=NULL,
+          `UPDATE zt_segments SET owner='', owner_user_id=NULL,
              status='Not started', updated_at=NOW() WHERE id=$1 AND congregation_id=$2`,
           [id, auth.congregation.id],
         )
