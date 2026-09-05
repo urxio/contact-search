@@ -45,6 +45,8 @@ type PackageRow = {
   hasSavedProgress?: boolean
   isMine?: boolean
   is_mine?: boolean
+  isAssignedToViewer?: boolean
+  is_assigned_to_viewer?: boolean
   state?: "available" | "assigned" | "in_progress" | "completed"
   uploader?: { id: number; displayName: string } | null
   segment?: {
@@ -136,11 +138,11 @@ export function PackageDialogs({
     {
       id: "my-excels",
       title: "Private Excels",
-      description: "Private Excels you uploaded, were assigned, or can administer.",
+      description: "Excels assigned to you, plus private Excels you uploaded or can administer.",
       emptyTitle: "No private Excels",
       emptyDescription: "Private Excels you can access will appear here.",
       icon: UserRound,
-      rows: packages.filter((row) => row.visibility === "private"),
+      rows: packages.filter((row) => row.visibility === "private" || value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer")),
     },
     {
       id: "congregation-excels",
@@ -149,7 +151,7 @@ export function PackageDialogs({
       emptyTitle: "No shared Excels available",
       emptyDescription: "New shared Excels will appear here when they are ready to claim.",
       icon: UsersRound,
-      rows: packages.filter((row) => row.visibility === "shared"),
+      rows: packages.filter((row) => row.visibility === "shared" && !value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer")),
     },
   ], [packages])
   const packageToOpenIsClaim = Boolean(packageToOpen && isClaimableByViewer(packageToOpen))

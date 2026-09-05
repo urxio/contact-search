@@ -120,6 +120,7 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
     originalFilename: row.original_filename, contactCount: Number(row.contact_count),
     createdAt: row.created_at, updatedAt: row.updated_at,
     isMine: Number(row.uploaded_by_user_id) === viewerUserId,
+    isAssignedToViewer: ownerUserId === viewerUserId,
     uploader: row.uploaded_by_user_id == null ? null : { id: Number(row.uploaded_by_user_id), displayName: row.uploader_name },
     segment: {
       id: Number(row.segment_id), zipcode: row.zipcode, city: row.city,
@@ -132,11 +133,11 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
   }
 }
 
-export function isPackageBrowsable(row: any, viewerUserId: number, includedPackageId?: number | null) {
+export function isPackageBrowsable(row: any, viewerUserId: number) {
   if (row.status === "Completed") return false
   if (row.visibility !== "shared") return true
   if (row.owner_user_id == null) return true
-  return Number(row.id) === includedPackageId && Number(row.owner_user_id) === viewerUserId
+  return Number(row.owner_user_id) === viewerUserId
 }
 
 export const PACKAGE_SELECT = `

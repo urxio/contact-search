@@ -14,7 +14,6 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
     const manageAll = canManageAll(auth)
-    const includedPackageId = integer(req.nextUrl.searchParams.get("include"))
     const activeForMe = req.nextUrl.searchParams.get("active") === "mine"
     const result = await pool.query(
       `${PACKAGE_SELECT}
@@ -26,7 +25,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     )
     return NextResponse.json({
       packages: result.rows
-        .filter(row => activeForMe || isPackageBrowsable(row, auth.user.id, includedPackageId))
+        .filter(row => activeForMe || isPackageBrowsable(row, auth.user.id))
         .map(row => serializePackage(row, auth.user.id, manageAll)),
     })
   } catch (error) { return apiError(error) }

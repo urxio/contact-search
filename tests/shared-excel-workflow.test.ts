@@ -185,12 +185,13 @@ describe("Excel upload and listing", () => {
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("cp.congregation_id=$1"), [34, false, 12, false])
   })
 
-  it("hides claimed shared files but permits the assignee's direct link", async () => {
+  it("lists shared files for their assignee but hides them from other members", async () => {
     current.owner_user_id = 12
     const { GET } = await import("@/app/api/c/[slug]/packages/route")
-    const request = (suffix: string) => GET(new NextRequest(`https://search.example/api/c/central/packages${suffix}`), { params: { slug: "central" } })
-    expect((await (await request("")).json()).packages).toEqual([])
-    expect((await (await request("?include=56")).json()).packages).toHaveLength(1)
+    const response = await GET(new NextRequest("https://search.example/api/c/central/packages"), { params: { slug: "central" } })
+    const packages = (await response.json()).packages
+    expect(packages).toHaveLength(1)
+    expect(packages[0].isAssignedToViewer).toBe(true)
   })
 })
 

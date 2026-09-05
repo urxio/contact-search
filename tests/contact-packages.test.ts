@@ -50,19 +50,16 @@ describe("contact packages", () => {
     expect(value.isMine).toBe(true)
   })
 
-  it("hides assigned shared Excels except for an assignee's direct handoff", () => {
+  it("shows shared Excels assigned to the viewer but hides them from other members", () => {
     const assigned = { id: 14, visibility: "shared", owner_user_id: 22 }
-    expect(isPackageBrowsable(assigned, 22)).toBe(false)
+    expect(isPackageBrowsable(assigned, 22)).toBe(true)
     expect(isPackageBrowsable(assigned, 99)).toBe(false)
-    expect(isPackageBrowsable(assigned, 22, 14)).toBe(true)
-    expect(isPackageBrowsable(assigned, 99, 14)).toBe(false)
     expect(isPackageBrowsable({ ...assigned, owner_user_id: null }, 99)).toBe(true)
   })
 
   it("hides submitted Excels from browsing for every viewer", () => {
     const submitted = { id: 14, visibility: "shared", owner_user_id: 22, status: "Completed" }
     expect(isPackageBrowsable(submitted, 22)).toBe(false)
-    expect(isPackageBrowsable(submitted, 22, 14)).toBe(false)
     expect(isPackageBrowsable({ ...submitted, visibility: "private" }, 22)).toBe(false)
     expect(isPackageBrowsable({ ...submitted, owner_user_id: null }, 99)).toBe(false)
   })
