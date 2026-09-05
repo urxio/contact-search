@@ -33,6 +33,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "User-Agent": "Name-Search-Feedback/1.0",
       },
       body: JSON.stringify({
         from,
