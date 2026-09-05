@@ -67,3 +67,17 @@ describe("contact packages", () => {
     expect(isPackageBrowsable({ ...submitted, owner_user_id: null }, 99)).toBe(false)
   })
 })
+
+describe("draft replacement conflicts", () => {
+  it("preserves a draft created concurrently after the initial empty read", async () => {
+    const { replaceDraft } = await import("@/lib/contact-packages")
+    const { vi } = await import("vitest")
+    const saved = { contacts: [{ id: "other-tab", notes: "Keep my work" }], revision: 1 }
+    const query = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [saved] })
+    await expect(replaceDraft({ query } as any, {
+      userId: 12, congregationId: 34, contacts: [], zipcode: "22301", pageStart: 1, pageEnd: 5, expectedRevision: 0,
+    })).rejects.toMatchObject({ status: 409, server: { contacts: saved.contacts, revision: 1 } })
+    expect(query.mock.calls[1][0]).toContain("WHERE contact_drafts.revision = $6")
+    expect(query.mock.calls[1][1][5]).toBe(0)
+  })
+})

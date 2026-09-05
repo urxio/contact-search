@@ -130,12 +130,12 @@ export function PackageDialogs({
   const packageSections = useMemo(() => [
     {
       id: "my-excels",
-      title: "My Excels",
-      description: "Private Excels only you and admins can find.",
-      emptyTitle: "No personal Excels",
-      emptyDescription: "Excels you save for only yourself will appear here.",
+      title: "Private Excels",
+      description: "Private Excels you uploaded, were assigned, or can administer.",
+      emptyTitle: "No private Excels",
+      emptyDescription: "Private Excels you can access will appear here.",
       icon: UserRound,
-      rows: packages.filter((row) => Boolean(value<boolean>(row, "isMine", "is_mine")) && row.visibility === "private"),
+      rows: packages.filter((row) => row.visibility === "private"),
     },
     {
       id: "congregation-excels",
@@ -240,7 +240,7 @@ export function PackageDialogs({
         action === "start"
           ? "Excel is ready to search."
           : action === "save"
-            ? "Excel saved to My Excels for later."
+            ? "Excel saved to Private Excels for later."
             : "Excel shared with the congregation.",
       )
     } catch (error) {
@@ -507,7 +507,7 @@ export function PackageDialogs({
       </AlertDialog>
 
       <Dialog open={Boolean(editingPackage)} onOpenChange={(open) => { if (!open) { setEditingPackage(null); onBrowseOpenChange(true) } }}>
-        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Excel details</DialogTitle><DialogDescription>Rename the Excel or change who can find it.</DialogDescription></DialogHeader><div className="space-y-4 py-2"><div className="space-y-2"><Label htmlFor="edit-package-name">Excel name</Label><Input id="edit-package-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="admin-field h-11 rounded-xl" /></div><div className="space-y-2"><Label>Visibility</Label><Select value={editVisibility} onValueChange={(next: "shared" | "private") => setEditVisibility(next)}><SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="shared">Shared with congregation</SelectItem><SelectItem value="private">Only me and admins</SelectItem></SelectContent></Select></div></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !editName.trim()} onClick={() => editingPackage && updatePackage(editingPackage, { name: editName.trim(), visibility: editVisibility })}><Check className="h-4 w-4" aria-hidden="true" />Save changes</Button></DialogFooter></DialogContent>
+        <DialogContent className="admin-material rounded-2xl sm:max-w-md"><DialogHeader className="text-left"><DialogTitle className="text-base font-semibold">Excel details</DialogTitle><DialogDescription>Rename the Excel or change who can find it.</DialogDescription></DialogHeader><div className="space-y-4 py-2"><div className="space-y-2"><Label htmlFor="edit-package-name">Excel name</Label><Input id="edit-package-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="admin-field h-11 rounded-xl" /></div><div className="space-y-2"><Label>Visibility</Label><Select value={editVisibility} onValueChange={(next: "shared" | "private") => setEditVisibility(next)}><SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="shared">Shared with congregation</SelectItem><SelectItem value="private">Uploader, assignee, and admins</SelectItem></SelectContent></Select></div></div><DialogFooter><Button className="admin-primary-button min-h-11 rounded-xl" disabled={busy || !editName.trim()} onClick={() => editingPackage && updatePackage(editingPackage, { name: editName.trim(), visibility: editVisibility })}><Check className="h-4 w-4" aria-hidden="true" />Save changes</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(packageToAssign)} onOpenChange={(open) => { if (!open) { setPackageToAssign(null); onBrowseOpenChange(true) } }}>

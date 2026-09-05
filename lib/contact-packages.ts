@@ -90,9 +90,18 @@ export async function replaceDraft(client: PoolClient, input: {
      ON CONFLICT(user_id,congregation_id) DO UPDATE SET contacts=EXCLUDED.contacts,global_notes='',
        territory_zipcode=EXCLUDED.territory_zipcode,territory_page_range=EXCLUDED.territory_page_range,
        last_verified_contact_id=NULL,revision=contact_drafts.revision+1,updated_at=NOW()
+     WHERE contact_drafts.revision = $6
      RETURNING contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at`,
-    [input.userId, input.congregationId, JSON.stringify(freshDraftContacts(input.contacts)), input.zipcode, `${input.pageStart}-${input.pageEnd}`],
+    [input.userId, input.congregationId, JSON.stringify(freshDraftContacts(input.contacts)), input.zipcode, `${input.pageStart}-${input.pageEnd}`, input.expectedRevision],
   )
+  if (!result.rows[0]) {
+    const server = await client.query(
+      `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at
+         FROM contact_drafts WHERE user_id=$1 AND congregation_id=$2`,
+      [input.userId, input.congregationId],
+    )
+    throw new DraftConflictError(serializeDraft(server.rows[0]))
+  }
   return serializeDraft(result.rows[0])
 }
 
