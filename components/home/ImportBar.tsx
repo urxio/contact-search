@@ -42,6 +42,9 @@ export function ImportBar({
   currentPackageId = null,
   onOpenAssignedPackage,
 }: ImportBarProps) {
+  const currentActivePackage = ownActivePackages.find((item) => item.id === currentPackageId)
+  const continuablePackages = ownActivePackages.filter((item) => item.id !== currentPackageId)
+
   return (
     <div className="admin-card mb-4 overflow-hidden rounded-2xl">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
@@ -77,6 +80,12 @@ export function ImportBar({
           </span>
         )}
 
+        {currentActivePackage ? (
+          <p className="min-w-0 max-w-full truncate text-xs font-semibold text-sky-700 dark:text-sky-300" title={currentActivePackage.name}>
+            Reviewing: {currentActivePackage.name}
+          </p>
+        ) : null}
+
         {/* Column hint */}
         <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
           Columns: First Name · Last Name · Address · City · Zipcode · Phone
@@ -107,20 +116,20 @@ export function ImportBar({
         </div>
       </div>
 
-      {ownActivePackages.length > 0 ? (
+      {continuablePackages.length > 0 ? (
         <div className="flex flex-col gap-3 border-t border-sky-100 bg-sky-50/70 px-5 py-3 text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100 sm:flex-row sm:items-center">
           <PackageOpen className="mt-0.5 h-5 w-5 shrink-0 text-sky-600 dark:text-sky-300 sm:mt-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{ownActivePackages.length === 1 ? "Your Excel is in progress" : `${ownActivePackages.length} of your Excels are in progress`}</p>
+            <p className="text-sm font-semibold">{continuablePackages.length === 1 ? "Your Excel is in progress" : `${continuablePackages.length} of your Excels are in progress`}</p>
             <p className="mt-0.5 text-xs text-sky-800/80 dark:text-sky-200/80">Continue reviewing an Excel you started.</p>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-sky-900 dark:text-sky-100">
-              {ownActivePackages.map((item) => <span key={item.id} className="font-semibold">Excel: {item.name}</span>)}
+              {continuablePackages.map((item) => <span key={item.id} className="font-semibold">Excel: {item.name}</span>)}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {ownActivePackages.map((item) => (
-              <Button key={item.id} type="button" size="sm" variant="outline" disabled={item.id === currentPackageId} className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
-                {item.id === currentPackageId ? "Reviewing now" : "Continue reviewing"}
+            {continuablePackages.map((item) => (
+              <Button key={item.id} type="button" size="sm" variant="outline" className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
+                Continue reviewing
               </Button>
             ))}
           </div>
