@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   LayoutGrid, LayoutList, RefreshCw, FileJson, FileSpreadsheet,
   Import, Plus, Send, UserCircle, ShieldCheck, BookOpen, Clock,
-  CheckCircle2, XCircle, CircleSlash, MapPin, Palette,
+  CheckCircle2, XCircle, CircleSlash, MapPin,
 } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useWorkspaceRuntime } from "@/components/workspace/workspace-context"
@@ -2240,23 +2240,6 @@ export default function SearchHelper({
                   </TooltipTrigger>
                   <TooltipContent>Gallery View (Ctrl+G)</TooltipContent>
                 </Tooltip>
-                {workspaceSlug && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => chooseAreaColoring(!colorByArea)}
-                        aria-pressed={colorByArea}
-                        className={colorByArea ? "bg-muted" : ""}
-                      >
-                        <Palette className="h-4 w-4 sm:mr-1" aria-hidden="true" />
-                        <span className="hidden sm:inline">Areas</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Color contacts by their configured area</TooltipContent>
-                  </Tooltip>
-                )}
               </div>
             </CardHeader>
             <CardContent>
