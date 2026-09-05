@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { BaseContact } from "@/types/contact"
+import { packageNameForSegment } from "@/lib/package-name"
 
 export type PendingPackageUpload = {
   filename: string
@@ -160,6 +161,11 @@ export function PackageDialogs({
     setPageStart("")
     setPageEnd("")
   }, [pendingUpload])
+
+  useEffect(() => {
+    const generatedName = selectedZip && packageNameForSegment(selectedZip.zipcode, selectedZip.city, pageStart, pageEnd)
+    if (generatedName) setName(generatedName)
+  }, [pageEnd, pageStart, selectedZip])
 
   useEffect(() => {
     if (!pendingUpload && !browseOpen) return
@@ -374,7 +380,8 @@ export function PackageDialogs({
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="package-name">Excel name</Label>
-              <Input id="package-name" value={name} onChange={(event) => setName(event.target.value)} className="admin-field h-11 rounded-xl" />
+              <Input id="package-name" value={name} readOnly className="admin-field h-11 rounded-xl" />
+              <p className="text-xs text-muted-foreground">Generated from the selected ZIP, city, and page range.</p>
             </div>
             <div className="space-y-2">
               <Label>ZIP code</Label>
