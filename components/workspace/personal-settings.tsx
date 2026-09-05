@@ -25,6 +25,7 @@ type PersonalSettingsProps = {
 
 const tabClassName = "min-h-11 rounded-lg px-4 text-sm data-[state=active]:shadow-sm"
 const choiceClassName = "flex min-h-11 items-center gap-3 rounded-xl border px-4 text-left text-sm font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+const feedbackEnabled = false
 
 export function PersonalSettings({
   slug,
@@ -300,25 +301,25 @@ export function PersonalSettings({
       </TabsContent>
 
       <TabsContent value="support">
-        <form onSubmit={sendToPlatformAdmin}>
-          <Card className="admin-card rounded-2xl">
+        <form onSubmit={feedbackEnabled ? sendToPlatformAdmin : undefined}>
+          <Card className="admin-card rounded-2xl opacity-60">
             <CardHeader>
               <div className="admin-icon-well mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-primary">
                 <MessageSquare className="h-5 w-5" aria-hidden="true" />
               </div>
-              <CardTitle className="text-base font-semibold">Report a bug or share feedback</CardTitle>
-              <CardDescription>Send a message directly to the platform administrator. Your email and workspace are included automatically.</CardDescription>
+              <CardTitle className="text-base font-semibold">Report a bug or share feedback <span className="text-muted-foreground">(coming soon)</span></CardTitle>
+              <CardDescription>This feature is being finished and is not available yet.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">What would you like to send?</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <button type="button" aria-pressed={supportType === "bug"} onClick={() => setSupportType("bug")} className={cn(choiceClassName, supportType === "bug" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
+                  <button type="button" disabled={!feedbackEnabled} aria-pressed={supportType === "bug"} onClick={() => setSupportType("bug")} className={cn(choiceClassName, supportType === "bug" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
                     <Bug className="h-5 w-5" aria-hidden="true" />
                     <span className="flex-1">Report a bug</span>
                     {supportType === "bug" ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
                   </button>
-                  <button type="button" aria-pressed={supportType === "feedback"} onClick={() => setSupportType("feedback")} className={cn(choiceClassName, supportType === "feedback" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
+                  <button type="button" disabled={!feedbackEnabled} aria-pressed={supportType === "feedback"} onClick={() => setSupportType("feedback")} className={cn(choiceClassName, supportType === "feedback" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted")}>
                     <MessageSquare className="h-5 w-5" aria-hidden="true" />
                     <span className="flex-1">Share feedback</span>
                     {supportType === "feedback" ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
@@ -327,13 +328,13 @@ export function PersonalSettings({
               </fieldset>
               <div className="space-y-2">
                 <Label htmlFor="support-message">Message</Label>
-                <Textarea id="support-message" value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} placeholder={supportType === "bug" ? "What happened? Include the steps you took and what you expected instead." : "Tell us what is working well or what could be improved."} className="min-h-36 rounded-xl" maxLength={3000} required />
+                <Textarea id="support-message" disabled={!feedbackEnabled} value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} placeholder={supportType === "bug" ? "What happened? Include the steps you took and what you expected instead." : "Tell us what is working well or what could be improved."} className="min-h-36 rounded-xl" maxLength={3000} required />
               </div>
-              <Button type="submit" disabled={sendingSupport} className="admin-primary-button min-h-11 rounded-xl">
+              <Button type="submit" disabled={!feedbackEnabled || sendingSupport} className="admin-primary-button min-h-11 rounded-xl">
                 {sendingSupport ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
-                {sendingSupport ? "Sending message" : "Send to platform admin"}
+                {sendingSupport ? "Sending message" : "Coming soon"}
               </Button>
-              <p className="text-xs text-muted-foreground">Your message is sent securely to the platform administrator. You do not need to open an email app.</p>
+              <p className="text-xs text-muted-foreground">Feedback submission will be available once the platform email setup is complete.</p>
             </CardContent>
           </Card>
         </form>

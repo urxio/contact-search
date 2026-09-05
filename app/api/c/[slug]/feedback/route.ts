@@ -5,11 +5,13 @@ import { apiError, assertMultiTenantEnabled, RouteContext } from "../../_shared"
 
 const PLATFORM_ADMIN_EMAIL = "borisnikaz@gmail.com"
 const RESEND_EMAIL_API = "https://api.resend.com/emails"
+const FEEDBACK_ENABLED = false
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(request)
+    if (!FEEDBACK_ENABLED) return NextResponse.json({ error: "Feedback is coming soon." }, { status: 503 })
     const auth = await requireMembership(params.slug)
     const body = await request.json()
     const type = body.type === "bug" || body.type === "feedback" ? body.type : null

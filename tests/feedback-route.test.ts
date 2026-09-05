@@ -34,7 +34,7 @@ afterEach(() => {
 })
 
 describe("feedback email", () => {
-  it("delivers a feedback message server-side to the platform administrator", async () => {
+  it("does not send feedback until the feature is enabled", async () => {
     const { POST } = await import("@/app/api/c/[slug]/feedback/route")
     const request = new NextRequest("https://search.example/api/c/central/feedback", {
       method: "POST",
@@ -44,29 +44,9 @@ describe("feedback email", () => {
 
     const response = await POST(request, { params: { slug: "central" } })
 
-    expect(response.status).toBe(200)
-    expect(mocks.validateMutationOrigin).toHaveBeenCalledWith(request)
-    expect(fetch).toHaveBeenCalledWith("https://api.resend.com/emails", expect.objectContaining({ method: "POST" }))
-    const sentPayload = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body)
-    expect(sentPayload).toMatchObject({
-      to: ["borisnikaz@gmail.com"],
-      reply_to: "member@example.test",
-      subject: "Bug report from Member User",
-    })
-    expect(sentPayload.text).toContain("Search results do not load")
-    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "platform_feedback.sent", congregationId: 34 }))
-  })
-
-  it("does not send messages when email delivery is not configured", async () => {
-    delete process.env.RESEND_API_KEY
-    const { POST } = await import("@/app/api/c/[slug]/feedback/route")
-    const response = await POST(new NextRequest("https://search.example/api/c/central/feedback", {
-      method: "POST",
-      headers: { origin: "https://search.example", host: "search.example", "content-type": "application/json" },
-      body: JSON.stringify({ type: "feedback", message: "Thank you for this tool." }),
-    }), { params: { slug: "central" } })
-
     expect(response.status).toBe(503)
+    expect(mocks.validateMutationOrigin).toHaveBeenCalledWith(request)
     expect(fetch).not.toHaveBeenCalled()
+    expect(mocks.auditEvent).not.toHaveBeenCalled()
   })
 })
