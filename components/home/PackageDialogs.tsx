@@ -379,11 +379,6 @@ export function PackageDialogs({
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="package-name">Excel name</Label>
-              <Input id="package-name" value={name} readOnly className="admin-field h-11 rounded-xl" />
-              <p className="text-xs text-muted-foreground">Generated from the selected ZIP, city, and page range.</p>
-            </div>
-            <div className="space-y-2">
               <Label>ZIP code</Label>
               <Select value={zipcode} onValueChange={setZipcode}>
                 <SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue placeholder="Choose a configured ZIP" /></SelectTrigger>
