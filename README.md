@@ -13,6 +13,10 @@ npm run build
 
 Copy the values documented in `.env.example` into `.env.local`. Use a `SESSION_SECRET` of at least 32 random characters.
 
+### Feedback email
+
+Bug reports and feedback submitted from **My settings → Help & feedback** are sent by the server to `borisnikaz@gmail.com`. Configure `RESEND_API_KEY` and `FEEDBACK_FROM_EMAIL` with a verified Resend sender address in every deployment environment. The reporter's email is used as the message Reply-To address.
+
 ## Multi-congregation rollout
 
 The tenant-aware routes and APIs are gated by `MULTI_TENANT_ENABLED`.

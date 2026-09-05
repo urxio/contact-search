@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { Bug, Check, KeyRound, Loader2, Mail, MessageSquare, Moon, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
+import { Bug, Check, KeyRound, Loader2, MessageSquare, Moon, Send, Save, Search, Sun, UserRound, UsersRound } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 
@@ -51,6 +51,7 @@ export function PersonalSettings({
   const [confirmPassword, setConfirmPassword] = useState("")
   const [supportType, setSupportType] = useState<"bug" | "feedback">("bug")
   const [supportMessage, setSupportMessage] = useState("")
+  const [sendingSupport, setSendingSupport] = useState(false)
 
   useEffect(() => {
     setTheme(initialTheme)
@@ -144,7 +145,7 @@ export function PersonalSettings({
     }
   }
 
-  function emailPlatformAdmin(event: FormEvent) {
+  async function sendToPlatformAdmin(event: FormEvent) {
     event.preventDefault()
     const message = supportMessage.trim()
     if (!message) {
@@ -152,19 +153,22 @@ export function PersonalSettings({
       return
     }
 
-    const kind = supportType === "bug" ? "Bug report" : "Feedback"
-    const subject = `${kind} from ${displayName}`
-    const body = [
-      `${kind} from Name Search`,
-      "",
-      message,
-      "",
-      "---",
-      `Reporter: ${displayName}`,
-      `Email: ${email}`,
-      `Workspace: ${slug}`,
-    ].join("\n")
-    window.location.href = `mailto:borisnikaz@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    setSendingSupport(true)
+    try {
+      const response = await fetch(`/api/c/${slug}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: supportType, message }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.error ?? "Your message could not be sent")
+      setSupportMessage("")
+      toast.success("Your message was sent to the platform administrator")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Your message could not be sent")
+    } finally {
+      setSendingSupport(false)
+    }
   }
 
   return (
@@ -296,7 +300,7 @@ export function PersonalSettings({
       </TabsContent>
 
       <TabsContent value="support">
-        <form onSubmit={emailPlatformAdmin}>
+        <form onSubmit={sendToPlatformAdmin}>
           <Card className="admin-card rounded-2xl">
             <CardHeader>
               <div className="admin-icon-well mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-primary">
@@ -325,11 +329,11 @@ export function PersonalSettings({
                 <Label htmlFor="support-message">Message</Label>
                 <Textarea id="support-message" value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} placeholder={supportType === "bug" ? "What happened? Include the steps you took and what you expected instead." : "Tell us what is working well or what could be improved."} className="min-h-36 rounded-xl" maxLength={3000} required />
               </div>
-              <Button type="submit" className="admin-primary-button min-h-11 rounded-xl">
-                <Mail aria-hidden="true" />
-                Email platform admin
+              <Button type="submit" disabled={sendingSupport} className="admin-primary-button min-h-11 rounded-xl">
+                {sendingSupport ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+                {sendingSupport ? "Sending message" : "Send to platform admin"}
               </Button>
-              <p className="text-xs text-muted-foreground">This opens a pre-addressed message to borisnikaz@gmail.com in your email app. Review it and send when ready.</p>
+              <p className="text-xs text-muted-foreground">Your message is sent securely to the platform administrator. You do not need to open an email app.</p>
             </CardContent>
           </Card>
         </form>
