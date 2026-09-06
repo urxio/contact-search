@@ -158,7 +158,6 @@ export async function consumeInvitation(token: string, input: { displayName?: st
     const invite = invitation.rows[0]
     const existing = await client.query(`SELECT id,password_hash FROM users WHERE email=$1`, [invite.email])
     let userId: number
-    let isNewUser = false
     if (existing.rowCount) {
       if (!(await verifyPassword(input.password, existing.rows[0].password_hash))) throw new AuthError(401, "Password is incorrect")
       userId = Number(existing.rows[0].id)
@@ -167,7 +166,6 @@ export async function consumeInvitation(token: string, input: { displayName?: st
       const passwordHash = await hashPassword(input.password)
       const created = await client.query(`INSERT INTO users(email,display_name,password_hash) VALUES($1,$2,$3) RETURNING id`, [invite.email, input.displayName.trim(), passwordHash])
       userId = Number(created.rows[0].id)
-      isNewUser = true
     }
     const displayName = input.displayName?.trim() || null
     await client.query(`INSERT INTO congregation_memberships(user_id,congregation_id,role,display_name) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,congregation_id) DO UPDATE SET role=EXCLUDED.role,status='active',display_name=COALESCE(EXCLUDED.display_name,congregation_memberships.display_name)`, [userId, invite.congregation_id, invite.role, displayName])
@@ -181,7 +179,7 @@ export async function consumeInvitation(token: string, input: { displayName?: st
     await client.query(`UPDATE invitations SET accepted_at=NOW() WHERE id=$1`, [invite.id])
     await client.query(`INSERT INTO audit_events(actor_user_id,congregation_id,action,target_type,target_id,metadata) VALUES($1,$2,'invitation.accepted','invitation',$3,'{}')`, [userId, invite.congregation_id, String(invite.id)])
     await client.query("COMMIT")
-    return { userId, slug: invite.slug as string, isNewUser }
+    return { userId, slug: invite.slug as string }
   } catch (error) { await client.query("ROLLBACK"); throw error } finally { client.release() }
 }
 

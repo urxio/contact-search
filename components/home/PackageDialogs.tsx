@@ -499,7 +499,7 @@ export function PackageDialogs({
       </Dialog>
 
       <Dialog open={browseOpen} onOpenChange={onBrowseOpenChange}>
-        <DialogContent className="admin-material max-h-[88vh] w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-2xl sm:max-w-2xl">
+        <DialogContent className="admin-material !inset-0 m-auto h-fit max-h-[88vh] w-[calc(100vw-2rem)] !transform-none overflow-x-hidden overflow-y-auto rounded-2xl data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:max-w-2xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-semibold">Browse Excels</DialogTitle>
             <DialogDescription>Your Excels and, for admins, congregation-wide management.</DialogDescription>

@@ -16,6 +16,6 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   try {
     validateMutationOrigin(request); await ensureSchema(); const body = await request.json()
     const accepted = await consumeInvitation(params.token, body)
-    await createAuthSession(accepted.userId); return NextResponse.json({ ok: true, slug: accepted.slug, isNewUser: accepted.isNewUser })
+    await createAuthSession(accepted.userId); return NextResponse.json({ ok: true, slug: accepted.slug })
   } catch (error) { return authErrorResponse(error) }
 }
