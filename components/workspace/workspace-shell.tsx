@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Building2,
   BarChart3,
+  BookOpen,
   Check,
   ChevronDown,
   CircleUserRound,
@@ -218,6 +219,12 @@ export function WorkspaceShell({
                       My stats
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
+                    <Link href="/instructions">
+                      <BookOpen aria-hidden="true" />
+                      Instructions
+                    </Link>
+                  </DropdownMenuItem>
                   {canAdmin ? (
                     <>
                       <DropdownMenuSeparator />
@@ -286,6 +293,12 @@ export function WorkspaceShell({
                         <Link href={`/c/${activeWorkspace.slug}/stats`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <BarChart3 className="h-4 w-4" aria-hidden="true" />
                           My stats
+                        </Link>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Link href="/instructions" className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <BookOpen className="h-4 w-4" aria-hidden="true" />
+                          Instructions
                         </Link>
                       </SheetClose>
                       {canAdmin ? (

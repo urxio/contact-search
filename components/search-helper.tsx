@@ -1974,12 +1974,6 @@ export default function SearchHelper({
                     Feature Overview
                   </a>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href="/instructions" className="flex items-center cursor-pointer w-full">
-                    <BookOpen className="h-4 w-4 mr-2 text-blue-500" />
-                    Instructions
-                  </a>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-gray-400 px-2 py-1">Admin</DropdownMenuLabel>
                 <DropdownMenuItem asChild>
