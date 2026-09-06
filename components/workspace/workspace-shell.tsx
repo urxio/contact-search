@@ -220,7 +220,7 @@ export function WorkspaceShell({
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
-                    <Link href="/instructions">
+                    <Link href={`/c/${activeWorkspace.slug}/instructions`}>
                       <BookOpen aria-hidden="true" />
                       Instructions
                     </Link>
@@ -296,7 +296,7 @@ export function WorkspaceShell({
                         </Link>
                       </SheetClose>
                       <SheetClose asChild>
-                        <Link href="/instructions" className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <Link href={`/c/${activeWorkspace.slug}/instructions`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <BookOpen className="h-4 w-4" aria-hidden="true" />
                           Instructions
                         </Link>
