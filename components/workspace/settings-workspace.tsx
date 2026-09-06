@@ -459,8 +459,8 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
           legacyIdentityId: legacyIdentityId ? Number(legacyIdentityId) : undefined,
         }),
       })
-      if (!response.ok) throw new Error("Invitation could not be created")
-      const result = (await response.json()) as InvitationResult
+      const result = await response.json() as InvitationResult & { error?: string }
+      if (!response.ok) throw new Error(result.error || "Invitation could not be created")
       const path = result.url ?? result.inviteUrl ?? (result.token ? `/join/${result.token}` : "")
       const absoluteUrl = path.startsWith("http") ? path : `${window.location.origin}${path}`
       setInviteUrl(absoluteUrl)
@@ -476,6 +476,13 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   async function copyInvitation() {
     await navigator.clipboard.writeText(inviteUrl)
     toast.success("Invitation link copied")
+  }
+
+  function resetInvitationDialog() {
+    setInviteUrl("")
+    setInviteEmail("")
+    setInviteRole("member")
+    setLegacyIdentityId("")
   }
 
   async function revokeInvitation(invitation: Invitation) {
@@ -665,7 +672,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <CardDescription>Create a secure link to copy and share manually.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Dialog onOpenChange={(open) => !open && setInviteUrl("")}>
+            <Dialog onOpenChange={(open) => !open && resetInvitationDialog()}>
               <DialogTrigger asChild>
                 <Button className="admin-primary-button min-h-11 rounded-xl">
                   <MailPlus aria-hidden="true" />

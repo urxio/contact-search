@@ -7,6 +7,30 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireCongregationAdmin(params.slug)
+    // Keep the invitation picker in sync with work imported after the initial
+    // multi-tenant migration. Identities remain congregation-scoped and an
+    // existing linked identity is never changed.
+    await pool.query(
+      `WITH historical_names AS (
+         SELECT lower(trim(user_id)) AS normalized_name, trim(user_id) AS display_name
+           FROM submissions
+          WHERE congregation_id = $1 AND trim(user_id) <> ''
+         UNION
+         SELECT lower(trim(owner)) AS normalized_name, trim(owner) AS display_name
+           FROM zt_segments
+          WHERE congregation_id = $1 AND trim(owner) <> ''
+         UNION
+         SELECT lower(trim(name)) AS normalized_name, trim(name) AS display_name
+           FROM zt_users
+          WHERE congregation_id = $1 AND trim(name) <> ''
+       )
+       INSERT INTO legacy_identities(congregation_id, normalized_name, display_name)
+       SELECT $1, normalized_name, min(display_name)
+         FROM historical_names
+        GROUP BY normalized_name
+       ON CONFLICT(congregation_id, normalized_name) DO NOTHING`,
+      [auth.congregation.id],
+    )
     const [members, legacy] = await Promise.all([
       pool.query(
         `SELECT m.id, m.user_id AS "userId", u.email, u.display_name AS "displayName",

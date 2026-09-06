@@ -78,4 +78,25 @@ describe("congregation invitation records", () => {
       targetId: "7",
     }))
   })
+
+  it("creates an invitation with the selected historical identity", async () => {
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [{ id: 81 }] })
+    mocks.issueInvitation.mockResolvedValueOnce({ token: "invite-token", expiresAt: new Date("2026-09-13T12:00:00.000Z") })
+    const { POST } = await import("@/app/api/c/[slug]/invitations/route")
+    const request = new NextRequest("https://search.example/api/c/central/invitations", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({ email: "new.member@example.test", role: "member", legacyIdentityId: 81 }),
+    })
+
+    const response = await POST(request, { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    expect(mocks.issueInvitation).toHaveBeenCalledWith(expect.objectContaining({
+      congregationId: 34,
+      email: "new.member@example.test",
+      legacyIdentityId: 81,
+    }))
+    await expect(response.json()).resolves.toMatchObject({ token: "invite-token" })
+  })
 })

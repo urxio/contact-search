@@ -28,6 +28,24 @@ beforeEach(() => {
 })
 
 describe("congregation members", () => {
+  it("refreshes congregation-scoped historical identities before returning invite choices", async () => {
+    const members = [{ id: 56, displayName: "Current Member" }]
+    const legacyIdentities = [{ id: 81, displayName: "Historical Contributor" }]
+    mocks.poolQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: members })
+      .mockResolvedValueOnce({ rows: legacyIdentities })
+    const { GET } = await import("@/app/api/c/[slug]/members/route")
+
+    const response = await GET(new NextRequest("https://search.example/api/c/central/members"), { params: { slug: "central" } })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ members, legacyIdentities })
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("INSERT INTO legacy_identities")
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("WHERE congregation_id = $1")
+    expect(mocks.poolQuery.mock.calls[0][1]).toEqual([34])
+  })
+
   it("permanently deletes a different member's congregation membership", async () => {
     mocks.poolQuery.mockResolvedValueOnce({ rows: [{ id: 56 }] })
     const { DELETE } = await import("@/app/api/c/[slug]/members/route")
