@@ -4,7 +4,9 @@ import { NextRequest } from "next/server"
 import { AuthError } from "@/lib/auth"
 
 const mocks = vi.hoisted(() => ({
+  auditEvent: vi.fn(),
   clientQuery: vi.fn(),
+  poolQuery: vi.fn(),
   release: vi.fn(),
   requirePlatformAdmin: vi.fn(),
   validateMutationOrigin: vi.fn(),
@@ -12,12 +14,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/auth")>()),
+  auditEvent: mocks.auditEvent,
   requirePlatformAdmin: mocks.requirePlatformAdmin,
   validateMutationOrigin: mocks.validateMutationOrigin,
 }))
 
 vi.mock("@/lib/db", () => ({
-  pool: { connect: vi.fn(async () => ({ query: mocks.clientQuery, release: mocks.release })), query: vi.fn() },
+  pool: { connect: vi.fn(async () => ({ query: mocks.clientQuery, release: mocks.release })), query: mocks.poolQuery },
 }))
 
 function request(body: Record<string, unknown>) {
@@ -28,9 +31,19 @@ function request(body: Record<string, unknown>) {
   })
 }
 
+function patchRequest(body: Record<string, unknown>) {
+  return new NextRequest("https://search.example/api/platform/congregations", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+    body: JSON.stringify(body),
+  })
+}
+
 beforeEach(() => {
   process.env.MULTI_TENANT_ENABLED = "true"
   mocks.clientQuery.mockReset().mockResolvedValue({ rows: [], rowCount: 0 })
+  mocks.poolQuery.mockReset().mockResolvedValue({ rows: [], rowCount: 0 })
+  mocks.auditEvent.mockReset().mockResolvedValue(undefined)
   mocks.release.mockReset()
   mocks.requirePlatformAdmin.mockReset().mockResolvedValue({ id: 99 })
   mocks.validateMutationOrigin.mockReset()
@@ -74,5 +87,25 @@ describe("platform congregation deletion", () => {
 
     expect(response.status).toBe(404)
     expect(mocks.clientQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe("platform congregation editing", () => {
+  it("updates congregation details for a platform admin and audits the change", async () => {
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [{ id: 34, name: "New Central", slug: "new-central", status: "active", settings: {} }], rowCount: 1 })
+    const { PATCH } = await import("@/app/api/platform/congregations/route")
+    const response = await PATCH(patchRequest({ id: 34, name: "New Central", slug: "new-central" }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.poolQuery).toHaveBeenCalledWith(expect.stringContaining("UPDATE congregations SET name"), [34, "New Central", "new-central"])
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 99, congregationId: 34, action: "congregation.updated", metadata: { name: "New Central", slug: "new-central" } }))
+  })
+
+  it("rejects an invalid congregation slug without updating", async () => {
+    const { PATCH } = await import("@/app/api/platform/congregations/route")
+    const response = await PATCH(patchRequest({ id: 34, name: "Central", slug: "not a slug" }))
+
+    expect(response.status).toBe(400)
+    expect(mocks.poolQuery).not.toHaveBeenCalled()
   })
 })

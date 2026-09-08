@@ -58,6 +58,35 @@ export async function POST(req: NextRequest) {
   } catch (error) { return apiError(error) }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    assertMultiTenantEnabled()
+    validateMutationOrigin(req)
+    const user = await requirePlatformAdmin()
+    const body = await req.json()
+    const id = Number(body.id)
+    const name = String(body.name ?? "").trim()
+    const slug = String(body.slug ?? "").trim().toLowerCase()
+    if (!Number.isSafeInteger(id) || id <= 0 || name.length < 2 || name.length > 100 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      return NextResponse.json({ error: "A valid name and slug are required." }, { status: 400 })
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE congregations SET name = $2, slug = $3, updated_at = NOW()
+         WHERE id = $1 RETURNING id, name, slug, status, settings`,
+        [id, name, slug],
+      )
+      if (!result.rowCount) return NextResponse.json({ error: "Congregation not found." }, { status: 404 })
+      await auditEvent({ actorUserId: user.id, congregationId: id, action: "congregation.updated",
+        targetType: "congregation", targetId: String(id), metadata: { name, slug } })
+      return NextResponse.json({ congregation: result.rows[0] })
+    } catch (error: any) {
+      if (error?.code === "23505") return NextResponse.json({ error: "That slug is already in use." }, { status: 409 })
+      throw error
+    }
+  } catch (error) { return apiError(error) }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     assertMultiTenantEnabled()

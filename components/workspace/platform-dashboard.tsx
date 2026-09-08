@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Building2, Copy, Loader2, Plus, Trash2 } from "lucide-react"
+import { ArrowRight, Building2, Copy, Edit3, Loader2, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 
 type Congregation = {
   id?: number
@@ -51,6 +58,10 @@ export function PlatformDashboard() {
   const [congregationToDelete, setCongregationToDelete] = useState<Congregation | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [congregationToEdit, setCongregationToEdit] = useState<Congregation | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editSlug, setEditSlug] = useState("")
+  const [editing, setEditing] = useState(false)
 
   function loadCongregations() {
     fetch("/api/platform/congregations", { cache: "no-store" })
@@ -128,6 +139,35 @@ export function PlatformDashboard() {
     }
   }
 
+  function openEditDialog(congregation: Congregation) {
+    setCongregationToEdit(congregation)
+    setEditName(congregation.name)
+    setEditSlug(congregation.slug)
+  }
+
+  async function updateCongregation(event: FormEvent) {
+    event.preventDefault()
+    if (!congregationToEdit?.id) return
+    setEditing(true)
+    try {
+      const response = await fetch("/api/platform/congregations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: congregationToEdit.id, name: editName.trim(), slug: editSlug.trim() }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error ?? "Congregation could not be updated")
+      const updated = result.congregation as Congregation
+      setCongregations((current) => current.map((congregation) => congregation.id === updated.id ? { ...congregation, ...updated } : congregation))
+      setCongregationToEdit(null)
+      toast.success("Congregation updated")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Congregation could not be updated")
+    } finally {
+      setEditing(false)
+    }
+  }
+
   const createButton = (
     <Dialog onOpenChange={(open) => !open && setFirstAdminLink("")}>
       <DialogTrigger asChild>
@@ -196,23 +236,42 @@ export function PlatformDashboard() {
       <div className="flex justify-end">{createButton}</div>
       <div className="grid gap-4 sm:grid-cols-2">
         {congregations.map((congregation) => (
-          <Card key={congregation.slug} className="admin-card relative h-full rounded-2xl">
-            <CardContent className="flex min-h-32 items-center gap-4 p-6 pr-16">
-              <Link href={`/c/${congregation.slug}`} className="group flex min-w-0 flex-1 items-center gap-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <CongregationMark name={congregation.name} className="h-12 w-12 text-base" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold">{congregation.name}</p>
-                  <p className="mt-1 text-sm font-normal text-muted-foreground">{congregation.memberCount ?? congregation.member_count ?? 0} members</p>
-                </div>
-                <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-1" aria-hidden="true" />
-              </Link>
-              <Button variant="ghost" size="icon" className="absolute right-4 top-4 text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete ${congregation.name}`} onClick={() => { setCongregationToDelete(congregation); setDeleteConfirmation("") }}>
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </CardContent>
-          </Card>
+          <ContextMenu key={congregation.slug}>
+            <ContextMenuTrigger asChild>
+              <Card className="admin-card h-full rounded-2xl">
+                <CardContent className="flex min-h-32 items-center gap-4 p-6">
+                  <Link href={`/c/${congregation.slug}`} className="group flex min-w-0 flex-1 items-center gap-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    <CongregationMark name={congregation.name} className="h-12 w-12 text-base" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-semibold">{congregation.name}</p>
+                      <p className="mt-1 text-sm font-normal text-muted-foreground">{congregation.memberCount ?? congregation.member_count ?? 0} members</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-1" aria-hidden="true" />
+                  </Link>
+                </CardContent>
+              </Card>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onSelect={() => openEditDialog(congregation)}><Edit3 className="mr-2 h-4 w-4" aria-hidden="true" />Edit congregation</ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onSelect={() => { setCongregationToDelete(congregation); setDeleteConfirmation("") }}><Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />Delete congregation</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
       </div>
+      <Dialog open={Boolean(congregationToEdit)} onOpenChange={(open) => { if (!open && !editing) setCongregationToEdit(null) }}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit congregation</DialogTitle>
+            <DialogDescription>Update the workspace name or URL slug.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={updateCongregation} className="space-y-5">
+            <div className="space-y-2"><Label htmlFor="edit-congregation-name">Name</Label><Input id="edit-congregation-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="h-11 rounded-xl" required /></div>
+            <div className="space-y-2"><Label htmlFor="edit-congregation-slug">Slug</Label><Input id="edit-congregation-slug" value={editSlug} onChange={(event) => setEditSlug(event.target.value)} className="h-11 rounded-xl" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required /></div>
+            <DialogFooter><Button type="submit" disabled={editing} className="admin-primary-button min-h-11 rounded-xl">{editing && <Loader2 className="animate-spin" aria-hidden="true" />}Save changes</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={Boolean(congregationToDelete)} onOpenChange={(open) => { if (!open && !deleting) { setCongregationToDelete(null); setDeleteConfirmation("") } }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
