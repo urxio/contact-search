@@ -22,9 +22,11 @@ interface ImportBarProps {
   assignedPackages?: Array<{ id: number; name: string }>
   currentPackageId?: number | null
   onOpenAssignedPackage?: (packageId: number) => void
+  onDismissPackageNotification?: (packageId: number) => void
   instructionNotifications?: Array<{ id: number; revision: number; title: string }>
   onOpenInstructions?: (instructionId: number) => void
   onDismissInstruction?: (instruction: { id: number; revision: number; title: string }) => void
+  onDismissError?: () => void
 }
 
 export function ImportBar({
@@ -44,9 +46,11 @@ export function ImportBar({
   assignedPackages = [],
   currentPackageId = null,
   onOpenAssignedPackage,
+  onDismissPackageNotification,
   instructionNotifications = [],
   onOpenInstructions,
   onDismissInstruction,
+  onDismissError,
 }: ImportBarProps) {
   const currentActivePackage = ownActivePackages.find((item) => item.id === currentPackageId)
   const continuablePackages = ownActivePackages.filter((item) => item.id !== currentPackageId)
@@ -134,11 +138,7 @@ export function ImportBar({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {continuablePackages.map((item) => (
-              <Button key={item.id} type="button" size="sm" variant="outline" className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
-                Continue reviewing
-              </Button>
-            ))}
+            {continuablePackages.map((item) => <div key={item.id} className="flex items-center gap-1"><Button type="button" size="sm" variant="outline" className="border-sky-200 bg-background text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-background/10 dark:text-sky-200" onClick={() => onOpenAssignedPackage?.(item.id)}>Continue reviewing</Button><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-sky-700 hover:bg-sky-100 hover:text-sky-900 dark:text-sky-200" aria-label={`Dismiss ${item.name} notification`} onClick={() => onDismissPackageNotification?.(item.id)}><X className="h-4 w-4" aria-hidden="true" /></Button></div>)}
           </div>
         </div>
       ) : null}
@@ -151,11 +151,7 @@ export function ImportBar({
             <p className="mt-0.5 text-xs text-indigo-800/80 dark:text-indigo-200/80">Open an assigned Excel to begin or continue reviewing its contacts.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {assignedPackages.map((item) => (
-              <Button key={item.id} type="button" size="sm" variant="outline" className="border-indigo-200 bg-background text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/10 dark:text-indigo-200" onClick={() => onOpenAssignedPackage?.(item.id)}>
-                Open {item.name}
-              </Button>
-            ))}
+            {assignedPackages.map((item) => <div key={item.id} className="flex items-center gap-1"><Button type="button" size="sm" variant="outline" className="border-indigo-200 bg-background text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/10 dark:text-indigo-200" onClick={() => onOpenAssignedPackage?.(item.id)}>Open {item.name}</Button><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 dark:text-indigo-200" aria-label={`Dismiss ${item.name} notification`} onClick={() => onDismissPackageNotification?.(item.id)}><X className="h-4 w-4" aria-hidden="true" /></Button></div>)}
           </div>
         </div>
       ) : null}
@@ -175,7 +171,8 @@ export function ImportBar({
       {error && (
         <div className="border-t border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 px-5 py-3 flex items-start gap-2">
           <AlertCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          <p className="min-w-0 flex-1 text-sm text-red-700 dark:text-red-400">{error}</p>
+          <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-red-700 hover:bg-red-100 hover:text-red-900 dark:text-red-300" aria-label="Dismiss error notification" onClick={onDismissError}><X className="h-4 w-4" aria-hidden="true" /></Button>
         </div>
       )}
     </div>

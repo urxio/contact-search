@@ -2197,7 +2197,7 @@ export default function SearchHelper({
           onSubmitForReview={sendForReview}
           packagesEnabled={Boolean(workspaceSlug)}
           onBrowsePackages={() => setPackageBrowserOpen(true)}
-          ownActivePackages={activePackages.filter((item) => item.state === "in_progress")}
+          ownActivePackages={activePackages.filter((item) => item.state === "in_progress" && (item.id === activePackageIdRef.current || !dismissedPackageNotifications.has(item.id)))}
           assignedPackages={activePackages.filter((item) => item.state === "assigned" && !dismissedPackageNotifications.has(item.id))}
           currentPackageId={activePackageIdRef.current}
           onOpenAssignedPackage={(packageId) => {
@@ -2206,6 +2206,7 @@ export default function SearchHelper({
             setPreferredPackageId(packageId)
             setPackageBrowserOpen(true)
           }}
+          onDismissPackageNotification={dismissPackageNotification}
           instructionNotifications={instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))}
           onOpenInstructions={async (instructionId) => {
             const instruction = instructionNotifications.find((item) => item.id === instructionId && !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))
@@ -2226,6 +2227,7 @@ export default function SearchHelper({
               method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: instruction.id, revision: instruction.revision }),
             })
           }}
+          onDismissError={() => setError(null)}
         />
 
         {/* ── Territory / General Notes ── */}

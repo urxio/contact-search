@@ -28,6 +28,7 @@ describe("ImportBar Excel progress notification", () => {
     }))
 
     expect(markup).toContain("Excel: Alexandria North — pages 541–582")
+    expect(markup).not.toContain("Dismiss Alexandria North — pages 541–582 notification")
     expect(markup).not.toContain("Your Excel is in progress")
     expect(markup).not.toContain("Reviewing now")
   })
@@ -37,6 +38,7 @@ describe("ImportBar Excel progress notification", () => {
 
     expect(markup).toContain("Excel: West Alexandria")
     expect(markup).toContain("Continue reviewing")
+    expect(markup).toContain("Dismiss West Alexandria notification")
     expect(markup).not.toContain("Reviewing now")
   })
 
@@ -45,6 +47,7 @@ describe("ImportBar Excel progress notification", () => {
 
     expect(markup).toContain("An Excel has been assigned to you by an admin")
     expect(markup).toContain("Open Assigned Excel")
+    expect(markup).toContain("Dismiss Assigned Excel notification")
     expect(markup).not.toContain("Your Excel is in progress")
   })
 
@@ -62,5 +65,10 @@ describe("ImportBar Excel progress notification", () => {
     ] }))
     expect(markup).toContain("Review Calling guidance")
     expect(markup).toContain("Review Territory notes")
+  })
+
+  it("allows errors to be dismissed", () => {
+    const markup = text(renderBar({ error: "The import failed." }))
+    expect(markup).toContain("Dismiss error notification")
   })
 })
