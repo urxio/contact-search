@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react"
+import { useRef, useState } from "react"
+import { ArrowDown, ArrowUp, Bold, Heading2, ImagePlus, Italic, Link, List, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import type { CongregationInstruction } from "@/lib/congregation-instructions"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { InstructionContent } from "@/components/instructions/instruction-content"
 
 type Props = { slug: string; initialInstructions: CongregationInstruction[]; canManage: boolean }
 
@@ -19,10 +20,30 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
   const [busy, setBusy] = useState(false)
+  const editorRef = useRef<HTMLTextAreaElement>(null)
 
   const endpoint = `/api/c/${encodeURIComponent(slug)}/instructions`
   function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0 }); setTitle(""); setBody("") }
   function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body) }
+
+  function insert(before: string, after = before, placeholder = "text") {
+    const editor = editorRef.current
+    if (!editor) return
+    const start = editor.selectionStart
+    const end = editor.selectionEnd
+    const selected = body.slice(start, end) || placeholder
+    const next = `${body.slice(0, start)}${before}${selected}${after}${body.slice(end)}`
+    setBody(next)
+    requestAnimationFrame(() => { editor.focus(); editor.setSelectionRange(start + before.length, start + before.length + selected.length) })
+  }
+
+  function insertImage() {
+    const url = window.prompt("Paste the HTTPS image URL")?.trim()
+    if (!url) return
+    try { if (new URL(url).protocol !== "https:") throw new Error() } catch { toast.error("Please use a valid HTTPS image URL."); return }
+    const alt = window.prompt("Image description (optional)")?.trim() || "Instruction image"
+    insert(`![${alt}](`, ")", url)
+  }
 
   async function save() {
     if (!editing || !title.trim() || !body.trim()) return
@@ -63,8 +84,8 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
         <div><h2 id="congregation-instructions-heading" className="text-xl font-semibold">Congregation instructions</h2><p className="mt-1 text-sm text-muted-foreground">Additional guidance from your congregation administrators.</p></div>
         {canManage ? <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" />Add instruction</Button> : null}
       </div>
-      {instructions.length ? <div className="mt-5 space-y-4">{instructions.map((instruction, index) => <Card key={instruction.id} id={`instruction-${instruction.id}`}><CardHeader className="gap-2"><div className="flex items-start justify-between gap-3"><CardTitle className="text-base">{instruction.title}</CardTitle>{canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Move ${instruction.title} up`} variant="ghost" size="icon" disabled={index === 0 || busy} onClick={() => void reorder([...instructions.slice(0, index - 1), instruction, instructions[index - 1], ...instructions.slice(index + 1)])}><ArrowUp className="h-4 w-4" /></Button><Button aria-label={`Move ${instruction.title} down`} variant="ghost" size="icon" disabled={index === instructions.length - 1 || busy} onClick={() => void reorder([...instructions.slice(0, index), instructions[index + 1], instruction, ...instructions.slice(index + 2)])}><ArrowDown className="h-4 w-4" /></Button><Button aria-label={`Edit ${instruction.title}`} variant="ghost" size="icon" disabled={busy} onClick={() => openEdit(instruction)}><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${instruction.title}`} variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={busy} onClick={() => void remove(instruction)}><Trash2 className="h-4 w-4" /></Button></div> : null}</div><CardDescription className="whitespace-pre-wrap leading-6">{instruction.body}</CardDescription></CardHeader></Card>)}</div> : <Card className="mt-5"><CardContent className="py-6 text-sm text-muted-foreground">{canManage ? "Add congregation-specific instructions for members here." : "There are no additional congregation instructions right now."}</CardContent></Card>}
-      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Members will be notified in Name Search when this instruction is published or updated.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><Textarea id="instruction-body" value={body} maxLength={5000} rows={8} onChange={(event) => setBody(event.target.value)} /></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
+      {instructions.length ? <div className="mt-5 space-y-4">{instructions.map((instruction, index) => <Card key={instruction.id} id={`instruction-${instruction.id}`}><CardHeader className="gap-2"><div className="flex items-start justify-between gap-3"><CardTitle className="text-base">{instruction.title}</CardTitle>{canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Move ${instruction.title} up`} variant="ghost" size="icon" disabled={index === 0 || busy} onClick={() => void reorder([...instructions.slice(0, index - 1), instruction, instructions[index - 1], ...instructions.slice(index + 1)])}><ArrowUp className="h-4 w-4" /></Button><Button aria-label={`Move ${instruction.title} down`} variant="ghost" size="icon" disabled={index === instructions.length - 1 || busy} onClick={() => void reorder([...instructions.slice(0, index), instructions[index + 1], instruction, ...instructions.slice(index + 2)])}><ArrowDown className="h-4 w-4" /></Button><Button aria-label={`Edit ${instruction.title}`} variant="ghost" size="icon" disabled={busy} onClick={() => openEdit(instruction)}><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${instruction.title}`} variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={busy} onClick={() => void remove(instruction)}><Trash2 className="h-4 w-4" /></Button></div> : null}</div><InstructionContent content={instruction.body} className="text-sm leading-6 text-muted-foreground" /></CardHeader></Card>)}</div> : <Card className="mt-5"><CardContent className="py-6 text-sm text-muted-foreground">{canManage ? "Add congregation-specific instructions for members here." : "There are no additional congregation instructions right now."}</CardContent></Card>}
+      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Format text with the toolbar, or add an image from an HTTPS URL. Members will be notified when this is published or updated.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><div className="flex flex-wrap gap-1 rounded-t-md border border-b-0 bg-muted/40 p-1"><Button type="button" variant="ghost" size="sm" aria-label="Bold" onClick={() => insert("**")}><Bold className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Italic" onClick={() => insert("*")}><Italic className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Heading" onClick={() => insert("## ", "", "Heading")}><Heading2 className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Bulleted list" onClick={() => insert("- ", "", "List item")}><List className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Link" onClick={() => insert("[", "](https://)", "Link text")}><Link className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Add image" onClick={insertImage}><ImagePlus className="h-4 w-4" /></Button></div><Textarea ref={editorRef} id="instruction-body" value={body} maxLength={5000} rows={8} className="rounded-t-none" onChange={(event) => setBody(event.target.value)} /><div className="rounded-md border bg-muted/20 p-3"><p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>{body.trim() ? <InstructionContent content={body} className="text-sm leading-6" /> : <p className="text-sm text-muted-foreground">Your formatted instruction will appear here.</p>}</div></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
     </section>
   )
 }
