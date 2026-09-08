@@ -120,19 +120,19 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
       const response = await fetch(endpoint, { method: editing.id ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editing.id ? { id: editing.id, title, body: instructionBody } : { title, body: instructionBody }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to save instruction")
-      setInstructions((current) => editing.id ? current.map((item) => item.id === editing.id ? result.instruction : item) : [...current, result.instruction])
+      setInstructions((current) => editing.id ? current.map((item) => item.id === editing.id ? result.instruction : item) : [result.instruction, ...current])
       setEditing(null); toast.success(editing.id ? "Instruction updated." : "Instruction published.")
     } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to save instruction") } finally { setBusy(false) }
   }
 
   async function reorder(next: CongregationInstruction[]) {
-    const previous = instructions; setInstructions(next)
+    const previous = instructions; setBusy(true); setInstructions(next)
     try {
       const response = await fetch(endpoint, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next.map((item) => item.id) }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to reorder instructions")
       setInstructions(result.instructions)
-    } catch (error) { setInstructions(previous); toast.error(error instanceof Error ? error.message : "Unable to reorder instructions") }
+    } catch (error) { setInstructions(previous); toast.error(error instanceof Error ? error.message : "Unable to reorder instructions") } finally { setBusy(false) }
   }
 
   async function remove(instruction: CongregationInstruction) {
