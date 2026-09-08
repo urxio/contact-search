@@ -79,7 +79,7 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         className={cn(
           "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           compact && "w-full justify-start",
-          isSearch && "bg-background text-foreground shadow-sm",
+          isSearch && "bg-background text-foreground shadow-sm ring-2 ring-blue-500 ring-offset-1",
         )}
       >
         <Search className="h-4 w-4" aria-hidden="true" />
@@ -91,7 +91,7 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         className={cn(
           "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           compact && "w-full justify-start",
-          isTeam && "bg-background text-foreground shadow-sm",
+          isTeam && "bg-background text-foreground shadow-sm ring-2 ring-blue-500 ring-offset-1",
         )}
       >
         <UsersRound className="h-4 w-4" aria-hidden="true" />
