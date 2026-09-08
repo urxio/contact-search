@@ -63,6 +63,22 @@ describe("congregation instructions API", () => {
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "congregation_instruction.updated" }))
   })
 
+  it("allows an administrator to persist a new ordering of the same instructions", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 8 }, { id: 7 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 7, title: "Second", body: "", position: 0, revision: 1 }, { id: 8, title: "First", body: "", position: 1, revision: 1 }] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { PATCH } = await import("@/app/api/c/[slug]/instructions/route")
+    const response = await PATCH(request("PATCH", { order: [7, 8] }), { params: { slug: "central" } })
+    expect(response.status).toBe(200)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("SET position=$1"), [0, 7, 34])
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "congregation_instruction.reordered" }))
+  })
+
   it("requires administrator access for mutations", async () => {
     mocks.admin.mockRejectedValueOnce(new AuthError(404, "Workspace not found"))
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")

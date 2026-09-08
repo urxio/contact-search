@@ -62,7 +62,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         await client.query("ROLLBACK"); return NextResponse.json({ error: "A complete, unique instruction order is required." }, { status: 400 })
       }
       const existing = await client.query(`SELECT id FROM congregation_instructions WHERE congregation_id=$1 ORDER BY position,id FOR UPDATE`, [auth.congregation.id])
-      if (existing.rows.length !== order.length || existing.rows.some((row, index) => Number(row.id) !== order[index])) {
+      const existingIds = new Set(existing.rows.map((row) => Number(row.id)))
+      if (existing.rows.length !== order.length || order.some((id) => !id || !existingIds.has(id))) {
         await client.query("ROLLBACK"); return NextResponse.json({ error: "Instruction order is out of date." }, { status: 409 })
       }
       // Avoid a transient unique-position collision while swapping cards.
