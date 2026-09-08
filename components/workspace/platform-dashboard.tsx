@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Building2, Copy, Loader2, Plus } from "lucide-react"
+import { ArrowRight, Building2, Copy, Loader2, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CongregationMark } from "./congregation-mark"
 import { EmptyState } from "./empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type Congregation = {
   id?: number
@@ -38,6 +48,9 @@ export function PlatformDashboard() {
   const [adminEmail, setAdminEmail] = useState("")
   const [saving, setSaving] = useState(false)
   const [firstAdminLink, setFirstAdminLink] = useState("")
+  const [congregationToDelete, setCongregationToDelete] = useState<Congregation | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [deleting, setDeleting] = useState(false)
 
   function loadCongregations() {
     fetch("/api/platform/congregations", { cache: "no-store" })
@@ -91,6 +104,28 @@ export function PlatformDashboard() {
   async function copyAdminLink() {
     await navigator.clipboard.writeText(firstAdminLink)
     toast.success("First admin invitation copied")
+  }
+
+  async function deleteCongregation() {
+    if (!congregationToDelete?.id) return
+    setDeleting(true)
+    try {
+      const response = await fetch("/api/platform/congregations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: congregationToDelete.id, confirmation: deleteConfirmation }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error ?? "Congregation could not be deleted")
+      setCongregations((current) => current.filter((congregation) => congregation.id !== congregationToDelete.id))
+      setCongregationToDelete(null)
+      setDeleteConfirmation("")
+      toast.success("Congregation deleted")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Congregation could not be deleted")
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const createButton = (
@@ -161,20 +196,39 @@ export function PlatformDashboard() {
       <div className="flex justify-end">{createButton}</div>
       <div className="grid gap-4 sm:grid-cols-2">
         {congregations.map((congregation) => (
-          <Link key={congregation.slug} href={`/c/${congregation.slug}`} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            <Card className="admin-card h-full rounded-2xl group-hover:-translate-y-px">
-              <CardContent className="flex min-h-32 items-center gap-4 p-6">
+          <Card key={congregation.slug} className="admin-card relative h-full rounded-2xl">
+            <CardContent className="flex min-h-32 items-center gap-4 p-6 pr-16">
+              <Link href={`/c/${congregation.slug}`} className="group flex min-w-0 flex-1 items-center gap-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <CongregationMark name={congregation.name} className="h-12 w-12 text-base" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-base font-semibold">{congregation.name}</p>
                   <p className="mt-1 text-sm font-normal text-muted-foreground">{congregation.memberCount ?? congregation.member_count ?? 0} members</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-1" aria-hidden="true" />
-              </CardContent>
-            </Card>
-          </Link>
+              </Link>
+              <Button variant="ghost" size="icon" className="absolute right-4 top-4 text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label={`Delete ${congregation.name}`} onClick={() => { setCongregationToDelete(congregation); setDeleteConfirmation("") }}>
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </CardContent>
+          </Card>
         ))}
       </div>
+      <AlertDialog open={Boolean(congregationToDelete)} onOpenChange={(open) => { if (!open && !deleting) { setCongregationToDelete(null); setDeleteConfirmation("") } }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {congregationToDelete?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>This permanently deletes the congregation, its members, invitations, and all workspace data. Type <strong>{congregationToDelete?.slug}</strong> to confirm.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input aria-label="Congregation slug confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} placeholder={congregationToDelete?.slug} autoComplete="off" />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleting || deleteConfirmation.trim().toLowerCase() !== congregationToDelete?.slug.toLowerCase()} onClick={(event) => { event.preventDefault(); void deleteCongregation() }}>
+              {deleting && <Loader2 className="animate-spin" aria-hidden="true" />}
+              Delete congregation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

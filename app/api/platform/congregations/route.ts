@@ -57,3 +57,51 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) { return apiError(error) }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    assertMultiTenantEnabled()
+    validateMutationOrigin(req)
+    const user = await requirePlatformAdmin()
+    const body = await req.json()
+    const id = Number(body.id)
+    const confirmation = String(body.confirmation ?? "").trim().toLowerCase()
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return NextResponse.json({ error: "A valid congregation is required." }, { status: 400 })
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const congregationResult = await client.query(
+        "SELECT id, name, slug FROM congregations WHERE id = $1 FOR UPDATE",
+        [id],
+      )
+      if (!congregationResult.rowCount) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Congregation not found." }, { status: 404 })
+      }
+      const congregation = congregationResult.rows[0]
+      if (confirmation !== String(congregation.slug).toLowerCase()) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Type the congregation slug to confirm deletion." }, { status: 400 })
+      }
+
+      // The audit record intentionally survives with a null congregation_id after
+      // the cascade, while retaining the deleted congregation in its target data.
+      await client.query(
+        `INSERT INTO audit_events(actor_user_id,congregation_id,action,target_type,target_id,metadata)
+         VALUES($1,$2,'congregation.deleted','congregation',$3,$4::jsonb)`,
+        [user.id, id, String(id), JSON.stringify({ name: congregation.name, slug: congregation.slug })],
+      )
+      await client.query("DELETE FROM congregations WHERE id = $1", [id])
+      await client.query("COMMIT")
+      return NextResponse.json({ success: true })
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
+    }
+  } catch (error) { return apiError(error) }
+}
