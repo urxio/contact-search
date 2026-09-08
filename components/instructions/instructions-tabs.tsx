@@ -23,7 +23,7 @@ export function InstructionsTabs({ children, customInstructions }: Props) {
   return (
     <Tabs value={tab} onValueChange={setTab} className="max-w-6xl">
       <TabsList aria-label="Instruction categories">
-        <TabsTrigger value="general">General app instructions</TabsTrigger>
+        <TabsTrigger value="general">General intructions</TabsTrigger>
         <TabsTrigger value="custom">Congregation instructions</TabsTrigger>
       </TabsList>
       <TabsContent value="general" className="mt-6">{children}</TabsContent>
