@@ -2219,6 +2219,13 @@ export default function SearchHelper({
             }
             if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions?tab=custom&instruction=${instructionId}&revision=${instruction?.revision ?? ""}`)
           }}
+          onDismissInstruction={(instruction) => {
+            dismissInstructionNotifications([instruction])
+            if (!workspaceSlug) return
+            void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions/views`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: instruction.id, revision: instruction.revision }),
+            })
+          }}
         />
 
         {/* ── Territory / General Notes ── */}

@@ -3,7 +3,7 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send, PackageOpen } from "lucide-react"
+import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send, PackageOpen, X } from "lucide-react"
 
 interface ImportBarProps {
   isLoading: boolean
@@ -24,6 +24,7 @@ interface ImportBarProps {
   onOpenAssignedPackage?: (packageId: number) => void
   instructionNotifications?: Array<{ id: number; revision: number; title: string }>
   onOpenInstructions?: (instructionId: number) => void
+  onDismissInstruction?: (instruction: { id: number; revision: number; title: string }) => void
 }
 
 export function ImportBar({
@@ -45,6 +46,7 @@ export function ImportBar({
   onOpenAssignedPackage,
   instructionNotifications = [],
   onOpenInstructions,
+  onDismissInstruction,
 }: ImportBarProps) {
   const currentActivePackage = ownActivePackages.find((item) => item.id === currentPackageId)
   const continuablePackages = ownActivePackages.filter((item) => item.id !== currentPackageId)
@@ -165,7 +167,7 @@ export function ImportBar({
             <p className="text-sm font-semibold">{instructionNotifications.length === 1 ? "Your congregation has a new instruction" : `Your congregation has ${instructionNotifications.length} new or updated instructions`}</p>
             <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Review the latest guidance before continuing your work.</p>
           </div>
-          <div className="flex flex-wrap gap-2">{instructionNotifications.map((instruction) => <Button key={`${instruction.id}:${instruction.revision}`} type="button" size="sm" variant="outline" className="border-amber-200 bg-background text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-background/10 dark:text-amber-200" onClick={() => onOpenInstructions?.(instruction.id)}>Review {instruction.title}</Button>)}</div>
+          <div className="flex flex-wrap gap-2">{instructionNotifications.map((instruction) => <div key={`${instruction.id}:${instruction.revision}`} className="flex items-center gap-1"><Button type="button" size="sm" variant="outline" className="border-amber-200 bg-background text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-background/10 dark:text-amber-200" onClick={() => onOpenInstructions?.(instruction.id)}>Review {instruction.title}</Button><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-amber-700 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-200" aria-label={`Dismiss ${instruction.title} notification`} onClick={() => onDismissInstruction?.(instruction)}><X className="h-4 w-4" aria-hidden="true" /></Button></div>)}</div>
         </div>
       ) : null}
 
