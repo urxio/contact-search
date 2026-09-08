@@ -65,7 +65,7 @@ export default async function InstructionsPage({ params }: { params: { slug: str
         </CardContent>
       </Card>
 
-      <section className="mt-10 max-w-4xl" aria-labelledby="quick-start-heading">
+      <section className="mt-10" aria-labelledby="quick-start-heading">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <ListChecks className="h-5 w-5" aria-hidden="true" />
@@ -82,13 +82,15 @@ export default async function InstructionsPage({ params }: { params: { slug: str
             ["3", "Save your progress", "Your work is saved as you go. Return to Search and choose Continue reviewing whenever you need to pick up an in-progress Excel."],
             ["4", "Submit when finished", "When every contact is reviewed, select Submit for review. Your congregation’s administrators can then review the completed work."],
           ].map(([number, title, description]) => (
-            <li key={number} className="admin-card flex gap-4 rounded-2xl p-5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{number}</span>
-              <div>
-                <h3 className="font-semibold">{title}</h3>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-              </div>
-            </li>
+            <Card key={number} className="h-full">
+              <CardHeader className="flex-row gap-4 space-y-0">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{number}</span>
+                <div>
+                  <CardTitle className="text-base">{title}</CardTitle>
+                  <CardDescription className="mt-1 leading-6">{description}</CardDescription>
+                </div>
+              </CardHeader>
+            </Card>
           ))}
         </ol>
       </section>
