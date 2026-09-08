@@ -27,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
+  const client = await pool.connect()
   try {
     assertMultiTenantEnabled(); validateMutationOrigin(req)
     const auth = await requireCongregationAdmin(params.slug)
@@ -34,13 +35,18 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const title = validateInstructionText(body?.title, 120)
     const instructionBody = validateInstructionText(body?.body, 750000)
     if (!title || !instructionBody) return NextResponse.json({ error: "Title and instructions are required (120 and 750,000 characters maximum)." }, { status: 400 })
-    const result = await pool.query(`INSERT INTO congregation_instructions(congregation_id,title,body,position,created_by_user_id)
-      VALUES($1,$2,$3,(SELECT count(*) FROM congregation_instructions WHERE congregation_id=$1),$4)
+    await client.query("BEGIN")
+    // Reserve the first position for the new instruction without a transient unique-position collision.
+    await client.query(`UPDATE congregation_instructions SET position=position+1000000 WHERE congregation_id=$1`, [auth.congregation.id])
+    await client.query(`UPDATE congregation_instructions SET position=position-999999 WHERE congregation_id=$1`, [auth.congregation.id])
+    const result = await client.query(`INSERT INTO congregation_instructions(congregation_id,title,body,position,created_by_user_id)
+      VALUES($1,$2,$3,0,$4)
       RETURNING id,title,body,position,revision,created_at,updated_at`, [auth.congregation.id, title, instructionBody, auth.user.id])
     const instruction = serializeInstruction(result.rows[0])
+    await client.query("COMMIT")
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id, action: "congregation_instruction.created", targetType: "congregation_instruction", targetId: String(instruction.id) })
     return NextResponse.json({ instruction }, { status: 201 })
-  } catch (error) { return apiError(error) }
+  } catch (error) { await client.query("ROLLBACK").catch(() => undefined); return apiError(error) } finally { client.release() }
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {

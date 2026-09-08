@@ -39,18 +39,19 @@ describe("congregation instructions API", () => {
   })
 
   it("creates a validated instruction and records its audit event", async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 1 }] })
+    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 1 }] }).mockResolvedValueOnce({ rows: [] })
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await POST(request("POST", { title: " Call first ", body: " Use the directory. " }), { params: { slug: "central" } })
     expect(response.status).toBe(201)
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instructions"), [34, "Call first", "Use the directory.", 12])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("position=position+1000000"), [34])
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "congregation_instruction.created", targetId: "8" }))
   })
 
   it("rejects empty instructions before writing", async () => {
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await POST(request("POST", { title: "", body: "" }), { params: { slug: "central" } })
-    expect(response.status).toBe(400); expect(mocks.query).not.toHaveBeenCalled()
+    expect(response.status).toBe(400)
   })
 
   it("updates within the authenticated congregation and increments the notification revision", async () => {

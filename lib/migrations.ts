@@ -208,6 +208,14 @@ const migrations: Migration[] = [{
     )`)
     await client.query(`CREATE INDEX congregation_instruction_views_notification_idx ON congregation_instruction_views(congregation_id,user_id,instruction_id,instruction_revision)`)
   }
+},{
+  version:14,name:"newest congregation instructions first",async run(client){
+    await client.query(`UPDATE congregation_instructions SET position=position+1000000`)
+    await client.query(`WITH ordered AS (
+      SELECT id,row_number() OVER (PARTITION BY congregation_id ORDER BY created_at DESC,id DESC)::int-1 position
+      FROM congregation_instructions
+    ) UPDATE congregation_instructions ci SET position=ordered.position FROM ordered WHERE ci.id=ordered.id`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
