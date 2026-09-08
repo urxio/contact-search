@@ -225,9 +225,19 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   const [totalPages, setTotalPages] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const nameOnlyArea = !territory && apiBase.startsWith("/api/c/")
 
   const submit = async () => {
     setError("")
+    if (nameOnlyArea) {
+      const name = territoryName.trim()
+      if (!name) { setError("An area name is required."); return }
+      setSaving(true)
+      const res = await fetch(`${apiBase}/areas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+      setSaving(false)
+      if (res.ok) { onAdded(name); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to create area.") }
+      return
+    }
     const pages = parseInt(totalPages)
     if (!territoryName.trim() || !city.trim() || !zipcode.trim() || !pages || pages < 1) { setError("All fields are required."); return }
     setSaving(true)
@@ -250,18 +260,18 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
               className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             <p className="mt-2 text-xs font-normal text-muted-foreground">This becomes a tab containing its cities and ZIP codes.</p>
           </div>
-          {[["City", city, setCity, "e.g. Alexandria"], ["Zipcode", zipcode, setZipcode, "e.g. 22314"]].map(([label, val, setter, ph]) => (
+          {!nameOnlyArea ? [["City", city, setCity, "e.g. Alexandria"], ["Zipcode", zipcode, setZipcode, "e.g. 22314"]].map(([label, val, setter, ph]) => (
             <div key={label as string}>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">{label as string}</label>
               <input value={val as string} onChange={e => (setter as (v: string) => void)(e.target.value)} placeholder={ph as string}
                 className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
-          ))}
-          <div>
+          )) : null}
+          {!nameOnlyArea ? <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Total pages in A-Z</label>
             <input type="number" value={totalPages} onChange={e => setTotalPages(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="e.g. 800" min={1}
               className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-          </div>
+          </div> : null}
           {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 min-h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
@@ -636,6 +646,7 @@ export default function Home() {
   const workspaceSlug = workspace?.slug
   const embedded = Boolean(workspace)
   const [zipcodes, setZipcodes]     = useState<ZipcodeRow[]>([])
+  const [areas, setAreas]           = useState<string[]>([])
   const [loading, setLoading]       = useState(true)
   const [userName, setUserName]     = useState("")
   const [knownUsers, setKnownUsers] = useState<string[]>([])
@@ -683,10 +694,13 @@ export default function Home() {
     fetch(`${apiBase}/zipcodes`)
       .then(r => r.json())
       .then(data => {
-        setZipcodes(data)
+        const rows = Array.isArray(data) ? data : data.rows ?? []
+        const nextAreas = Array.isArray(data?.areas) ? data.areas : Array.from(new Set(rows.map((row: ZipcodeRow) => row.territory)))
+        setZipcodes(rows)
+        setAreas(nextAreas)
         setLoading(false)
-        const territoryExists = data.some((row: ZipcodeRow) => row.territory === currentTerritory)
-        const nextTerritory = territoryExists ? currentTerritory : data[0]?.territory ?? ""
+        const territoryExists = nextAreas.includes(currentTerritory)
+        const nextTerritory = territoryExists ? currentTerritory : nextAreas[0] ?? ""
         setActiveTerritory(nextTerritory)
         if (nextTerritory) sessionStorage.setItem(territoryStorageKey, nextTerritory)
         else sessionStorage.removeItem(territoryStorageKey)
@@ -710,13 +724,14 @@ export default function Home() {
   // Group: territory → city → rows
   const grouped = useMemo(() => {
     const map: Record<string, Record<string, ZipcodeRow[]>> = {}
+    for (const area of areas) map[area] = {}
     for (const z of zipcodes) {
       if (!map[z.territory]) map[z.territory] = {}
       if (!map[z.territory][z.city]) map[z.territory][z.city] = []
       map[z.territory][z.city].push(z)
     }
     return map
-  }, [zipcodes])
+  }, [areas, zipcodes])
 
   // Show welcome card for unsigned-in users (after hydration)
   const showWelcome = !workspaceSlug && hydrated && !userName
@@ -841,6 +856,12 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              {tRows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed px-6 py-12 text-center">
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">No ZIP codes in this area yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Add a ZIP code to begin tracking this area.</p>
+                </div>
+              ) : <>
               {/* Territory progress bar */}
               <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
@@ -935,6 +956,7 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+              </>}
             </div>
           )
         })()}

@@ -164,6 +164,9 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
 
   const territoryRowsByArea = useMemo(() => {
     const groups = new Map<string, TerritoryZipRow[]>()
+    if (!territorySearch.trim()) {
+      for (const area of territoryAreas) groups.set(area, [])
+    }
     for (const row of filteredTerritoryRows) {
       const area = row.area.trim() || "Unassigned"
       const rows = groups.get(area)
@@ -181,7 +184,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
         - (areaIndex.get(b.area.toLocaleLowerCase()) ?? territoryAreas.length)
       return orderDifference || a.area.localeCompare(b.area)
     })
-  }, [filteredTerritoryRows, territoryAreas])
+  }, [filteredTerritoryRows, territoryAreas, territorySearch])
 
   const mappingAreaOptions = useMemo(() => {
     const currentArea = editingTerritoryRow?.area?.trim()
@@ -862,7 +865,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
 
             {territoryRowsLoading ? (
               <div className="h-40 animate-pulse rounded-xl bg-muted" aria-label="Loading ZIP mappings" aria-busy="true" />
-            ) : filteredTerritoryRows.length ? (
+            ) : territoryRowsByArea.length ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {territoryRowsByArea.map(({ area, rows }) => (
                   <section
@@ -882,7 +885,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                       </div>
                     </div>
                     <div className="flex-1 space-y-2 overflow-y-auto p-3">
-                      {rows.map((row) => (
+                      {rows.length ? rows.map((row) => (
                         <div key={row.zipcode} className="rounded-xl border bg-background/80 p-3 shadow-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -905,7 +908,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                             )}
                           </div>
                         </div>
-                      ))}
+                      )) : <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No ZIP codes in this area yet.</div>}
                     </div>
                   </section>
                 ))}

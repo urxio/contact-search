@@ -457,9 +457,10 @@ export default function SearchHelper({
     let cancelled = false
     fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/team/zipcodes`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : [])
-      .then((rows) => {
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : data?.rows ?? []
         if (cancelled || !Array.isArray(rows)) return
-        const nextAreas: string[] = []
+        const nextAreas: string[] = Array.isArray(data?.areas) ? data.areas.map(String) : []
         const nextAreaByZipcode = new Map<string, string>()
         for (const row of rows) {
           const area = String(row?.territory ?? "").trim()

@@ -12,8 +12,8 @@ export function orderedTeamAreas(areas: string[], preferredOrder: unknown): stri
   const included = new Set<string>()
   if (Array.isArray(preferredOrder)) {
     for (const value of preferredOrder) {
-      const key = String(value ?? "").trim().toLocaleLowerCase()
-      const area = canonicalByKey.get(key)
+      const area = String(value ?? "").trim()
+      const key = area.toLocaleLowerCase()
       if (area && key !== unassignedKey && !included.has(key)) {
         ordered.push(area)
         included.add(key)

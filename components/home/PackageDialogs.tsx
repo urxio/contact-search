@@ -194,7 +194,7 @@ export function PackageDialogs({
     if (!pendingUpload && !browseOpen) return
     fetch(`/api/c/${encodeURIComponent(slug)}/team/zipcodes`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : [])
-      .then((rows) => setZipcodes(Array.isArray(rows) ? rows : rows.zipcodes ?? []))
+      .then((rows) => setZipcodes(Array.isArray(rows) ? rows : rows.rows ?? rows.zipcodes ?? []))
       .catch(() => setZipcodes([]))
   }, [browseOpen, pendingUpload, slug])
 

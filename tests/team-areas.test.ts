@@ -51,6 +51,10 @@ describe("Team Progress area ordering", () => {
     )).toEqual(["South", "North", "East", "Unassigned"])
   })
 
+  it("keeps a saved empty area in the ordered list", () => {
+    expect(orderedTeamAreas(["North"], ["South", "North"])).toEqual(["South", "North"])
+  })
+
   it("applies the saved area order to Team Progress ZIP results", async () => {
     mocks.poolQuery
       .mockResolvedValueOnce({ rows: [
@@ -63,8 +67,71 @@ describe("Team Progress area ordering", () => {
     const response = await GET(new NextRequest("https://search.example/api/c/central/team/zipcodes"), { params: { slug: "central" } })
 
     expect(response.status).toBe(200)
-    expect((await response.json()).map((row: { territory: string }) => row.territory))
+    const body = await response.json()
+    expect(body.rows.map((row: { territory: string }) => row.territory))
       .toEqual(["South", "North", "Unassigned"])
+    expect(body.areas).toEqual(["South", "North", "Unassigned"])
+  })
+})
+
+describe("Team Progress area creation", () => {
+  it("creates an empty area in the saved area order", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ settings: { teamProgressAreaOrder: ["North"] } }] })
+      .mockResolvedValueOnce({ rows: [{ territory: "North" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/team/areas/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/team/areas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({ name: "South" }),
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual({ success: true, areas: ["North", "South"] })
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "team.area.created", targetId: "South" }))
+  })
+})
+
+describe("Team Progress ZIP coverage synchronization", () => {
+  it("adds a newly created Team Progress ZIP to congregation territory coverage", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ settings: { searchTerritoryZipcodes: ["22301"] } }] })
+      .mockResolvedValueOnce({ rows: [{ id: 7, zipcode: "22302" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/team/zipcodes/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/team/zipcodes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", origin: "https://search.example", host: "search.example" },
+      body: JSON.stringify({ city: "Alexandria", zipcode: "22302", total_pages: 100, territory: "North" }),
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(201)
+    const settingsCall = mocks.clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE congregations SET settings"))
+    expect(JSON.parse(settingsCall?.[1][1])).toEqual({ searchTerritoryZipcodes: ["22301", "22302"] })
+  })
+
+  it("removes a deleted Team Progress ZIP from congregation territory coverage", async () => {
+    mocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ settings: { searchTerritoryZipcodes: ["22301", "22302"] } }] })
+      .mockResolvedValueOnce({ rows: [{ zipcode: "22302" }] })
+      .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 7, zipcode: "22302" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+    const { DELETE } = await import("@/app/api/c/[slug]/team/zipcodes/route")
+    const response = await DELETE(new NextRequest("https://search.example/api/c/central/team/zipcodes?id=7", {
+      method: "DELETE", headers: { origin: "https://search.example", host: "search.example" },
+    }), { params: { slug: "central" } })
+
+    expect(response.status).toBe(200)
+    const settingsCall = mocks.clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE congregations SET settings"))
+    expect(JSON.parse(settingsCall?.[1][1])).toEqual({ searchTerritoryZipcodes: ["22301"] })
   })
 })
 

@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       const cityDifference = String(a.city).localeCompare(String(b.city))
       return cityDifference || String(a.zipcode).localeCompare(String(b.zipcode), undefined, { numeric: true })
     })
-    return NextResponse.json(result.rows)
+    return NextResponse.json({ rows: result.rows, areas })
   } catch (error) {
     return apiError(error)
   }
@@ -59,22 +59,46 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!city || !/^\d{5}$/.test(zipcode) || !territory || !Number.isSafeInteger(totalPages) || totalPages < 1) {
       return NextResponse.json({ error: "City, a five-digit zipcode, territory, and total pages are required." }, { status: 400 })
     }
-    const result = await pool.query(
-      `INSERT INTO zt_zipcodes (congregation_id, city, zipcode, total_pages, territory)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (congregation_id, zipcode) DO NOTHING
-       RETURNING *`,
-      [auth.congregation.id, city, zipcode, totalPages, territory],
-    )
-    if (!result.rows[0]) return NextResponse.json({ error: "Zipcode already exists." }, { status: 409 })
+    const client = await pool.connect()
+    let created: any
+    try {
+      await client.query("BEGIN")
+      const congregation = await client.query(`SELECT settings FROM congregations WHERE id = $1 FOR UPDATE`, [auth.congregation.id])
+      const result = await client.query(
+        `INSERT INTO zt_zipcodes (congregation_id, city, zipcode, total_pages, territory)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (congregation_id, zipcode) DO NOTHING
+         RETURNING *`,
+        [auth.congregation.id, city, zipcode, totalPages, territory],
+      )
+      if (!result.rows[0]) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Zipcode already exists." }, { status: 409 })
+      }
+      const settings = congregation.rows[0]?.settings ?? {}
+      const coverage = new Set<string>(Array.isArray(settings.searchTerritoryZipcodes)
+        ? settings.searchTerritoryZipcodes.map(String) : [])
+      coverage.add(zipcode)
+      await client.query(
+        `UPDATE congregations SET settings = settings || $2::jsonb, updated_at = NOW() WHERE id = $1`,
+        [auth.congregation.id, JSON.stringify({ searchTerritoryZipcodes: Array.from(coverage).sort() })],
+      )
+      await client.query("COMMIT")
+      created = result.rows[0]
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
+    }
     await auditEvent({
       actorUserId: auth.user.id,
       congregationId: auth.congregation.id,
       action: "team.zipcode.created",
       targetType: "zipcode",
-      targetId: String(result.rows[0].id),
+      targetId: String(created!.id),
     })
-    return NextResponse.json(result.rows[0], { status: 201 })
+    return NextResponse.json(created, { status: 201 })
   } catch (error) {
     return apiError(error)
   }
@@ -136,24 +160,50 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     const auth = await requireCongregationAdmin(params.slug)
     const id = integer(req.nextUrl.searchParams.get("id"))
     if (!id) return NextResponse.json({ error: "Zipcode id is required." }, { status: 400 })
-    const segmentCount = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM zt_segments
-       WHERE congregation_id = $1 AND zipcode_id = $2`,
-      [auth.congregation.id, id],
-    )
-    if (Number(segmentCount.rows[0]?.count ?? 0) > 0) {
-      return NextResponse.json(
-        { error: "This ZIP code has segment history. Delete its segments or Excels before deleting the ZIP code." },
-        { status: 409 },
+    const client = await pool.connect()
+    let deleted: { id: number; zipcode: string } | undefined
+    try {
+      await client.query("BEGIN")
+      const congregation = await client.query(`SELECT settings FROM congregations WHERE id = $1 FOR UPDATE`, [auth.congregation.id])
+      const zipcodeResult = await client.query(
+        `SELECT zipcode FROM zt_zipcodes WHERE id = $1 AND congregation_id = $2 FOR UPDATE`, [id, auth.congregation.id],
       )
+      if (!zipcodeResult.rows[0]) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Zipcode not found." }, { status: 404 })
+      }
+      const segmentCount = await client.query(
+        `SELECT COUNT(*)::int AS count FROM zt_segments WHERE congregation_id = $1 AND zipcode_id = $2`,
+        [auth.congregation.id, id],
+      )
+      if (Number(segmentCount.rows[0]?.count ?? 0) > 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "This ZIP code has segment history. Delete its segments or Excels before deleting the ZIP code." },
+          { status: 409 },
+        )
+      }
+      const result = await client.query(
+        `DELETE FROM zt_zipcodes WHERE id = $1 AND congregation_id = $2 RETURNING id, zipcode`,
+        [id, auth.congregation.id],
+      )
+      const settings = congregation.rows[0]?.settings ?? {}
+      const coverage = (Array.isArray(settings.searchTerritoryZipcodes) ? settings.searchTerritoryZipcodes : [])
+        .map(String).filter((zipcode: string) => zipcode !== String(result.rows[0].zipcode))
+      await client.query(
+        `UPDATE congregations SET settings = settings || $2::jsonb, updated_at = NOW() WHERE id = $1`,
+        [auth.congregation.id, JSON.stringify({ searchTerritoryZipcodes: coverage })],
+      )
+      await client.query("COMMIT")
+      deleted = result.rows[0]
+    } catch (error) {
+      await client.query("ROLLBACK")
+      throw error
+    } finally {
+      client.release()
     }
-    const result = await pool.query(
-      `DELETE FROM zt_zipcodes WHERE id = $1 AND congregation_id = $2 RETURNING id`,
-      [id, auth.congregation.id],
-    )
-    if (!result.rows[0]) return NextResponse.json({ error: "Zipcode not found." }, { status: 404 })
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
-      action: "team.zipcode.deleted", targetType: "zipcode", targetId: String(id) })
+      action: "team.zipcode.deleted", targetType: "zipcode", targetId: String(deleted!.id) })
     return NextResponse.json({ success: true })
   } catch (error) { return apiError(error) }
 }
