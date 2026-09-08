@@ -556,7 +556,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
           <TabsTrigger value="members" className={tabClassName}>Members</TabsTrigger>
           <TabsTrigger value="invitations" className={tabClassName}>Invitations</TabsTrigger>
           <TabsTrigger value="search" className={tabClassName}>Territory ZIPs</TabsTrigger>
-          <TabsTrigger value="team" className={tabClassName}>Team Progress</TabsTrigger>
         </TabsList>
       </div>
 
@@ -1150,22 +1149,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
         </Dialog>
       </TabsContent>
 
-      <TabsContent value="team">
-        <Card className="admin-card rounded-2xl">
-          <CardHeader>
-            <div className="admin-icon-well mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-primary">
-              <MapPinned className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <CardTitle className="text-base font-semibold">Team Progress territories</CardTitle>
-            <CardDescription>Add and organize territory ZIP codes from the Team Progress workspace.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="min-h-11 rounded-xl">
-              <a href={`/c/${slug}/team`}>Open Team Progress</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </TabsContent>
     </Tabs>
   )
 }
