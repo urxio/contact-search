@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <!-- Blue rounded square background -->
   <rect width="100" height="100" rx="22" fill="#3B5BF6"/>
-  <!-- White "O" / zero centered -->
+  <!-- White "S" centered -->
   <text
     x="50"
     y="69"
@@ -11,5 +11,5 @@
     text-anchor="middle"
     fill="white"
     letter-spacing="-1"
-  >0</text>
+  >s</text>
 </svg>
