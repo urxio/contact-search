@@ -9,10 +9,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { InstructionContent } from "@/components/instructions/instruction-content"
 
 type Props = { slug: string; initialInstructions: CongregationInstruction[]; canManage: boolean }
+
+const dataImage = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i
+const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+
+function markdownToEditorHtml(content: string) {
+  return content.split(/\r?\n/).map((line) => {
+    const image = line.match(/^!\[([^\]]*)\]\(([^)]*)\)$/)
+    if (image && dataImage.test(image[2])) return `<img src="${image[2]}" alt="${escapeHtml(image[1])}" />`
+    return escapeHtml(line) || "<br />"
+  }).join("<br />")
+}
+
+function editorToMarkdown(editor: HTMLElement) {
+  const read = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent || ""
+    if (!(node instanceof HTMLElement)) return ""
+    if (node.tagName === "BR") return "\n"
+    if (node.tagName === "IMG") return dataImage.test(node.getAttribute("src") || "") ? `![${node.getAttribute("alt") || "Instruction image"}](${node.getAttribute("src")})` : ""
+    const text = Array.from(node.childNodes).map(read).join("")
+    if (["B", "STRONG"].includes(node.tagName)) return `**${text}**`
+    if (["I", "EM"].includes(node.tagName)) return `*${text}*`
+    if (node.tagName === "LI") return `- ${text}\n`
+    if (node.tagName === "A") { const href = node.getAttribute("href") || ""; return /^https:|^mailto:/.test(href) ? `[${text}](${href})` : text }
+    if (/^H[1-3]$/.test(node.tagName)) return `## ${text}\n`
+    if (["DIV", "P", "UL", "OL"].includes(node.tagName)) return `${text}\n`
+    return text
+  }
+  return Array.from(editor.childNodes).map(read).join("").replace(/\n{3,}/g, "\n\n").trim()
+}
 
 export function CustomInstructions({ slug, initialInstructions, canManage }: Props) {
   const [instructions, setInstructions] = useState(initialInstructions)
@@ -20,7 +48,7 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
   const [busy, setBusy] = useState(false)
-  const editorRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   const endpoint = `/api/c/${encodeURIComponent(slug)}/instructions`
@@ -34,16 +62,9 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
   function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0 }); setTitle(""); setBody("") }
   function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body) }
 
-  function insert(before: string, after = before, placeholder = "text") {
-    const editor = editorRef.current
-    if (!editor) return
-    const start = editor.selectionStart
-    const end = editor.selectionEnd
-    const selected = body.slice(start, end) || placeholder
-    const next = `${body.slice(0, start)}${before}${selected}${after}${body.slice(end)}`
-    setBody(next)
-    requestAnimationFrame(() => { editor.focus(); editor.setSelectionRange(start + before.length, start + before.length + selected.length) })
-  }
+  useEffect(() => { if (editing && editorRef.current) editorRef.current.innerHTML = markdownToEditorHtml(editing.body) }, [editing])
+
+  function format(command: string, value?: string) { editorRef.current?.focus(); document.execCommand(command, false, value); if (editorRef.current) setBody(editorToMarkdown(editorRef.current)) }
 
   async function addImage(file: File) {
     if (!/image\/(png|jpeg|webp)/.test(file.type)) { toast.error("Choose a PNG, JPEG, or WebP image."); return }
@@ -67,7 +88,9 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
       for (let quality = 0.72; compressed.length > 500_000 && quality >= 0.42; quality -= 0.1) compressed = canvas.toDataURL("image/webp", quality)
       if (compressed.length > 500_000) throw new Error("This image is still too large after compression. Please choose a smaller image.")
       const alt = file.name.replace(/\.[^.]+$/, "").replace(/[\[\]()]/g, "").slice(0, 100) || "Instruction image"
-      insert(`![${alt}](`, ")", compressed)
+      editorRef.current?.focus()
+      document.execCommand("insertImage", false, compressed)
+      if (editorRef.current) setBody(editorToMarkdown(editorRef.current))
       toast.success("Image added. Save the instruction to publish it.")
     } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to add image") }
   }
@@ -78,7 +101,7 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
     if (file) void addImage(file)
   }
 
-  function pasteImage(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+  function pasteImage(event: React.ClipboardEvent<HTMLDivElement>) {
     const item = [...event.clipboardData.items].find((candidate) => /image\/(png|jpeg|webp)/.test(candidate.type))
     const file = item?.getAsFile()
     if (!file) return
@@ -126,7 +149,7 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
         {canManage ? <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" />Add instruction</Button> : null}
       </div>
       {instructions.length ? <div className="mt-5 space-y-4">{instructions.map((instruction, index) => <Card key={instruction.id} id={`instruction-${instruction.id}`} className={index === 0 ? "ring-1 ring-blue-400/50 shadow-[0_0_24px_rgba(59,130,246,0.16)]" : undefined}><CardHeader className="gap-2"><div className="flex items-start justify-between gap-3"><CardTitle className="text-base">{instruction.title}</CardTitle>{canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Move ${instruction.title} up`} variant="ghost" size="icon" disabled={index === 0 || busy} onClick={() => void reorder([...instructions.slice(0, index - 1), instruction, instructions[index - 1], ...instructions.slice(index + 1)])}><ArrowUp className="h-4 w-4" /></Button><Button aria-label={`Move ${instruction.title} down`} variant="ghost" size="icon" disabled={index === instructions.length - 1 || busy} onClick={() => void reorder([...instructions.slice(0, index), instructions[index + 1], instruction, ...instructions.slice(index + 2)])}><ArrowDown className="h-4 w-4" /></Button><Button aria-label={`Edit ${instruction.title}`} variant="ghost" size="icon" disabled={busy} onClick={() => openEdit(instruction)}><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${instruction.title}`} variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={busy} onClick={() => void remove(instruction)}><Trash2 className="h-4 w-4" /></Button></div> : null}</div><InstructionContent content={instruction.body} className="text-sm leading-6 text-muted-foreground" /></CardHeader></Card>)}</div> : <Card className="mt-5"><CardContent className="py-6 text-sm text-muted-foreground">{canManage ? "Add congregation-specific instructions for members here." : "There are no additional congregation instructions right now."}</CardContent></Card>}
-      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Format text, paste an image, or upload one from your device. Members will be notified when this is published or updated.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><div className="flex flex-wrap gap-1 rounded-t-md border border-b-0 bg-muted/40 p-1"><Button type="button" variant="ghost" size="sm" aria-label="Bold" onClick={() => insert("**")}><Bold className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Italic" onClick={() => insert("*")}><Italic className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Heading" onClick={() => insert("## ", "", "Heading")}><Heading2 className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Bulleted list" onClick={() => insert("- ", "", "List item")}><List className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Link" onClick={() => insert("[", "](https://)", "Link text")}><Link className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Upload image from device" onClick={() => imageInputRef.current?.click()}><ImagePlus className="h-4 w-4" /><span className="ml-1">Upload</span></Button><Input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadImage} /></div><Textarea ref={editorRef} id="instruction-body" value={body} maxLength={750000} rows={8} className="rounded-t-none" onChange={(event) => setBody(event.target.value)} onPaste={pasteImage} /><p className="text-xs text-muted-foreground">Paste a PNG, JPEG, or WebP image directly into the editor.</p><div className="rounded-md border bg-muted/20 p-3"><p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>{body.trim() ? <InstructionContent content={body} className="text-sm leading-6" /> : <p className="text-sm text-muted-foreground">Your formatted instruction will appear here.</p>}</div></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Format text, paste an image, or upload one from your device. Members will be notified when this is published or updated.</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><div className="flex flex-wrap gap-1 rounded-t-md border border-b-0 bg-muted/40 p-1"><Button type="button" variant="ghost" size="sm" aria-label="Bold" onClick={() => format("bold")}><Bold className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Italic" onClick={() => format("italic")}><Italic className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Heading" onClick={() => format("formatBlock", "h2")}><Heading2 className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Bulleted list" onClick={() => format("insertUnorderedList")}><List className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Link" onClick={() => { const url = window.prompt("Paste an HTTPS URL")?.trim(); if (url?.startsWith("https://")) format("createLink", url) }}><Link className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Upload image from device" onClick={() => imageInputRef.current?.click()}><ImagePlus className="h-4 w-4" /><span className="ml-1">Upload</span></Button><Input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadImage} /></div><div ref={editorRef} id="instruction-body" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" className="min-h-48 rounded-b-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring" onInput={(event) => setBody(editorToMarkdown(event.currentTarget))} onPaste={pasteImage} /><p className="text-xs text-muted-foreground">Paste a PNG, JPEG, or WebP image directly into the editor.</p><div className="rounded-md border bg-muted/20 p-3"><p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>{body.trim() ? <InstructionContent content={body} className="text-sm leading-6" /> : <p className="text-sm text-muted-foreground">Your formatted instruction will appear here.</p>}</div></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim() || body.length > 750000} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
     </section>
   )
 }
