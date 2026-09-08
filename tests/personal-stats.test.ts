@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { activityStreak, uncoveredPageRanges, validTimeZone } from "@/lib/personal-stats"
+import { activityStreak, localDateForTimeZone, statsPeriodRange, uncoveredPageRanges, validStatsDate, validStatsPeriod, validTimeZone } from "@/lib/personal-stats"
 import { SEARCH_ACTIVITY_IDLE_MS, searchActivityBucketStart, searchActivityQualifies } from "@/lib/search-activity"
 
 describe("personal stats uncovered ranges", () => {
@@ -26,7 +26,7 @@ describe("personal stats uncovered ranges", () => {
 describe("personal stats activity rules", () => {
   afterEach(() => vi.useRealTimers())
 
-  it("pauses after two minutes of inactivity", () => {
+  it("pauses after five minutes of inactivity", () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-08-21T12:00:00Z"))
     const lastInteractionAt = Date.now()
@@ -59,5 +59,19 @@ describe("personal stats calendar helpers", () => {
   it("falls back to UTC for invalid timezones", () => {
     expect(validTimeZone("America/New_York")).toBe("America/New_York")
     expect(validTimeZone("Not/A_Timezone")).toBe("UTC")
+  })
+
+  it("normalizes reporting periods to local calendar boundaries", () => {
+    expect(validStatsPeriod("week")).toBe("week")
+    expect(validStatsPeriod("year")).toBe("month")
+    expect(validStatsDate("2026-02-29")).toBeNull()
+    expect(validStatsDate("2026-02-28")).toBe("2026-02-28")
+    expect(statsPeriodRange("day", "2026-08-21")).toEqual({ startDate: "2026-08-21", endDate: "2026-08-22" })
+    expect(statsPeriodRange("week", "2026-08-21")).toEqual({ startDate: "2026-08-16", endDate: "2026-08-23" })
+    expect(statsPeriodRange("month", "2026-08-21")).toEqual({ startDate: "2026-08-01", endDate: "2026-09-01" })
+  })
+
+  it("formats the current date in the requested timezone", () => {
+    expect(localDateForTimeZone("America/New_York", new Date("2026-08-21T02:00:00Z"))).toBe("2026-08-20")
   })
 })

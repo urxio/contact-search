@@ -1,5 +1,5 @@
 export const SEARCH_ACTIVITY_BUCKET_MS = 30_000
-export const SEARCH_ACTIVITY_IDLE_MS = 2 * 60_000
+export const SEARCH_ACTIVITY_IDLE_MS = 5 * 60_000
 
 export function searchActivityQualifies(input: {
   visibilityState: DocumentVisibilityState

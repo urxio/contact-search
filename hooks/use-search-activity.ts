@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { SEARCH_ACTIVITY_BUCKET_MS, SEARCH_ACTIVITY_IDLE_MS, searchActivityBucketStart, searchActivityQualifies } from "@/lib/search-activity"
+import { SEARCH_ACTIVITY_BUCKET_MS, SEARCH_ACTIVITY_IDLE_MS, searchActivityBucketStart } from "@/lib/search-activity"
 
 const SAMPLE_MS = 5_000
 
@@ -14,12 +14,9 @@ export function useSearchActivity(slug?: string) {
     const buckets = new Map<number, PendingBucket>()
     let lastInteraction = Date.now()
     let lastSample = Date.now()
-    let wasActive = false
     let disposed = false
 
     const markInteraction = () => { lastInteraction = Date.now() }
-    const isActive = () => searchActivityQualifies({ visibilityState: document.visibilityState, focused: document.hasFocus(), lastInteractionAt: lastInteraction })
-
     function sendBucket(bucketStartedAt: number, bucket: PendingBucket) {
       if (bucket.seconds <= bucket.sentSeconds) return
       const activeSeconds = Math.min(30, Math.max(1, Math.round(bucket.seconds)))
@@ -42,25 +39,31 @@ export function useSearchActivity(slug?: string) {
       }
     }
 
+    function addElapsed(startedAt: number, endedAt: number) {
+      let cursor = startedAt
+      while (cursor < endedAt) {
+        const bucketStartedAt = searchActivityBucketStart(cursor)
+        const bucketEndsAt = bucketStartedAt + SEARCH_ACTIVITY_BUCKET_MS
+        const seconds = Math.min(endedAt, bucketEndsAt) - cursor
+        const bucket = buckets.get(bucketStartedAt) ?? { seconds: 0, sentSeconds: 0 }
+        bucket.seconds = Math.min(30, bucket.seconds + seconds / 1000)
+        buckets.set(bucketStartedAt, bucket)
+        cursor += seconds
+      }
+    }
+
     function sample() {
       const now = Date.now()
-      const active = isActive()
-      if (active && wasActive) {
-        const elapsed = Math.min(SAMPLE_MS / 1000, Math.max(0, (now - lastSample) / 1000))
-        const midpoint = now - elapsed * 500
-        const bucketStartedAt = searchActivityBucketStart(midpoint)
-        const bucket = buckets.get(bucketStartedAt) ?? { seconds: 0, sentSeconds: 0 }
-        bucket.seconds = Math.min(30, bucket.seconds + elapsed)
-        buckets.set(bucketStartedAt, bucket)
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        const eligibleUntil = lastInteraction + SEARCH_ACTIVITY_IDLE_MS
+        addElapsed(lastSample, Math.max(lastSample, Math.min(now, eligibleUntil)))
       }
-      wasActive = active
       lastSample = now
       flush(false)
     }
 
     function pauseAndFlush() {
       sample()
-      wasActive = false
       flush(true)
     }
 

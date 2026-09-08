@@ -1,5 +1,41 @@
 export type CoveredRange = { pageStart: number; pageEnd: number | null }
 export type PageRange = { pageStart: number; pageEnd: number }
+export type StatsPeriod = "day" | "week" | "month"
+
+const datePattern = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+
+export function validStatsPeriod(value: string | null): StatsPeriod {
+  return value === "day" || value === "week" || value === "month" ? value : "month"
+}
+
+export function validStatsDate(value: string | null) {
+  if (!value || !datePattern.test(value)) return null
+  const date = new Date(`${value}T12:00:00Z`)
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : value
+}
+
+export function statsPeriodRange(period: StatsPeriod, anchor: string) {
+  const start = new Date(`${anchor}T00:00:00Z`)
+  const end = new Date(start)
+  if (period === "day") end.setUTCDate(end.getUTCDate() + 1)
+  if (period === "week") {
+    start.setUTCDate(start.getUTCDate() - start.getUTCDay())
+    end.setTime(start.getTime())
+    end.setUTCDate(end.getUTCDate() + 7)
+  }
+  if (period === "month") {
+    start.setUTCDate(1)
+    end.setTime(start.getTime())
+    end.setUTCMonth(end.getUTCMonth() + 1)
+  }
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }
+}
+
+export function localDateForTimeZone(timeZone: string, now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now)
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || ""
+  return `${value("year")}-${value("month")}-${value("day")}`
+}
 
 export function uncoveredPageRanges(totalPages: number, ranges: CoveredRange[]): PageRange[] {
   if (!Number.isSafeInteger(totalPages) || totalPages < 1) return []
