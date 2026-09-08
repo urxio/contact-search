@@ -15,8 +15,8 @@ let DICT: Set<string> | null = null
 let dictionaryLoadedAt = 0
 const DICTIONARY_CACHE_MS = 60_000
 
-export async function loadDictionaryIfNeeded(): Promise<void> {
-  if (DICT && Date.now() - dictionaryLoadedAt < DICTIONARY_CACHE_MS) return
+export async function loadDictionaryIfNeeded(forceRefresh = false): Promise<void> {
+  if (!forceRefresh && DICT && Date.now() - dictionaryLoadedAt < DICTIONARY_CACHE_MS) return
   try {
     const resp = await fetch("/api/dictionary", { cache: "no-store" })
     if (!resp.ok) throw new Error(`Dictionary request failed (${resp.status})`)

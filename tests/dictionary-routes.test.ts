@@ -111,4 +111,18 @@ describe("dictionary mutation routes", () => {
     expect(mocks.applyDictionaryChanges).toHaveBeenCalledWith("remove", ["dupont"], 99)
     expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "dictionary.remove" }))
   })
+
+  it("accepts a platform-owner batch and audits only the newly applied surnames", async () => {
+    mocks.applyDictionaryChanges.mockResolvedValue(["martin"])
+    const { POST } = await import("@/app/api/platform/dictionary/route")
+    const response = await POST(request({ action: "add", names: ["Martin", "Dupont", "Martin"] }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ success: true, applied: ["martin"] })
+    expect(mocks.applyDictionaryChanges).toHaveBeenCalledWith("add", ["martin", "dupont"], 99)
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: "dictionary.add",
+      metadata: { names: ["martin"] },
+    }))
+  })
 })

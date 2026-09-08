@@ -712,7 +712,7 @@ export default function SearchHelper({
         // Run French name detection automatically after import (non-blocking)
         if (!workspaceSlug) setTimeout(() => {
           try {
-            ; (detectFrenchNames as any)?.(false, deduped)
+            ; (detectFrenchNames as any)?.(false, deduped, true)
           } catch (e) {
             console.warn("detectFrenchNames not available yet", e)
           }
@@ -759,7 +759,7 @@ export default function SearchHelper({
     }
     void refreshActivePackages()
     if (!draft.resumed) setTimeout(() => {
-      try { ;(detectFrenchNames as any)?.(false, nextContacts) } catch (error) { console.warn("Unable to detect names", error) }
+      try { ;(detectFrenchNames as any)?.(false, nextContacts, true) } catch (error) { console.warn("Unable to detect names", error) }
     }, 50)
   }, [refreshActivePackages])
 
@@ -1213,7 +1213,7 @@ export default function SearchHelper({
 
   // Automated detection of French-looking names using utils/french-name-detection
   const detectFrenchNames = useCallback(
-    async (onlySelected = false, contactsToCheck?: EnhancedContact[]) => {
+    async (onlySelected = false, contactsToCheck?: EnhancedContact[], forceRefresh = false) => {
       const sourceContacts = contactsToCheck ?? contacts
 
       if (!sourceContacts || sourceContacts.length === 0) {
@@ -1222,7 +1222,7 @@ export default function SearchHelper({
       }
 
       setIsDetecting(true)
-      await loadDictionaryIfNeeded()
+      await loadDictionaryIfNeeded(forceRefresh)
 
       const targetIds = onlySelected && selectedContacts.length > 0 ? new Set(selectedContacts) : null
 

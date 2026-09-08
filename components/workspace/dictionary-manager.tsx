@@ -8,11 +8,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+
+function pastedSurnames(value: string) {
+  return value.split(/[\n\r\t,;]+/).map((name) => name.trim()).filter(Boolean)
+}
 
 export function DictionaryManager() {
   const [names, setNames] = useState<string[]>([])
   const [query, setQuery] = useState("")
-  const [newName, setNewName] = useState("")
+  const [newNames, setNewNames] = useState("")
+  const [lastImportSummary, setLastImportSummary] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -31,18 +37,27 @@ export function DictionaryManager() {
     [names, query],
   )
 
-  async function mutate(action: "add" | "remove", name: string) {
+  async function mutate(action: "add" | "remove", submittedNames: string[]) {
     setSaving(true)
     try {
       const response = await fetch("/api/platform/dictionary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, name }),
+        body: JSON.stringify({ action, names: submittedNames }),
       })
       if (!response.ok) throw new Error("The shared dictionary could not be updated")
-      setNewName("")
+      const result = await response.json()
+      const applied = Array.isArray(result?.applied) ? result.applied : []
+      if (action === "add") {
+        const skipped = Math.max(0, submittedNames.length - applied.length)
+        setNewNames("")
+        setLastImportSummary(skipped
+          ? `${applied.length} added; ${skipped} skipped because it was invalid or already present.`
+          : `${applied.length} surname${applied.length === 1 ? "" : "s"} added.`)
+        toast.success(skipped ? `${applied.length} surnames added; ${skipped} skipped` : `${applied.length} surnames added`)
+      }
       load()
-      toast.success(action === "add" ? "Surname added" : "Surname removed")
+      if (action === "remove") toast.success("Surname removed")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The shared dictionary could not be updated")
     } finally {
@@ -52,8 +67,8 @@ export function DictionaryManager() {
 
   function addName(event: FormEvent) {
     event.preventDefault()
-    const value = newName.trim()
-    if (value) void mutate("add", value)
+    const values = pastedSurnames(newNames)
+    if (values.length) void mutate("add", values)
   }
 
   return (
@@ -63,19 +78,21 @@ export function DictionaryManager() {
           <div className="admin-icon-well mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-primary">
             <Database className="h-5 w-5" aria-hidden="true" />
           </div>
-          <CardTitle className="text-base font-semibold">Add surname</CardTitle>
-          <CardDescription>Changes apply to all congregations. Local admins can dismiss suggestions without changing this list.</CardDescription>
+          <CardTitle className="text-base font-semibold">Import surnames</CardTitle>
+          <CardDescription>Paste one or more surnames from Excel or text. Changes apply to all congregations.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={addName} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="dictionary-name">Surname</Label>
-              <Input id="dictionary-name" value={newName} onChange={(event) => setNewName(event.target.value)} className="h-11 rounded-xl" autoComplete="off" />
+              <Label htmlFor="dictionary-names">Surnames</Label>
+              <Textarea id="dictionary-names" value={newNames} onChange={(event) => setNewNames(event.target.value)} className="min-h-32 rounded-xl" autoComplete="off" placeholder={"Dupont\nMartin\nSaint Pierre"} />
+              <p className="text-xs text-muted-foreground">One per row is easiest; tabs, commas, and semicolons also work.</p>
             </div>
-            <Button type="submit" disabled={saving || !newName.trim()} className="admin-primary-button min-h-11 w-full rounded-xl">
+            <Button type="submit" disabled={saving || pastedSurnames(newNames).length === 0} className="admin-primary-button min-h-11 w-full rounded-xl">
               {saving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
-              Add to dictionary
+              Import into dictionary
             </Button>
+            {lastImportSummary && <p className="text-sm text-muted-foreground" role="status">{lastImportSummary}</p>}
           </form>
         </CardContent>
       </Card>
@@ -97,7 +114,7 @@ export function DictionaryManager() {
               {filteredNames.map((name) => (
                 <li key={name} className="flex min-h-12 items-center justify-between gap-3 px-4">
                   <span className="truncate text-sm font-normal">{name}</span>
-                  <Button type="button" variant="ghost" size="icon" disabled={saving} onClick={() => mutate("remove", name)} className="h-11 w-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive" aria-label={`Remove ${name} from dictionary`}>
+                  <Button type="button" variant="ghost" size="icon" disabled={saving} onClick={() => mutate("remove", [name])} className="h-11 w-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive" aria-label={`Remove ${name} from dictionary`}>
                     <Trash2 aria-hidden="true" />
                   </Button>
                 </li>

@@ -47,4 +47,21 @@ describe("browser dictionary loading", () => {
 
     expect(dictionary.isPotentiallyFrench("Jean Dupont")).toBe(true)
   })
+
+  it("can force a fresh dictionary fetch for a new Excel import", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-22T12:00:00Z"))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ lines: ["dupont"] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ lines: ["martin"] }), { status: 200 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const dictionary = await import("@/utils/french-name-detection")
+    await dictionary.loadDictionaryIfNeeded()
+    await dictionary.loadDictionaryIfNeeded(true)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(dictionary.isPotentiallyFrench("Jean Martin")).toBe(true)
+    expect(dictionary.isPotentiallyFrench("Jean Dupont")).toBe(false)
+  })
 })
