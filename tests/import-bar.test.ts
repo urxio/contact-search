@@ -51,6 +51,15 @@ describe("ImportBar Excel progress notification", () => {
   it("shows a congregation instruction alert with a review action", () => {
     const markup = text(renderBar({ instructionNotifications: [{ id: 7, revision: 2, title: "New calling guidance" }] }))
     expect(markup).toContain("Your congregation has a new instruction")
-    expect(markup).toContain("Review instructions")
+    expect(markup).toContain("Review New calling guidance")
+  })
+
+  it("provides a direct review action for every new instruction", () => {
+    const markup = text(renderBar({ instructionNotifications: [
+      { id: 7, revision: 2, title: "Calling guidance" },
+      { id: 8, revision: 1, title: "Territory notes" },
+    ] }))
+    expect(markup).toContain("Review Calling guidance")
+    expect(markup).toContain("Review Territory notes")
   })
 })

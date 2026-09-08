@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageFrame } from "@/components/workspace/page-frame"
 import { CustomInstructions } from "@/components/instructions/custom-instructions"
+import { InstructionsTabs } from "@/components/instructions/instructions-tabs"
 
 const presentationUrl =
   "https://docs.google.com/presentation/d/1ycSduWrylr_MVjJFY58KAG2TLTpiN7vR_4G7Jdrugww/edit?usp=sharing"
@@ -43,6 +44,7 @@ export default async function InstructionsPage({ params }: { params: { slug: str
       description="Everything a congregation member needs to use Name Search, from opening an Excel to tracking progress."
       className="max-w-6xl"
     >
+      <InstructionsTabs customInstructions={<CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={access.user.isPlatformAdmin || access.membership?.role === "admin"} />}>
       <Card className="max-w-3xl">
         <CardHeader>
           <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -125,7 +127,7 @@ export default async function InstructionsPage({ params }: { params: { slug: str
           <li><strong className="text-foreground">Need a refresher?</strong> This page is always available from your profile menu under Instructions.</li>
         </ul>
       </section>
-      <CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={access.user.isPlatformAdmin || access.membership?.role === "admin"} />
+      </InstructionsTabs>
     </PageFrame>
   )
 }

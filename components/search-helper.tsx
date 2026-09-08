@@ -2207,10 +2207,10 @@ export default function SearchHelper({
             setPackageBrowserOpen(true)
           }}
           instructionNotifications={instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))}
-          onOpenInstructions={() => {
-            const visible = instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))
-            dismissInstructionNotifications(visible)
-            if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions`)
+          onOpenInstructions={(instructionId) => {
+            const instruction = instructionNotifications.find((item) => item.id === instructionId && !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))
+            if (instruction) dismissInstructionNotifications([instruction])
+            if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions?tab=custom&instruction=${instructionId}`)
           }}
         />
 
