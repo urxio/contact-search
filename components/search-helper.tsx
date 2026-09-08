@@ -134,6 +134,8 @@ export default function SearchHelper({
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
   const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; state: "assigned" | "in_progress"; isMine: boolean }>>([])
   const [dismissedPackageNotifications, setDismissedPackageNotifications] = useState<Set<number>>(new Set())
+  const [instructionNotifications, setInstructionNotifications] = useState<Array<{ id: number; revision: number; title: string }>>([])
+  const [dismissedInstructionNotifications, setDismissedInstructionNotifications] = useState<Set<string>>(new Set())
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
   const [territoryZipcode, setTerritoryZipcode] = useState("")
@@ -208,6 +210,9 @@ export default function SearchHelper({
   const packageNotificationStorageKey = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}:dismissed-package-notifications`
     : null
+  const instructionNotificationStorageKey = workspaceSlug
+    ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}:dismissed-instruction-notifications`
+    : null
 
   useEffect(() => {
     if (!packageNotificationStorageKey) return
@@ -219,6 +224,14 @@ export default function SearchHelper({
     }
   }, [packageNotificationStorageKey])
 
+  useEffect(() => {
+    if (!instructionNotificationStorageKey) return
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(instructionNotificationStorageKey) ?? "[]")
+      setDismissedInstructionNotifications(new Set(Array.isArray(stored) ? stored.filter((value) => typeof value === "string") : []))
+    } catch { setDismissedInstructionNotifications(new Set()) }
+  }, [instructionNotificationStorageKey])
+
   const dismissPackageNotification = useCallback((packageId: number) => {
     setDismissedPackageNotifications((current) => {
       const next = new Set(current).add(packageId)
@@ -226,6 +239,15 @@ export default function SearchHelper({
       return next
     })
   }, [packageNotificationStorageKey])
+
+  const dismissInstructionNotifications = useCallback((items: Array<{ id: number; revision: number }>) => {
+    setDismissedInstructionNotifications((current) => {
+      const next = new Set(current)
+      items.forEach((item) => next.add(`${item.id}:${item.revision}`))
+      if (instructionNotificationStorageKey) sessionStorage.setItem(instructionNotificationStorageKey, JSON.stringify([...next]))
+      return next
+    })
+  }, [instructionNotificationStorageKey])
 
   const refreshActivePackages = useCallback(async () => {
     if (!workspaceSlug) return
@@ -239,6 +261,13 @@ export default function SearchHelper({
   }, [workspaceSlug])
 
   useEffect(() => { void refreshActivePackages() }, [refreshActivePackages])
+  useEffect(() => {
+    if (!workspaceSlug) return
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions`, { cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() : { instructions: [] })
+      .then((result) => setInstructionNotifications(Array.isArray(result.instructions) ? result.instructions : []))
+      .catch(() => setInstructionNotifications([]))
+  }, [workspaceSlug])
   const storagePrefix = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
@@ -2176,6 +2205,12 @@ export default function SearchHelper({
             if (packageToOpen?.state === "assigned") dismissPackageNotification(packageId)
             setPreferredPackageId(packageId)
             setPackageBrowserOpen(true)
+          }}
+          instructionNotifications={instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))}
+          onOpenInstructions={() => {
+            const visible = instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))
+            dismissInstructionNotifications(visible)
+            if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions`)
           }}
         />
 

@@ -14,22 +14,27 @@ import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { AuthError, requireMembership } from "@/lib/auth"
+import { pool } from "@/lib/db"
+import { serializeInstruction } from "@/lib/congregation-instructions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageFrame } from "@/components/workspace/page-frame"
+import { CustomInstructions } from "@/components/instructions/custom-instructions"
 
 const presentationUrl =
   "https://docs.google.com/presentation/d/1ycSduWrylr_MVjJFY58KAG2TLTpiN7vR_4G7Jdrugww/edit?usp=sharing"
 
 export default async function InstructionsPage({ params }: { params: { slug: string } }) {
+  let access
   try {
-    await requireMembership(params.slug)
+    access = await requireMembership(params.slug)
   } catch (error) {
     if (error instanceof AuthError && error.status === 401) {
       redirect(`/auth/sign-in?next=/c/${encodeURIComponent(params.slug)}/instructions`)
     }
     notFound()
   }
+  const result = await pool.query(`SELECT id,title,body,position,revision,created_at,updated_at FROM congregation_instructions WHERE congregation_id=$1 ORDER BY position,id`, [access.congregation.id])
 
   return (
     <PageFrame
@@ -120,6 +125,7 @@ export default async function InstructionsPage({ params }: { params: { slug: str
           <li><strong className="text-foreground">Need a refresher?</strong> This page is always available from your profile menu under Instructions.</li>
         </ul>
       </section>
+      <CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={access.user.isPlatformAdmin || access.membership?.role === "admin"} />
     </PageFrame>
   )
 }

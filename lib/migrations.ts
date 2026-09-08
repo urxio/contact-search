@@ -175,6 +175,22 @@ const migrations: Migration[] = [{
       'contacts',d.contacts,'globalNotes',d.global_notes,'lastVerifiedId',d.last_verified_contact_id)
       FROM contact_drafts d WHERE d.package_id=cp.id AND d.congregation_id=cp.congregation_id`)
   }
+},{
+  version:11,name:"congregation custom instructions",async run(client){
+    await client.query(`CREATE TABLE congregation_instructions (
+      id BIGSERIAL PRIMARY KEY,
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 120),
+      body TEXT NOT NULL CHECK(length(trim(body)) BETWEEN 1 AND 5000),
+      position INT NOT NULL CHECK(position >= 0),
+      revision INT NOT NULL DEFAULT 1 CHECK(revision > 0),
+      created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(congregation_id, position)
+    )`)
+    await client.query(`CREATE INDEX congregation_instructions_tenant_position_idx ON congregation_instructions(congregation_id,position,id)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

@@ -22,6 +22,8 @@ interface ImportBarProps {
   assignedPackages?: Array<{ id: number; name: string }>
   currentPackageId?: number | null
   onOpenAssignedPackage?: (packageId: number) => void
+  instructionNotifications?: Array<{ id: number; revision: number; title: string }>
+  onOpenInstructions?: () => void
 }
 
 export function ImportBar({
@@ -41,6 +43,8 @@ export function ImportBar({
   assignedPackages = [],
   currentPackageId = null,
   onOpenAssignedPackage,
+  instructionNotifications = [],
+  onOpenInstructions,
 }: ImportBarProps) {
   const currentActivePackage = ownActivePackages.find((item) => item.id === currentPackageId)
   const continuablePackages = ownActivePackages.filter((item) => item.id !== currentPackageId)
@@ -151,6 +155,17 @@ export function ImportBar({
               </Button>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {instructionNotifications.length > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-amber-100 bg-amber-50/70 px-5 py-3 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center">
+          <AlertCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300 sm:mt-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{instructionNotifications.length === 1 ? "Your congregation has a new instruction" : `Your congregation has ${instructionNotifications.length} new or updated instructions`}</p>
+            <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Review the latest guidance before continuing your work.</p>
+          </div>
+          <Button type="button" size="sm" variant="outline" className="border-amber-200 bg-background text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-background/10 dark:text-amber-200" onClick={onOpenInstructions}>Review instructions</Button>
         </div>
       ) : null}
 

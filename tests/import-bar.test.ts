@@ -47,4 +47,10 @@ describe("ImportBar Excel progress notification", () => {
     expect(markup).toContain("Open Assigned Excel")
     expect(markup).not.toContain("Your Excel is in progress")
   })
+
+  it("shows a congregation instruction alert with a review action", () => {
+    const markup = text(renderBar({ instructionNotifications: [{ id: 7, revision: 2, title: "New calling guidance" }] }))
+    expect(markup).toContain("Your congregation has a new instruction")
+    expect(markup).toContain("Review instructions")
+  })
 })
