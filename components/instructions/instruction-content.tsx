@@ -3,6 +3,7 @@ import { Fragment } from "react"
 type Props = { content: string; className?: string }
 
 function safeUrl(value: string, image = false) {
+  if (image && /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value)) return value
   try {
     const url = new URL(value)
     return url.protocol === "https:" || (!image && url.protocol === "mailto:") ? url.toString() : null

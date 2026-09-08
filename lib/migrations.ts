@@ -191,6 +191,11 @@ const migrations: Migration[] = [{
     )`)
     await client.query(`CREATE INDEX congregation_instructions_tenant_position_idx ON congregation_instructions(congregation_id,position,id)`)
   }
+},{
+  version:12,name:"instruction image uploads",async run(client){
+    await client.query(`ALTER TABLE congregation_instructions DROP CONSTRAINT IF EXISTS congregation_instructions_body_check`)
+    await client.query(`ALTER TABLE congregation_instructions ADD CONSTRAINT congregation_instructions_body_check CHECK(length(trim(body)) BETWEEN 1 AND 750000)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

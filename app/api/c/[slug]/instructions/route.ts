@@ -22,8 +22,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const auth = await requireCongregationAdmin(params.slug)
     const body = await req.json()
     const title = validateInstructionText(body?.title, 120)
-    const instructionBody = validateInstructionText(body?.body, 5000)
-    if (!title || !instructionBody) return NextResponse.json({ error: "Title and instructions are required (120 and 5,000 characters maximum)." }, { status: 400 })
+    const instructionBody = validateInstructionText(body?.body, 750000)
+    if (!title || !instructionBody) return NextResponse.json({ error: "Title and instructions are required (120 and 750,000 characters maximum)." }, { status: 400 })
     const result = await pool.query(`INSERT INTO congregation_instructions(congregation_id,title,body,position,created_by_user_id)
       VALUES($1,$2,$3,(SELECT count(*) FROM congregation_instructions WHERE congregation_id=$1),$4)
       RETURNING id,title,body,position,revision,created_at,updated_at`, [auth.congregation.id, title, instructionBody, auth.user.id])
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     }
     const id = integer(body?.id)
     const title = validateInstructionText(body?.title, 120)
-    const instructionBody = validateInstructionText(body?.body, 5000)
+    const instructionBody = validateInstructionText(body?.body, 750000)
     if (!id || !title || !instructionBody) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Instruction ID, title, and instructions are required." }, { status: 400 }) }
     const result = await client.query(`UPDATE congregation_instructions SET title=$1,body=$2,revision=revision+1,updated_at=NOW()
       WHERE id=$3 AND congregation_id=$4 RETURNING id,title,body,position,revision,created_at,updated_at`, [title, instructionBody, id, auth.congregation.id])
