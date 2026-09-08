@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowDown, ArrowUp, Bold, Heading2, ImagePlus, Italic, Link, List, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import type { CongregationInstruction } from "@/lib/congregation-instructions"
@@ -24,6 +24,13 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   const endpoint = `/api/c/${encodeURIComponent(slug)}/instructions`
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const instructionId = Number(params.get("instruction"))
+    const revision = Number(params.get("revision"))
+    if (!Number.isSafeInteger(instructionId) || instructionId < 1 || !Number.isSafeInteger(revision) || revision < 1) return
+    void fetch(`${endpoint}/views`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId, revision }) })
+  }, [endpoint])
   function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0 }); setTitle(""); setBody("") }
   function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body) }
 
