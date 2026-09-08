@@ -23,8 +23,8 @@ export function InstructionsTabs({ children, customInstructions }: Props) {
   return (
     <Tabs value={tab} onValueChange={setTab} className="max-w-6xl">
       <TabsList aria-label="Instruction categories">
-        <TabsTrigger value="general">General intructions</TabsTrigger>
-        <TabsTrigger value="custom">Congregation instructions</TabsTrigger>
+        <TabsTrigger value="general" className="data-[state=active]:ring-2 data-[state=active]:ring-blue-500 data-[state=active]:ring-offset-1">General intructions</TabsTrigger>
+        <TabsTrigger value="custom" className="data-[state=active]:ring-2 data-[state=active]:ring-blue-500 data-[state=active]:ring-offset-1">Congregation instructions</TabsTrigger>
       </TabsList>
       <TabsContent value="general" className="mt-6">{children}</TabsContent>
       <TabsContent value="custom" className="mt-6">{customInstructions}</TabsContent>
