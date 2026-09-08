@@ -30,6 +30,14 @@ describe("congregation instructions API", () => {
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE congregation_id=$1"), [34])
   })
 
+  it("returns only instruction revisions the member has not viewed when requested for notifications", async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 2 }] })
+    const { GET } = await import("@/app/api/c/[slug]/instructions/route")
+    const response = await GET(request("GET", undefined, "?notifications=unviewed"), { params: { slug: "central" } })
+    expect(response.status).toBe(200)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("congregation_instruction_views"), [34, 12])
+  })
+
   it("creates a validated instruction and records its audit event", async () => {
     mocks.query.mockResolvedValueOnce({ rows: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 1 }] })
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")
@@ -59,5 +67,15 @@ describe("congregation instructions API", () => {
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await POST(request("POST", { title: "Private", body: "No access" }), { params: { slug: "central" } })
     expect(response.status).toBe(404)
+  })
+
+  it("records a member's view for the exact instruction revision", async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ id: 8 }], rowCount: 1 }).mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/instructions/views/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/instructions/views", {
+      method: "POST", headers: { origin: "https://search.example", host: "search.example", "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: 8, revision: 2 }),
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(200)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instruction_views"), [12, 34, 8, 2])
   })
 })

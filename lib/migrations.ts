@@ -196,6 +196,18 @@ const migrations: Migration[] = [{
     await client.query(`ALTER TABLE congregation_instructions DROP CONSTRAINT IF EXISTS congregation_instructions_body_check`)
     await client.query(`ALTER TABLE congregation_instructions ADD CONSTRAINT congregation_instructions_body_check CHECK(length(trim(body)) BETWEEN 1 AND 750000)`)
   }
+},{
+  version:13,name:"instruction view acknowledgements",async run(client){
+    await client.query(`CREATE TABLE congregation_instruction_views (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      instruction_id BIGINT NOT NULL REFERENCES congregation_instructions(id) ON DELETE CASCADE,
+      instruction_revision INT NOT NULL CHECK(instruction_revision > 0),
+      viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(user_id,instruction_id,instruction_revision)
+    )`)
+    await client.query(`CREATE INDEX congregation_instruction_views_notification_idx ON congregation_instruction_views(congregation_id,user_id,instruction_id,instruction_revision)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

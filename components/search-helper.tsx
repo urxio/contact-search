@@ -263,7 +263,7 @@ export default function SearchHelper({
   useEffect(() => { void refreshActivePackages() }, [refreshActivePackages])
   useEffect(() => {
     if (!workspaceSlug) return
-    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions`, { cache: "no-store" })
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions?notifications=unviewed`, { cache: "no-store" })
       .then(async (response) => response.ok ? response.json() : { instructions: [] })
       .then((result) => setInstructionNotifications(Array.isArray(result.instructions) ? result.instructions : []))
       .catch(() => setInstructionNotifications([]))
@@ -2207,10 +2207,17 @@ export default function SearchHelper({
             setPackageBrowserOpen(true)
           }}
           instructionNotifications={instructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))}
-          onOpenInstructions={(instructionId) => {
+          onOpenInstructions={async (instructionId) => {
             const instruction = instructionNotifications.find((item) => item.id === instructionId && !dismissedInstructionNotifications.has(`${item.id}:${item.revision}`))
-            if (instruction) dismissInstructionNotifications([instruction])
-            if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions?tab=custom&instruction=${instructionId}`)
+            if (instruction && workspaceSlug) {
+              try {
+                const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions/views`, {
+                  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId, revision: instruction.revision }),
+                })
+                if (response.ok) dismissInstructionNotifications([instruction])
+              } catch { /* The destination also records the view after it opens. */ }
+            }
+            if (workspaceSlug) window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions?tab=custom&instruction=${instructionId}&revision=${instruction?.revision ?? ""}`)
           }}
         />
 

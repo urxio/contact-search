@@ -11,7 +11,17 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
-    const result = await pool.query(SELECT, [auth.congregation.id])
+    const notificationsOnly = _req.nextUrl.searchParams.get("notifications") === "unviewed"
+    const result = await pool.query(notificationsOnly
+      ? `SELECT ci.id,ci.title,ci.body,ci.position,ci.revision,ci.created_at,ci.updated_at
+          FROM congregation_instructions ci
+          WHERE ci.congregation_id=$1 AND NOT EXISTS (
+            SELECT 1 FROM congregation_instruction_views civ
+            WHERE civ.congregation_id=ci.congregation_id AND civ.user_id=$2
+              AND civ.instruction_id=ci.id AND civ.instruction_revision=ci.revision
+          ) ORDER BY ci.position ASC,ci.id ASC`
+      : SELECT,
+    notificationsOnly ? [auth.congregation.id, auth.user.id] : [auth.congregation.id])
     return NextResponse.json({ instructions: result.rows.map(serializeInstruction) })
   } catch (error) { return apiError(error) }
 }
