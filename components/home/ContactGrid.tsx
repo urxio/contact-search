@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { areaColorClass } from "@/lib/area-colors"
+import { normalizeSurname, type SurnameCountryEntry } from "@/lib/surname-countries"
 
 interface ContactGridProps {
   contacts: EnhancedContact[]
@@ -29,6 +30,7 @@ interface ContactGridProps {
   onTerritoryStatusChange: (id: string, v: boolean) => void
   onSearchForebears: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
+  surnameCountries?: Record<string, SurnameCountryEntry>
   colorByArea?: boolean
   areaByZipcode?: Map<string, string>
   areaOrder?: string[]
@@ -67,6 +69,7 @@ export function ContactGrid({
   onTerritoryStatusChange,
   onSearchForebears,
   onSearchTPS,
+  surnameCountries = {},
   colorByArea = false,
   areaByZipcode = new Map(),
   areaOrder = [],
@@ -91,6 +94,11 @@ export function ContactGrid({
                   />
                   <CardTitle className="text-base">{contact.fullName}</CardTitle>
                 </div>
+                {surnameCountries[normalizeSurname(contact.lastName)]?.countries.length > 0 && (
+                  <span className="mt-1 inline-block rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
+                    {surnameCountries[normalizeSurname(contact.lastName)].countries.join(", ")}
+                  </span>
+                )}
                 {colorByArea && areaByZipcode.get(contact.zipcode.trim()) && (
                   <span className="mt-1 inline-block rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                     {areaByZipcode.get(contact.zipcode.trim())}
@@ -171,7 +179,7 @@ export function ContactGrid({
                     <Globe className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Search on Forebears.io</TooltipContent>
+                <TooltipContent>{surnameCountries[normalizeSurname(contact.lastName)]?.countries.length ? "Show saved surname countries" : "Search on Forebears.io"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

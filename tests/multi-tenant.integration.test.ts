@@ -110,6 +110,11 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 8, name: "platform surname dictionary" },
       { version: 9, name: "invitation revocation history" },
       { version: 10, name: "Excel handoff progress" },
+      { version: 11, name: "congregation custom instructions" },
+      { version: 12, name: "instruction image uploads" },
+      { version: 13, name: "instruction view acknowledgements" },
+      { version: 14, name: "newest congregation instructions first" },
+      { version: 15, name: "shared surname country cache" },
     ])
   })
 

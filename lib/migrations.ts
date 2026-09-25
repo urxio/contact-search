@@ -216,6 +216,20 @@ const migrations: Migration[] = [{
       FROM congregation_instructions
     ) UPDATE congregation_instructions ci SET position=ordered.position FROM ordered WHERE ci.id=ordered.id`)
   }
+},{
+  version:15,name:"shared surname country cache",async run(client){
+    await client.query(`CREATE TABLE surname_country_cache (
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      surname TEXT NOT NULL CHECK(length(surname) BETWEEN 1 AND 120),
+      countries TEXT[] NOT NULL CHECK(cardinality(countries) BETWEEN 0 AND 3),
+      source TEXT NOT NULL CHECK(source IN ('onograph','manual')),
+      updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(congregation_id,surname)
+    )`)
+    await client.query(`CREATE INDEX surname_country_cache_updated_idx ON surname_country_cache(congregation_id,updated_at DESC)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

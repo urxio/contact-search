@@ -38,3 +38,9 @@ Do not roll back to a pre-tenant release after a second congregation contains da
 - `/platform` and `/platform/dictionary`
 
 Legacy pages and APIs remain available only while the feature flag is off. Once enabled, legacy global APIs return `404` to prevent accidental cross-congregation access.
+
+## Surname country lookups
+
+In a workspace, the Forebears button first checks a shared surname cache. Saved countries appear beside every contact with that surname, so teammates do not need to load the same Forebears page repeatedly. Without an API key, a cache miss opens the existing Forebears page and the user can save up to three countries from its distribution results. The cache is scoped to the workspace and stores surname data only, not contact details. Accents are preserved because Forebears treats accented and unaccented surnames separately.
+
+For automatic lookups, create a verified [OnoGraph location API](https://forebears.io/onograph/location) account and set `ONOGRAPH_API_KEY` as a server-side environment variable. New surnames are then queried through the official location API and cached. The key is never sent to the browser. OnoGraph lists a free allowance and paid credits; review its current terms and pricing before enabling it. If the API is unavailable, the dialog still offers the Forebears link and manual entry. The country list reports surname distribution, not a person's ancestry or nationality.
