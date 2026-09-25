@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
-import { forebearsSurnameUrl, normalizeSurname, parseCountries } from "@/lib/surname-countries"
+import { forebearsSurnameUrl, normalizeSurname } from "@/lib/surname-countries"
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), member: vi.fn(), origin: vi.fn(), audit: vi.fn() }))
+const mocks = vi.hoisted(() => ({ query: vi.fn(), member: vi.fn(), origin: vi.fn() }))
 vi.mock("@/lib/db", () => ({ pool: { query: mocks.query } }))
 vi.mock("@/lib/auth", async (original) => ({
   ...(await original<typeof import("@/lib/auth")>()),
-  requireMembership: mocks.member, validateMutationOrigin: mocks.origin, auditEvent: mocks.audit,
+  requireMembership: mocks.member, validateMutationOrigin: mocks.origin,
 }))
 
 const context = { params: { slug: "central" } }
@@ -24,7 +24,6 @@ beforeEach(() => {
   delete process.env.ONOGRAPH_API_KEY
   mocks.member.mockResolvedValue({ user: { id: 12 }, congregation: { id: 34 } })
   mocks.query.mockResolvedValue({ rows: [] })
-  mocks.audit.mockResolvedValue(undefined)
 })
 afterEach(() => { vi.unstubAllGlobals() })
 
@@ -33,7 +32,6 @@ describe("surname country cache", () => {
     expect(normalizeSurname("  Dupré  ")).toBe("dupré")
     expect(normalizeSurname("Dupre")).toBe("dupre")
     expect(forebearsSurnameUrl("Dupré")).toBe("https://forebears.io/surnames/dupr%C3%A9")
-    expect(parseCountries(["France", "france"])).toBeNull()
   })
 
   it("returns only entries from the member's workspace", async () => {
@@ -45,13 +43,11 @@ describe("surname country cache", () => {
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE congregation_id=$1"), [34])
   })
 
-  it("saves a manual result for the workspace and audits the change", async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [row("dupré", ["France", "Belgium"])] })
+  it("does not allow users to submit countries manually", async () => {
     const { POST } = await import("@/app/api/c/[slug]/surname-countries/route")
     const response = await POST(request("POST", { action: "save", surname: " Dupré ", countries: ["France", "Belgium"] }), context)
-    expect(response.status).toBe(200)
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO surname_country_cache"), [34, "dupré", ["France", "Belgium"], 12])
-    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "surname_country.saved", targetId: "dupré" }))
+    expect(response.status).toBe(400)
+    expect(mocks.query).not.toHaveBeenCalled()
   })
 
   it("reuses a cached result without contacting OnoGraph", async () => {

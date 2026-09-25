@@ -42,7 +42,7 @@ import { ContactTable } from "@/components/home/ContactTable"
 import { ContactGrid } from "@/components/home/ContactGrid"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { useSearchActivity } from "@/hooks/use-search-activity"
-import { forebearsSurnameUrl, normalizeSurname, parseCountries, type SurnameCountryEntry } from "@/lib/surname-countries"
+import { forebearsSurnameUrl, normalizeSurname, type SurnameCountryEntry } from "@/lib/surname-countries"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -149,9 +149,6 @@ export default function SearchHelper({
   const [surnameLookup, setSurnameLookup] = useState<{
     surname: string; contactId: string; entry: SurnameCountryEntry | null; loading: boolean; error: string
   } | null>(null)
-  const [countryInput, setCountryInput] = useState("")
-  const [editingCountries, setEditingCountries] = useState(false)
-  const [savingCountries, setSavingCountries] = useState(false)
 
   useEffect(() => {
     if (!workspaceSlug) { setSurnameCacheReady(true); return }
@@ -865,8 +862,9 @@ export default function SearchHelper({
 
   const openForebears = useCallback((surname: string) => {
     const opened = window.open(forebearsSurnameUrl(surname), "_blank")
-    if (!opened) { toast.error("Your browser blocked the Forebears tab"); return }
+    if (!opened) { toast.error("Your browser blocked the Forebears tab"); return false }
     opened.opener = null
+    return true
   }, [])
 
   const searchOnForebears = useCallback(
@@ -877,17 +875,21 @@ export default function SearchHelper({
         return
       }
       if (!workspaceSlug) {
-        openForebears(surname)
-        markSurnameChecked(contact.id)
+        if (openForebears(surname)) markSurnameChecked(contact.id)
         return
       }
+      if (!surnameCacheReady) { toast.info("Saved surname countries are still loading. Try again in a moment."); return }
       const entry = surnameCountries[surname] ?? null
-      setCountryInput(entry?.countries.join(", ") ?? "")
-      setEditingCountries(false)
-      setSurnameLookup({ surname, contactId: contact.id, entry, loading: !entry && onographAvailable, error: "" })
-      if (entry?.countries.length) { markSurnameChecked(contact.id); return }
-      if (!surnameCacheReady) return
-      if (!onographAvailable) { openForebears(surname); return }
+      if (entry) {
+        setSurnameLookup({ surname, contactId: contact.id, entry, loading: false, error: "" })
+        if (entry.countries.length) markSurnameChecked(contact.id)
+        return
+      }
+      if (!onographAvailable) {
+        if (openForebears(surname)) markSurnameChecked(contact.id)
+        return
+      }
+      setSurnameLookup({ surname, contactId: contact.id, entry: null, loading: true, error: "" })
       void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-countries`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "lookup", surname }),
@@ -900,7 +902,8 @@ export default function SearchHelper({
           if (nextEntry.countries.length) markSurnameChecked(contact.id)
         }
         setSurnameLookup((current) => current?.surname === surname && current.contactId === contact.id
-          ? { ...current, entry: nextEntry, loading: false } : current)
+          ? { ...current, entry: nextEntry, loading: false,
+              error: nextEntry ? "" : "OnoGraph is not configured. You can open Forebears instead." } : current)
       }).catch((error) => {
         setSurnameLookup((current) => current?.surname === surname && current.contactId === contact.id
           ? { ...current, loading: false, error: error instanceof Error ? error.message : "Country lookup failed" } : current)
@@ -908,28 +911,6 @@ export default function SearchHelper({
     },
     [markSurnameChecked, onographAvailable, openForebears, surnameCacheReady, surnameCountries, workspaceSlug],
   )
-
-  const saveSurnameCountries = useCallback(async () => {
-    if (!workspaceSlug || !surnameLookup) return
-    const countries = parseCountries(countryInput.split(","))
-    if (!countries) { toast.error("Enter one to three distinct countries, separated by commas"); return }
-    setSavingCountries(true)
-    try {
-      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-countries`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", surname: surnameLookup.surname, countries }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Unable to save countries")
-      const entry = data.entry as SurnameCountryEntry
-      setSurnameCountries((current) => ({ ...current, [entry.surname]: entry }))
-      setSurnameLookup((current) => current?.surname === entry.surname ? { ...current, entry, error: "" } : current)
-      setEditingCountries(false)
-      markSurnameChecked(surnameLookup.contactId)
-      toast.success("Countries saved for everyone in this workspace")
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to save countries") }
-    finally { setSavingCountries(false) }
-  }, [countryInput, markSurnameChecked, surnameLookup, workspaceSlug])
 
   // Update the handleStatusChange function
   const handleStatusChange = useCallback(
@@ -2504,28 +2485,12 @@ export default function SearchHelper({
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No countries saved for this surname yet.</p>
+                <p className="text-sm text-muted-foreground">No country distribution data is available for this surname.</p>
               )}
               {surnameLookup?.error && <p className="text-sm text-red-600">{surnameLookup.error}</p>}
-              {(editingCountries || !surnameLookup?.entry?.countries.length) && (
-                <div className="space-y-2">
-                  <label htmlFor="surname-countries" className="text-sm font-medium">Save countries after checking Forebears</label>
-                  <Input id="surname-countries" value={countryInput} onChange={(event) => setCountryInput(event.target.value)}
-                    placeholder="France, Belgium" maxLength={245} />
-                  <p className="text-xs text-muted-foreground">Enter up to three countries, separated by commas. Everyone in this workspace can reuse them.</p>
-                  <Button onClick={saveSurnameCountries} disabled={savingCountries} size="sm">
-                    {savingCountries ? "Saving…" : "Save countries"}
-                  </Button>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => surnameLookup && openForebears(surnameLookup.surname)}>
-                  Open Forebears
-                </Button>
-                {surnameLookup?.entry?.countries.length && !editingCountries && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingCountries(true)}>Edit saved countries</Button>
-                )}
-              </div>
+              <Button variant="outline" size="sm" onClick={() => surnameLookup && openForebears(surnameLookup.surname)}>
+                Open Forebears
+              </Button>
             </div>
           )}
         </DialogContent>

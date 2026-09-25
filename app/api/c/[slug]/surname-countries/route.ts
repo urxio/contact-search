@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
-import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
-import { normalizeSurname, parseCountries, validSurname } from "@/lib/surname-countries"
+import { requireMembership, validateMutationOrigin } from "@/lib/auth"
+import { normalizeSurname, validSurname } from "@/lib/surname-countries"
 import { apiError, assertMultiTenantEnabled, type RouteContext } from "../../_shared"
 
 type CacheRow = { surname: string; countries: string[]; source: "onograph" | "manual"; updated_at: Date }
@@ -56,22 +56,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const surname = normalizeSurname(body?.surname)
     if (!validSurname(surname)) return NextResponse.json({ error: "A valid surname is required." }, { status: 400 })
 
-    if (body?.action === "save") {
-      const countries = parseCountries(body?.countries)
-      if (!countries) return NextResponse.json({ error: "Enter one to three distinct countries." }, { status: 400 })
-      const result = await pool.query<CacheRow>(
-        `INSERT INTO surname_country_cache(congregation_id,surname,countries,source,updated_by_user_id)
-         VALUES($1,$2,$3,'manual',$4)
-         ON CONFLICT(congregation_id,surname) DO UPDATE SET
-           countries=EXCLUDED.countries,source='manual',updated_by_user_id=EXCLUDED.updated_by_user_id,updated_at=NOW()
-         RETURNING surname,countries,source,updated_at`,
-        [auth.congregation.id, surname, countries, auth.user.id],
-      )
-      await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
-        action: "surname_country.saved", targetType: "surname", targetId: surname })
-      return NextResponse.json({ entry: serialize(result.rows[0]) }, { headers: cacheHeaders })
-    }
-
     if (body?.action !== "lookup") return NextResponse.json({ error: "Unknown action." }, { status: 400 })
     const cached = await pool.query<CacheRow>(selectEntry, [auth.congregation.id, surname])
     if (cached.rows[0]) return NextResponse.json({ entry: serialize(cached.rows[0]) }, { headers: cacheHeaders })
@@ -80,7 +64,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!key) return NextResponse.json({ entry: null, lookupAvailable: false }, { headers: cacheHeaders })
     let countries: string[]
     try { countries = await lookupOnoGraph(surname, key) }
-    catch { return NextResponse.json({ error: "OnoGraph lookup is unavailable. You can still check Forebears manually." }, { status: 502 }) }
+    catch { return NextResponse.json({ error: "OnoGraph lookup is unavailable. You can still open Forebears." }, { status: 502 }) }
     await pool.query(
       `INSERT INTO surname_country_cache(congregation_id,surname,countries,source)
        VALUES($1,$2,$3,'onograph') ON CONFLICT(congregation_id,surname) DO NOTHING`,
