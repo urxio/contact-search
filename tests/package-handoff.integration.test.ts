@@ -80,6 +80,32 @@ beforeEach(async () => {
 })
 
 describe("Excel progress handoffs with PostgreSQL", () => {
+  it("lists package summaries without contact payloads and retains saved-progress status", async () => {
+    const { GET } = await import("@/app/api/c/[slug]/packages/route")
+    const { PACKAGE_LIST_SELECT, PACKAGE_SELECT, serializePackage } = await import("@/lib/contact-packages")
+
+    const initial = await GET(new NextRequest("https://search.example/api/c/central/packages"), { params: { slug: "central" } })
+    expect(initial.status).toBe(200)
+    expect((await initial.json()).packages[0].hasSavedProgress).toBe(false)
+
+    const summary = await query(`${PACKAGE_LIST_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2`, [packageId, 1])
+    expect(summary.rows[0]).not.toHaveProperty("contacts")
+    expect(summary.rows[0]).not.toHaveProperty("saved_progress")
+    expect(summary.rows[0].has_saved_progress).toBe(false)
+
+    await query("UPDATE contact_packages SET saved_progress=$2::jsonb WHERE id=$1", [packageId, JSON.stringify({ contacts: [contact] })])
+    state.role = "admin"
+    const library = await GET(new NextRequest("https://search.example/api/c/central/packages?scope=library"), { params: { slug: "central" } })
+    expect(library.status).toBe(200)
+    expect((await library.json()).packages[0].hasSavedProgress).toBe(true)
+
+    const detail = await query(`${PACKAGE_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2`, [packageId, 1])
+    expect(detail.rows[0].contacts).toEqual([contact])
+    expect(detail.rows[0].saved_progress).toEqual({ contacts: [contact] })
+    const savedSummary = await query(`${PACKAGE_LIST_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2`, [packageId, 1])
+    expect(serializePackage(savedSummary.rows[0], 1, true)).toEqual(serializePackage(detail.rows[0], 1, true))
+  })
+
   it("backfills the current owner's matching pre-migration draft", async () => {
     expect(migratedProgress).toMatchObject({ contacts: [{ id: "legacy-id", status: "Not French" }], globalNotes: "Existing notes", lastVerifiedId: "legacy-id" })
   })

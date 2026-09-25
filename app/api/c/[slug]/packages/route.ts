@@ -4,7 +4,7 @@ import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { apiError, assertMultiTenantEnabled, canManageAll, integer, RouteContext } from "../../_shared"
 import {
-  DraftConflictError, insertPackageAudit, PACKAGE_SELECT, replaceDraft, sanitizePackageContacts,
+  DraftConflictError, insertPackageAudit, PACKAGE_LIST_SELECT, PACKAGE_SELECT, replaceDraft, sanitizePackageContacts,
   isPackageBrowsable, serializePackage, validatePackageName, validateVisibility,
 } from "@/lib/contact-packages"
 import { assertNoSegmentConflict, SegmentConflictError } from "@/lib/team-segments"
@@ -18,11 +18,11 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     const library = req.nextUrl.searchParams.get("scope") === "library"
     if (library && !manageAll) return NextResponse.json({ error: "Excel library not found." }, { status: 404 })
     const result = await pool.query(library
-      ? `${PACKAGE_SELECT}
+      ? `${PACKAGE_LIST_SELECT}
         WHERE cp.congregation_id=$1
           AND s.status <> 'Completed'
         ORDER BY cp.created_at DESC,cp.id DESC`
-      : `${PACKAGE_SELECT}
+      : `${PACKAGE_LIST_SELECT}
         WHERE cp.congregation_id=$1
           AND s.status <> 'Completed'
           AND ($4::boolean AND s.owner_user_id=$3 OR NOT $4::boolean AND ($2::boolean OR cp.visibility='shared' OR cp.uploaded_by_user_id=$3 OR s.owner_user_id=$3))

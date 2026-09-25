@@ -127,7 +127,7 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
       pageStart: Number(row.page_start), pageEnd: Number(row.page_end), ownerUserId,
       owner: row.owner || "", status: row.status, stoppedAtPage: row.stopped_at_page == null ? null : Number(row.stopped_at_page),
     },
-    hasSavedProgress: row.saved_progress != null,
+    hasSavedProgress: row.has_saved_progress ?? (row.saved_progress != null),
     state, canManage: manageAll || Number(row.uploaded_by_user_id) === viewerUserId, canAssign: manageAll,
     canOpen: row.status !== "Completed" && (manageAll || isAvailable || ownerUserId === viewerUserId),
   }
@@ -140,8 +140,13 @@ export function isPackageBrowsable(row: any, viewerUserId: number) {
   return Number(row.owner_user_id) === viewerUserId
 }
 
-export const PACKAGE_SELECT = `
-  SELECT cp.id,cp.name,cp.visibility,cp.original_filename,cp.contact_count,cp.contacts,cp.saved_progress,cp.assignment_revision,
+function packageSelect(includePayload: boolean) {
+  const payloadColumns = includePayload
+    ? "cp.contacts,cp.saved_progress"
+    : "cp.saved_progress IS NOT NULL AS has_saved_progress"
+  return `
+  SELECT cp.id,cp.name,cp.visibility,cp.original_filename,cp.contact_count,
+         ${payloadColumns},cp.assignment_revision,
          cp.uploaded_by_user_id,cp.created_at,cp.updated_at,u.display_name uploader_name,
          s.id segment_id,s.page_start,s.page_end,s.owner,s.owner_user_id,s.stopped_at_page,s.status,
          s.zipcode_id,z.zipcode,z.city,z.total_pages
@@ -149,6 +154,10 @@ export const PACKAGE_SELECT = `
     JOIN zt_segments s ON s.id=cp.segment_id AND s.congregation_id=cp.congregation_id
     JOIN zt_zipcodes z ON z.id=s.zipcode_id AND z.congregation_id=s.congregation_id
     LEFT JOIN users u ON u.id=cp.uploaded_by_user_id`
+}
+
+export const PACKAGE_SELECT = packageSelect(true)
+export const PACKAGE_LIST_SELECT = packageSelect(false)
 
 export async function insertPackageAudit(client: PoolClient, input: {
   actorUserId: number; congregationId: number; action: string; packageId: number; metadata?: Record<string, unknown>
