@@ -147,8 +147,9 @@ export default function SearchHelper({
   const [surnameCacheReady, setSurnameCacheReady] = useState(false)
   const [onographAvailable, setOnographAvailable] = useState(false)
   const [surnameLookup, setSurnameLookup] = useState<{
-    surname: string; contactId: string; entry: SurnameCountryEntry | null; loading: boolean; error: string
+    surname: string; contactId: string; entry: SurnameCountryEntry | null; loading: boolean
   } | null>(null)
+  const surnameLookupRequest = useRef(0)
 
   useEffect(() => {
     if (!workspaceSlug) { setSurnameCacheReady(true); return }
@@ -861,52 +862,68 @@ export default function SearchHelper({
   }, [updateLastInteraction])
 
   const openForebears = useCallback((surname: string) => {
-    const opened = window.open(forebearsSurnameUrl(surname), "_blank")
-    if (!opened) { toast.error("Your browser blocked the Forebears tab"); return false }
-    opened.opener = null
-    return true
+    const url = forebearsSurnameUrl(surname)
+    const opened = window.open(url, "_blank")
+    if (opened) opened.opener = null
+    else window.location.assign(url)
   }, [])
 
   const searchOnForebears = useCallback(
     (contact: EnhancedContact) => {
+      const lookupRequest = ++surnameLookupRequest.current
       const surname = normalizeSurname(contact.lastName)
       if (!surname) {
         toast.error("Last name is required for Forebears search")
         return
       }
       if (!workspaceSlug) {
-        if (openForebears(surname)) markSurnameChecked(contact.id)
+        openForebears(surname)
+        markSurnameChecked(contact.id)
         return
       }
       if (!surnameCacheReady) { toast.info("Saved surname countries are still loading. Try again in a moment."); return }
       const entry = surnameCountries[surname] ?? null
       if (entry) {
-        setSurnameLookup({ surname, contactId: contact.id, entry, loading: false, error: "" })
-        if (entry.countries.length) markSurnameChecked(contact.id)
+        if (!entry.countries.length) {
+          openForebears(surname)
+          markSurnameChecked(contact.id)
+          return
+        }
+        setSurnameLookup({ surname, contactId: contact.id, entry, loading: false })
+        markSurnameChecked(contact.id)
         return
       }
       if (!onographAvailable) {
-        if (openForebears(surname)) markSurnameChecked(contact.id)
+        openForebears(surname)
+        markSurnameChecked(contact.id)
         return
       }
-      setSurnameLookup({ surname, contactId: contact.id, entry: null, loading: true, error: "" })
+      setSurnameLookup({ surname, contactId: contact.id, entry: null, loading: true })
       void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-countries`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "lookup", surname }),
       }).then(async (response) => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || "Country lookup failed")
+        if (surnameLookupRequest.current !== lookupRequest) return
         const nextEntry = data.entry as SurnameCountryEntry | null
         if (nextEntry) {
           setSurnameCountries((current) => ({ ...current, [surname]: nextEntry }))
-          if (nextEntry.countries.length) markSurnameChecked(contact.id)
         }
+        if (!nextEntry?.countries.length) {
+          setSurnameLookup(null)
+          openForebears(surname)
+          markSurnameChecked(contact.id)
+          return
+        }
+        markSurnameChecked(contact.id)
         setSurnameLookup((current) => current?.surname === surname && current.contactId === contact.id
-          ? { ...current, entry: nextEntry, loading: false,
-              error: nextEntry ? "" : "OnoGraph is not configured. You can open Forebears instead." } : current)
-      }).catch((error) => {
-        setSurnameLookup((current) => current?.surname === surname && current.contactId === contact.id
-          ? { ...current, loading: false, error: error instanceof Error ? error.message : "Country lookup failed" } : current)
+          ? { ...current, entry: nextEntry, loading: false } : current)
+      }).catch(() => {
+        if (surnameLookupRequest.current !== lookupRequest) return
+        setSurnameLookup(null)
+        openForebears(surname)
+        markSurnameChecked(contact.id)
       })
     },
     [markSurnameChecked, onographAvailable, openForebears, surnameCacheReady, surnameCountries, workspaceSlug],
@@ -2465,7 +2482,9 @@ export default function SearchHelper({
         canMarkNotFrench={canMarkSelectedNotFrench}
       />
 
-      <Dialog open={Boolean(surnameLookup)} onOpenChange={(open) => { if (!open) setSurnameLookup(null) }}>
+      <Dialog open={Boolean(surnameLookup)} onOpenChange={(open) => {
+        if (!open) { surnameLookupRequest.current += 1; setSurnameLookup(null) }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Countries for {surnameLookup?.surname}</DialogTitle>
@@ -2484,10 +2503,7 @@ export default function SearchHelper({
                     {surnameLookup.entry.source === "onograph" ? "Most prevalent countries · OnoGraph" : "Saved by your team"}
                   </div>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No country distribution data is available for this surname.</p>
-              )}
-              {surnameLookup?.error && <p className="text-sm text-red-600">{surnameLookup.error}</p>}
+              ) : null}
               <Button variant="outline" size="sm" onClick={() => surnameLookup && openForebears(surnameLookup.surname)}>
                 Open Forebears
               </Button>
