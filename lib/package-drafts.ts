@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg"
 import { DraftConflictError, PACKAGE_SELECT, serializeDraft } from "./contact-packages"
+import { assertDraftEditSession } from "./draft-edit-sessions"
 
 const DRAFT_SELECT = `SELECT contacts,global_notes,territory_zipcode,territory_page_range,
   last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision
@@ -22,6 +23,7 @@ export async function storePackageProgress(client: PoolClient, packageId: number
 /** Caller owns the transaction. Package locks precede draft locks, as in opening an Excel. */
 export async function saveMemberDraft(client: PoolClient, input: {
   userId: number; congregationId: number; revision: number; contacts: unknown[];
+  draftSessionId: string;
   globalNotes?: string; territoryZipcode?: string; territoryPageRange?: string;
   lastVerifiedId?: string | null; packageId?: number | null; packageAssignmentRevision?: number | null;
 }) {
@@ -34,6 +36,11 @@ export async function saveMemberDraft(client: PoolClient, input: {
     const result = await client.query(`${PACKAGE_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2 FOR UPDATE OF cp,s`, [packageId, input.congregationId])
     linkedPackage = result.rows[0]
   }
+  await assertDraftEditSession(client, {
+    userId: input.userId,
+    congregationId: input.congregationId,
+    sessionId: input.draftSessionId,
+  })
   const current = await client.query(`${DRAFT_SELECT} FOR UPDATE`, args)
   const row = current.rows[0]
   if (Number(row?.revision ?? 0) !== input.revision) throw new DraftConflictError(serializeDraft(row))

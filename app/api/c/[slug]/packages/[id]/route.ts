@@ -8,6 +8,7 @@ import {
   validatePackageName, validateVisibility,
 } from "@/lib/contact-packages"
 import { assertNoSegmentConflict, SegmentConflictError } from "@/lib/team-segments"
+import { DraftEditSessionConflict, isDraftEditSessionId } from "@/lib/draft-edit-sessions"
 
 type Context = { params: { slug: string; id: string } }
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Context) {
 
     if (action === "open") {
       const revision = Number(body?.draftRevision)
-      if (!Number.isSafeInteger(revision) || revision < 0) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Draft revision is required." }, { status: 400 }) }
+      if (!Number.isSafeInteger(revision) || revision < 0 || !isDraftEditSessionId(body?.draftSessionId)) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Draft revision and editing session are required." }, { status: 400 }) }
       if (row.status === "Completed") { await client.query("ROLLBACK"); return NextResponse.json({ error: "Completed Excels cannot be opened." }, { status: 409 }) }
       const ownerUserId = row.owner_user_id == null ? null : Number(row.owner_user_id)
       if (ownerUserId && ownerUserId !== auth.user.id && !manageAll) { await client.query("ROLLBACK"); return NextResponse.json({ error: "This Excel is assigned to another member." }, { status: 409 }) }
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest, { params }: Context) {
       const assignmentRevision = Number(row.assignment_revision ?? 0) + 1
       await client.query(`UPDATE contact_packages SET assignment_revision=$3 WHERE id=$1 AND congregation_id=$2`, [id,auth.congregation.id,assignmentRevision])
       const draft = await replaceDraft(client,{ userId:auth.user.id,congregationId:auth.congregation.id,contacts:row.contacts,
-        zipcode:row.zipcode,pageStart:Number(row.page_start),pageEnd:Number(row.page_end),expectedRevision:revision, packageId:id,assignmentRevision,savedProgress:row.saved_progress })
+        zipcode:row.zipcode,pageStart:Number(row.page_start),pageEnd:Number(row.page_end),expectedRevision:revision,draftSessionId:body.draftSessionId, packageId:id,assignmentRevision,savedProgress:row.saved_progress })
       await storePackageProgress(client,id,auth.congregation.id,draft)
       await insertPackageAudit(client,{actorUserId:auth.user.id,congregationId:auth.congregation.id,action:"contact_package.opened",packageId:id,
         metadata:{previousOwnerUserId:ownerUserId}})
@@ -90,6 +91,9 @@ export async function POST(req: NextRequest, { params }: Context) {
     if(error instanceof SegmentConflictError){
       if(auditContext)await auditEvent({...auditContext,action:"contact_package.conflict_rejected",targetType:"segment",targetId:String(error.conflict.segmentId),metadata:{conflict:error.conflict}}).catch(()=>undefined)
       return NextResponse.json({error:error.message,conflict:error.conflict},{status:409})
+    }
+    if(error instanceof DraftEditSessionConflict){
+      return NextResponse.json({error:error.message,code:error.code,server:error.server},{status:409})
     }
     if (error instanceof DraftConflictError) return NextResponse.json({error:error.message,server:error.server},{status:409})
     return apiError(error)

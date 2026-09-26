@@ -241,6 +241,16 @@ const migrations: Migration[] = [{
       PRIMARY KEY(congregation_id,surname)
     )`)
   }
+},{
+  version:17,name:"single active draft editor",async run(client){
+    await client.query(`CREATE TABLE contact_draft_edit_sessions (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      session_id UUID NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(user_id,congregation_id)
+    )`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

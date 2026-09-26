@@ -4,6 +4,7 @@ import { pool } from "@/lib/db"
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { parseSegmentPageRange } from "@/lib/team-segments"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../_shared"
+import { assertDraftEditSession, DraftEditSessionConflict, isDraftEditSessionId } from "@/lib/draft-edit-sessions"
 
 type Contact = { status?: string; [key: string]: unknown }
 
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const auth = await requireMembership(params.slug)
     const body = await req.json()
     const requestedRevision = integer(body?.draftRevision)
-    if (!requestedRevision) {
-      return NextResponse.json({ error: "A valid draftRevision is required." }, { status: 400 })
+    if (!requestedRevision || !isDraftEditSessionId(body?.draftSessionId)) {
+      return NextResponse.json({ error: "A valid draft revision and editing session are required." }, { status: 400 })
     }
 
     const client = await pool.connect()
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         const result = await client.query(`${PACKAGE_SELECT} WHERE cp.id=$1 AND cp.congregation_id=$2 FOR UPDATE OF cp,s`, [linked.rows[0].package_id,auth.congregation.id])
         linkedPackage = result.rows[0]
       }
+      await assertDraftEditSession(client, {
+        userId: auth.user.id,
+        congregationId: auth.congregation.id,
+        sessionId: body.draftSessionId,
+      })
       const draftResult = await client.query(
         `SELECT contacts, global_notes, territory_zipcode, territory_page_range, revision, package_id, package_assignment_revision
          FROM contact_drafts
@@ -116,6 +122,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: true, ...inserted.rows[0], completedSegmentIds }, { status: 201 })
     } catch (error) {
       await client.query("ROLLBACK")
+      if (error instanceof DraftEditSessionConflict) {
+        return NextResponse.json({ error: error.message, code: error.code, server: error.server }, { status: 409 })
+      }
       throw error
     } finally {
       client.release()

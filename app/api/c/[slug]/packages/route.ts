@@ -8,6 +8,7 @@ import {
   isPackageBrowsable, serializePackage, validatePackageName, validateVisibility,
 } from "@/lib/contact-packages"
 import { assertNoSegmentConflict, SegmentConflictError } from "@/lib/team-segments"
+import { DraftEditSessionConflict, isDraftEditSessionId } from "@/lib/draft-edit-sessions"
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const startNow = body?.startNow === true
     const draftRevision = Number(body?.draftRevision)
     if (!name || !visibility || !contacts || !zipcode || !pageStart || !pageEnd || pageEnd < pageStart ||
-        (startNow && (!Number.isSafeInteger(draftRevision) || draftRevision < 0))) {
+        (startNow && (!Number.isSafeInteger(draftRevision) || draftRevision < 0 || !isDraftEditSessionId(body?.draftSessionId)))) {
       return NextResponse.json({ error: "Excel name, visibility, contacts, ZIP code, and page range are required." }, { status: 400 })
     }
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     let draft
     if (startNow) {
       draft = await replaceDraft(client, { userId: auth.user.id, congregationId: auth.congregation.id, contacts,
-        zipcode, pageStart, pageEnd, expectedRevision: draftRevision, packageId, assignmentRevision: 0 })
+        zipcode, pageStart, pageEnd, expectedRevision: draftRevision, draftSessionId: body.draftSessionId, packageId, assignmentRevision: 0 })
       await storePackageProgress(client, packageId, auth.congregation.id, draft)
     }
     await insertPackageAudit(client, { actorUserId: auth.user.id, congregationId: auth.congregation.id,
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (error instanceof SegmentConflictError) {
       if (auditContext) await auditEvent({ ...auditContext, action: "contact_package.conflict_rejected", targetType: "segment", targetId: String(error.conflict.segmentId), metadata: { conflict: error.conflict } }).catch(() => undefined)
       return NextResponse.json({ error: error.message, conflict: error.conflict }, { status: 409 })
+    }
+    if (error instanceof DraftEditSessionConflict) {
+      return NextResponse.json({ error: error.message, code: error.code, server: error.server }, { status: 409 })
     }
     if (error instanceof DraftConflictError) return NextResponse.json({ error: error.message, server: error.server }, { status: 409 })
     return apiError(error)

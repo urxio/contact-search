@@ -15,22 +15,35 @@ vi.mock("@/lib/auth", async (original) => ({
 }))
 
 const contact = { firstName: "Ana", lastName: "Martin", address: "1 Main", city: "Alexandria", zipcode: "22301", phone: "555" }
+const editorSessionA = "123e4567-e89b-42d3-a456-426614174000"
+const editorSessionB = "223e4567-e89b-42d3-a456-426614174001"
 let packageId: number
 let segmentId: number
 let migratedProgress: any
 const query = (sql: string, args?: unknown[]) => state.db.query(sql, args)
 async function action(body: object) {
   const { POST } = await import("@/app/api/c/[slug]/packages/[id]/route")
-  return POST(new NextRequest(`https://search.example/api/c/central/packages/${packageId}`, { method: "POST", body: JSON.stringify(body) }), { params: { slug: "central", id: String(packageId) } })
+  const payload = "action" in body && body.action === "open"
+    ? { ...body, draftSessionId: (body as { draftSessionId?: string }).draftSessionId ?? editorSessionA }
+    : body
+  return POST(new NextRequest(`https://search.example/api/c/central/packages/${packageId}`, { method: "POST", body: JSON.stringify(payload) }), { params: { slug: "central", id: String(packageId) } })
 }
-async function open(revision = 0) {
-  const response = await action({ action: "open", draftRevision: revision })
+async function editSession(sessionId: string, action: "open" | "switch" = "open") {
+  const { POST } = await import("@/app/api/c/[slug]/draft/session/route")
+  return POST(new NextRequest("https://search.example/api/c/central/draft/session", {
+    method: "POST", body: JSON.stringify({ action, sessionId }),
+  }), { params: { slug: "central" } })
+}
+async function open(revision = 0, sessionId = editorSessionA) {
+  const claim = await editSession(sessionId)
+  expect(claim.status).toBe(200)
+  const response = await action({ action: "open", draftRevision: revision, draftSessionId: sessionId })
   expect(response.status).toBe(200)
   return (await response.json()).draft
 }
-async function save(draft: any, changes: object = {}) {
+async function save(draft: any, changes: object = {}, sessionId = editorSessionA) {
   const { PUT } = await import("@/app/api/c/[slug]/draft/route")
-  return PUT(new NextRequest("https://search.example/api/c/central/draft", { method: "PUT", body: JSON.stringify({ ...draft, ...changes }) }), { params: { slug: "central" } })
+  return PUT(new NextRequest("https://search.example/api/c/central/draft", { method: "PUT", body: JSON.stringify({ ...draft, ...changes, draftSessionId: sessionId }) }), { params: { slug: "central" } })
 }
 async function review() {
   const draft = await open()
@@ -69,6 +82,7 @@ beforeEach(async () => {
   state.userId = 1; state.role = "member"; state.tenantId = 1
   process.env.MULTI_TENANT_ENABLED = "true"
   await query("DELETE FROM contact_drafts")
+  await query("DELETE FROM contact_draft_edit_sessions")
   await query("DELETE FROM contact_packages")
   await query("DELETE FROM zt_segments")
   await query("DELETE FROM zt_zipcodes")
@@ -80,6 +94,24 @@ beforeEach(async () => {
 })
 
 describe("Excel progress handoffs with PostgreSQL", () => {
+  it("requires an explicit device switch and fences saves from the previous editor", async () => {
+    const oldDeviceDraft = await open()
+    const blocked = await editSession(editorSessionB)
+    expect(blocked.status).toBe(409)
+    expect((await blocked.json()).code).toBe("DRAFT_EDITING_ELSEWHERE")
+
+    const switched = await editSession(editorSessionB, "switch")
+    expect(switched.status).toBe(200)
+    const newDeviceDraft = (await switched.json()).draft
+    const oldSave = await save(oldDeviceDraft, { globalNotes: "Old device overwrite" }, editorSessionA)
+    expect(oldSave.status).toBe(409)
+    expect((await oldSave.json()).code).toBe("DRAFT_EDIT_SESSION_REPLACED")
+
+    const newSave = await save(newDeviceDraft, { globalNotes: "Saved from the switched device" }, editorSessionB)
+    expect(newSave.status).toBe(200)
+    expect((await newSave.json()).globalNotes).toBe("Saved from the switched device")
+  })
+
   it("lists package summaries without contact payloads and retains saved-progress status", async () => {
     const { GET } = await import("@/app/api/c/[slug]/packages/route")
     const { PACKAGE_LIST_SELECT, PACKAGE_SELECT, serializePackage } = await import("@/lib/contact-packages")
@@ -110,7 +142,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
     expect(migratedProgress).toMatchObject({ contacts: [{ id: "legacy-id", status: "Not French" }], globalNotes: "Existing notes", lastVerifiedId: "legacy-id" })
   })
   it("applies the handoff migration", async () => {
-    expect((await query("SELECT max(version) AS version FROM schema_migrations")).rows[0].version).toBe(16)
+    expect((await query("SELECT max(version) AS version FROM schema_migrations")).rows[0].version).toBe(17)
   })
   it("restores reviewed contacts, stable IDs, notes, flags, and last position after release and claim", async () => {
     const saved = await review()
@@ -158,7 +190,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
   it("leaves saved package progress intact when a personal draft is cleared", async () => {
     const saved = await review()
     const { DELETE } = await import("@/app/api/c/[slug]/draft/route")
-    await DELETE(new NextRequest("https://search.example/api/c/central/draft", { method: "DELETE" }), { params: { slug: "central" } })
+    await DELETE(new NextRequest("https://search.example/api/c/central/draft", { method: "DELETE", body: JSON.stringify({ draftSessionId: editorSessionA }) }), { params: { slug: "central" } })
     expect((await open()).contacts).toEqual(saved.contacts)
   })
   it("does not publish an unrelated imported draft to the Excel", async () => {
@@ -189,7 +221,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
   it("preserves final progress through submission and an administrator reopening completed work", async () => {
     const saved = await review()
     const { POST } = await import("@/app/api/c/[slug]/submissions/route")
-    const response = await POST(new NextRequest("https://search.example/api/c/central/submissions", { method: "POST", body: JSON.stringify({ draftRevision: saved.revision }) }), { params: { slug: "central" } })
+    const response = await POST(new NextRequest("https://search.example/api/c/central/submissions", { method: "POST", body: JSON.stringify({ draftRevision: saved.revision, draftSessionId: editorSessionA }) }), { params: { slug: "central" } })
     expect(response.status).toBe(201)
     expect((await save(saved)).status).toBe(409)
     state.role = "admin"
@@ -201,7 +233,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
     const saved = await review()
     await action({ action: "release" })
     const { POST } = await import("@/app/api/c/[slug]/submissions/route")
-    const response = await POST(new NextRequest("https://search.example/api/c/central/submissions", { method: "POST", body: JSON.stringify({ draftRevision: saved.revision }) }), { params: { slug: "central" } })
+    const response = await POST(new NextRequest("https://search.example/api/c/central/submissions", { method: "POST", body: JSON.stringify({ draftRevision: saved.revision, draftSessionId: editorSessionA }) }), { params: { slug: "central" } })
     expect(response.status).toBe(409)
   })
   it("retains deliberate contact deletions when resumed", async () => {
@@ -214,7 +246,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
   it("rejects an old tab even when clearing and reopening reused its draft revision", async () => {
     const old = await open()
     const { DELETE } = await import("@/app/api/c/[slug]/draft/route")
-    await DELETE(new NextRequest("https://search.example/api/c/central/draft", { method: "DELETE" }), { params: { slug: "central" } })
+    await DELETE(new NextRequest("https://search.example/api/c/central/draft", { method: "DELETE", body: JSON.stringify({ draftSessionId: editorSessionA }) }), { params: { slug: "central" } })
     const reopened = await open()
     expect(reopened.revision).toBe(old.revision)
     expect(reopened.packageAssignmentRevision).not.toBe(old.packageAssignmentRevision)

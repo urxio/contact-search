@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto"
 import type { PoolClient } from "pg"
+import { assertDraftEditSession } from "./draft-edit-sessions"
 
 export type PackageVisibility = "shared" | "private"
 export type PackageContact = {
@@ -75,9 +76,15 @@ export function serializeDraft(row: any) {
 export async function replaceDraft(client: PoolClient, input: {
   userId: number; congregationId: number; contacts: PackageContact[];
   zipcode: string; pageStart: number; pageEnd: number; expectedRevision: number;
+  draftSessionId: string;
   packageId?: number; assignmentRevision?: number;
   savedProgress?: { contacts: unknown[]; globalNotes?: string; lastVerifiedId?: string | null } | null
 }) {
+  await assertDraftEditSession(client, {
+    userId: input.userId,
+    congregationId: input.congregationId,
+    sessionId: input.draftSessionId,
+  })
   const current = await client.query(
     `SELECT contacts,global_notes,territory_zipcode,territory_page_range,last_verified_contact_id,revision,updated_at,package_id,package_assignment_revision
        FROM contact_drafts WHERE user_id=$1 AND congregation_id=$2 FOR UPDATE`,

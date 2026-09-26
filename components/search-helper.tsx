@@ -115,6 +115,27 @@ type SearchHelperProps = {
 }
 
 type DraftStatus = "loading" | "saving" | "saved" | "offline" | "conflict"
+type DraftSaveSnapshot = {
+  contacts: EnhancedContact[]
+  globalNotes: string
+  territoryZipcode: string
+  territoryPageRange: string
+  lastVerifiedId: string | null
+  packageId: number | null
+  packageAssignmentRevision: number | null
+}
+
+function getOrCreateDraftSessionId(key: string) {
+  try {
+    const stored = sessionStorage.getItem(key)
+    if (stored && /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(stored)) return stored
+    const id = crypto.randomUUID()
+    sessionStorage.setItem(key, id)
+    return id
+  } catch {
+    return crypto.randomUUID()
+  }
+}
 
 export default function SearchHelper({
   workspaceSlug,
@@ -204,8 +225,18 @@ export default function SearchHelper({
   const [draftRevision, setDraftRevision] = useState(0)
   const [draftStatus, setDraftStatus] = useState<DraftStatus>(workspaceSlug ? "loading" : "saved")
   const [serverDraft, setServerDraft] = useState<any>(null)
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null)
+  const [draftSessionLoading, setDraftSessionLoading] = useState(Boolean(workspaceSlug))
+  const [draftEditBlocked, setDraftEditBlocked] = useState(false)
+  const [switchingDraftEditor, setSwitchingDraftEditor] = useState(false)
   const draftReadyRef = useRef(false)
   const draftRevisionRef = useRef(0)
+  const draftSessionIdRef = useRef<string | null>(null)
+  const draftEditBlockedRef = useRef(false)
+  const draftConflictRef = useRef(false)
+  const draftWriteQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const draftAutosaveTimerRef = useRef<number | null>(null)
+  const draftClearInProgressRef = useRef(false)
   const activePackageIdRef = useRef<number | null>(null)
   const activePackageRevisionRef = useRef<number | null>(null)
 
@@ -289,6 +320,45 @@ export default function SearchHelper({
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
   const storageKey = useCallback((key: string) => `${storagePrefix}:${key}`, [storagePrefix])
+  const draftSessionStorageKey = workspaceSlug
+    ? `${storagePrefix}:draft-editor-session`
+    : null
+  const applyServerDraft = useCallback((draft: any) => {
+    activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
+    activePackageIdRef.current = draft.packageId ?? null
+    setPackageAssignmentLocked(Boolean(draft.packageId))
+    setContacts(Array.isArray(draft.contacts) ? draft.contacts : [])
+    setGlobalNotes(draft.globalNotes || "")
+    setTerritoryZipcode(draft.territoryZipcode || "")
+    setTerritoryPageRange(draft.territoryPageRange || "")
+    setLastVerifiedId(draft.lastVerifiedId || draft.lastVerifiedContactId || null)
+    draftRevisionRef.current = Number(draft.revision) || 0
+    setDraftRevision(draftRevisionRef.current)
+  }, [])
+  const blockDraftEditing = useCallback((draft: any | null) => {
+    if (draftAutosaveTimerRef.current != null) {
+      window.clearTimeout(draftAutosaveTimerRef.current)
+      draftAutosaveTimerRef.current = null
+    }
+    if (draft) {
+      setServerDraft(draft)
+      applyServerDraft(draft)
+    }
+    draftEditBlockedRef.current = true
+    setDraftEditBlocked(true)
+    setDraftStatus("conflict")
+  }, [applyServerDraft])
+  useEffect(() => {
+    if (!workspaceSlug || (!draftSessionLoading && !draftEditBlocked)) return
+    const preventBackgroundShortcuts = (event: KeyboardEvent) => {
+      const dialog = document.querySelector('[role="alertdialog"]')
+      if (dialog?.contains(event.target as Node)) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    }
+    window.addEventListener("keydown", preventBackgroundShortcuts, true)
+    return () => window.removeEventListener("keydown", preventBackgroundShortcuts, true)
+  }, [draftEditBlocked, draftSessionLoading, workspaceSlug])
   const chooseViewType = useCallback((view: ViewType) => {
     localStorage.setItem(storageKey("viewTypeExplicit"), "true")
     setViewType(view)
@@ -365,6 +435,12 @@ export default function SearchHelper({
 
   // Load contacts and notes from localStorage on component mount
   useEffect(() => {
+    draftReadyRef.current = false
+    setDraftSessionLoading(Boolean(workspaceSlug))
+    draftEditBlockedRef.current = false
+    draftConflictRef.current = false
+    setDraftEditBlocked(false)
+    setServerDraft(null)
     const savedContacts = localStorage.getItem(storageKey("contacts"))
     const savedNotes = localStorage.getItem(storageKey("globalNotes"))
     const savedZipcode = localStorage.getItem(storageKey("territoryZipcode"))
@@ -424,39 +500,49 @@ export default function SearchHelper({
     window.addEventListener("keydown", handleKeyDown)
     if (!workspaceSlug) {
       draftReadyRef.current = true
+      setDraftSessionLoading(false)
       return () => window.removeEventListener("keydown", handleKeyDown)
     }
 
     let cancelled = false
-    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, { cache: "no-store" })
+    const sessionId = getOrCreateDraftSessionId(draftSessionStorageKey ?? `${storagePrefix}:draft-editor-session`)
+    draftSessionIdRef.current = sessionId
+    setDraftSessionId(sessionId)
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "open", sessionId }),
+    })
       .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load the server draft")
-        const draft = await response.json()
+        const result = await response.json()
         if (cancelled) return
-        activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
-        activePackageIdRef.current = draft.packageId ?? null
-        setPackageAssignmentLocked(Boolean(draft.packageId))
-        setContacts(Array.isArray(draft.contacts) ? draft.contacts : [])
-        setGlobalNotes(draft.globalNotes || "")
-        setTerritoryZipcode(draft.territoryZipcode || "")
-        setTerritoryPageRange(draft.territoryPageRange || "")
-        setLastVerifiedId(draft.lastVerifiedId || draft.lastVerifiedContactId || null)
-        setDraftRevision(Number(draft.revision) || 0)
-        draftRevisionRef.current = Number(draft.revision) || 0
+        if (response.status === 409 && result.code === "DRAFT_EDITING_ELSEWHERE") {
+          blockDraftEditing(result.server ?? null)
+          return
+        }
+        if (!response.ok) throw new Error(result.error || "Unable to load the server draft")
+        applyServerDraft(result.draft)
         setDraftStatus("saved")
       })
       .catch(() => {
-        if (!cancelled) setDraftStatus("offline")
+        if (!cancelled) {
+          draftEditBlockedRef.current = true
+          setDraftEditBlocked(true)
+          setDraftStatus("offline")
+        }
       })
       .finally(() => {
-        if (!cancelled) draftReadyRef.current = true
+        if (!cancelled) {
+          draftReadyRef.current = true
+          setDraftSessionLoading(false)
+        }
       })
 
     return () => {
       cancelled = true
       window.removeEventListener("keydown", handleKeyDown)
     }
-  }, [authenticatedDisplayName, storageKey, workspaceSlug])
+  }, [applyServerDraft, authenticatedDisplayName, blockDraftEditing, draftSessionStorageKey, storageKey, storagePrefix, workspaceSlug])
 
   useEffect(() => {
     if (!workspaceSlug) return
@@ -540,48 +626,87 @@ export default function SearchHelper({
     localStorage.setItem(storageKey("territoryPageRange"), territoryPageRange)
   }, [storageKey, territoryPageRange])
 
+  const saveDraftSnapshot = useCallback((snapshot: DraftSaveSnapshot) => {
+    if (!workspaceSlug) return Promise.resolve(null)
+    const sessionId = draftSessionIdRef.current
+    const save = draftWriteQueueRef.current.catch(() => undefined).then(async () => {
+      if (draftEditBlockedRef.current) {
+        const error = new Error("This editing session is no longer active.") as Error & { code?: string }
+        error.code = "DRAFT_EDIT_SESSION_REPLACED"
+        throw error
+      }
+      if (!sessionId) throw new Error("Editing session is not ready.")
+      setDraftStatus("saving")
+      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...snapshot, revision: draftRevisionRef.current, draftSessionId: sessionId }),
+      })
+      const result = await response.json()
+      if (response.status === 409) {
+        if (result.code === "DRAFT_EDIT_SESSION_REPLACED") {
+          blockDraftEditing(result.server ?? null)
+        } else {
+          if (draftAutosaveTimerRef.current != null) {
+            window.clearTimeout(draftAutosaveTimerRef.current)
+            draftAutosaveTimerRef.current = null
+          }
+          draftConflictRef.current = true
+          setServerDraft(result.server ?? null)
+          setDraftStatus("conflict")
+        }
+        const error = new Error(result.error || "Draft conflict.") as Error & { code?: string }
+        error.code = result.code === "DRAFT_EDIT_SESSION_REPLACED" ? result.code : "DRAFT_CONFLICT"
+        throw error
+      }
+      if (!response.ok) throw new Error(result.error || "Draft save failed")
+      draftRevisionRef.current = result.revision
+      setDraftRevision(result.revision)
+      draftConflictRef.current = false
+      setDraftStatus("saved")
+      return result
+    })
+    draftWriteQueueRef.current = save.then(() => undefined, () => undefined)
+    return save
+  }, [blockDraftEditing, workspaceSlug])
+
+  const beforeDraftReplacement = useCallback(async () => {
+    if (draftAutosaveTimerRef.current != null) {
+      window.clearTimeout(draftAutosaveTimerRef.current)
+      draftAutosaveTimerRef.current = null
+    }
+    await draftWriteQueueRef.current.catch(() => undefined)
+    if (draftEditBlockedRef.current || !draftSessionIdRef.current) {
+      throw new Error("Switch editing to this device before opening an Excel.")
+    }
+    if (draftConflictRef.current) {
+      throw new Error("Resolve the draft conflict before opening an Excel.")
+    }
+    return draftRevisionRef.current
+  }, [])
+
   // PostgreSQL is authoritative while connected; the namespaced cache above
   // remains available for offline recovery.
   useEffect(() => {
-    if (!workspaceSlug || !draftReadyRef.current || draftStatus === "conflict") return
-    const controller = new AbortController()
-    const timer = window.setTimeout(async () => {
-      setDraftStatus("saving")
-      try {
-        const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            revision: draftRevisionRef.current,
-            contacts,
-            globalNotes,
-            territoryZipcode,
-            territoryPageRange,
-            lastVerifiedId,
-            packageId: activePackageIdRef.current,
-            packageAssignmentRevision: activePackageRevisionRef.current,
-          }),
-        })
-        const result = await response.json()
-        if (response.status === 409) {
-          setServerDraft(result.server)
-          setDraftStatus("conflict")
-          return
-        }
-        if (!response.ok) throw new Error(result.error || "Draft save failed")
-        setDraftRevision(result.revision)
-        draftRevisionRef.current = result.revision
-        setDraftStatus("saved")
-      } catch (error) {
-        if ((error as Error).name !== "AbortError") setDraftStatus("offline")
-      }
+    if (!workspaceSlug || !draftReadyRef.current || draftSessionLoading || draftEditBlocked || draftConflictRef.current || draftClearInProgressRef.current) return
+    const snapshot: DraftSaveSnapshot = {
+      contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId,
+      packageId: activePackageIdRef.current,
+      packageAssignmentRevision: activePackageRevisionRef.current,
+    }
+    const timer = window.setTimeout(() => {
+      if (draftAutosaveTimerRef.current === timer) draftAutosaveTimerRef.current = null
+      void saveDraftSnapshot(snapshot).catch((error) => {
+        const code = (error as Error & { code?: string }).code
+        if (code !== "DRAFT_CONFLICT" && code !== "DRAFT_EDIT_SESSION_REPLACED") setDraftStatus("offline")
+      })
     }, 1000)
+    draftAutosaveTimerRef.current = timer
     return () => {
       window.clearTimeout(timer)
-      controller.abort()
+      if (draftAutosaveTimerRef.current === timer) draftAutosaveTimerRef.current = null
     }
-  }, [contacts, globalNotes, lastVerifiedId, territoryPageRange, territoryZipcode, workspaceSlug])
+  }, [contacts, draftEditBlocked, draftSessionId, draftSessionLoading, globalNotes, lastVerifiedId, saveDraftSnapshot, territoryPageRange, territoryZipcode, workspaceSlug])
 
   // Reset copied state after 2 seconds
   useEffect(() => {
@@ -1542,6 +1667,7 @@ export default function SearchHelper({
 
   // Send work to admin for review
   const sendForReview = useCallback(async () => {
+    if (draftEditBlockedRef.current) return
     if (!userId) {
       setIsUserIdDialogOpen(true)
       return
@@ -1555,28 +1681,20 @@ export default function SearchHelper({
     try {
       let revisionToSubmit = draftRevisionRef.current
       if (workspaceSlug) {
-        const saveResponse = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            revision: revisionToSubmit,
-            contacts,
-            globalNotes,
-            territoryZipcode,
-            territoryPageRange,
-            lastVerifiedId,
-            packageId: activePackageIdRef.current,
-            packageAssignmentRevision: activePackageRevisionRef.current,
-          }),
-        })
-        const savedDraft = await saveResponse.json()
-        if (saveResponse.status === 409) {
-          setServerDraft(savedDraft.server)
-          setDraftStatus("conflict")
-          toast.error("This draft changed elsewhere. Resolve the conflict before submitting.")
-          return
+        if (draftAutosaveTimerRef.current != null) {
+          window.clearTimeout(draftAutosaveTimerRef.current)
+          draftAutosaveTimerRef.current = null
         }
-        if (!saveResponse.ok) throw new Error(savedDraft.error || "Unable to save draft")
+        const savedDraft = await saveDraftSnapshot({
+          contacts,
+          globalNotes,
+          territoryZipcode,
+          territoryPageRange,
+          lastVerifiedId,
+          packageId: activePackageIdRef.current,
+          packageAssignmentRevision: activePackageRevisionRef.current,
+        })
+        if (!savedDraft) throw new Error("Unable to save draft")
         revisionToSubmit = savedDraft.revision
         draftRevisionRef.current = revisionToSubmit
         setDraftRevision(revisionToSubmit)
@@ -1586,7 +1704,7 @@ export default function SearchHelper({
       const res = await fetch(workspaceSlug ? `/api/c/${encodeURIComponent(workspaceSlug)}/submissions` : "/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(workspaceSlug ? { draftRevision: revisionToSubmit } : {
+        body: JSON.stringify(workspaceSlug ? { draftRevision: revisionToSubmit, draftSessionId: draftSessionIdRef.current } : {
           userId, contacts, globalNotes, territoryZipcode, territoryPageRange,
         }),
       })
@@ -1597,14 +1715,25 @@ export default function SearchHelper({
         setTimeout(() => setIsPostExportDialogOpen(true), 1000)
       } else {
         const data = await res.json()
+        if (res.status === 409 && data.code === "DRAFT_EDIT_SESSION_REPLACED") {
+          blockDraftEditing(data.server ?? null)
+          return
+        }
         toast.error(`Submission failed: ${data.error ?? "Unknown error"}`)
       }
     } catch (err) {
-      toast.error("Submission failed. Check your connection and try again.")
+      const code = (err as Error & { code?: string }).code
+      if (code === "DRAFT_EDIT_SESSION_REPLACED") {
+        toast.error("This Excel is being edited on another device. Switch editing to this device to continue.")
+      } else if (code === "DRAFT_CONFLICT") {
+        toast.error("This draft changed elsewhere. Resolve the conflict before submitting.")
+      } else {
+        toast.error("Submission failed. Check your connection and try again.")
+      }
     } finally {
       setIsSendingReview(false)
     }
-  }, [contacts, globalNotes, lastVerifiedId, territoryPageRange, territoryZipcode, userId, workspaceSlug])
+  }, [blockDraftEditing, contacts, globalNotes, lastVerifiedId, saveDraftSnapshot, territoryPageRange, territoryZipcode, userId, workspaceSlug])
 
   // Modify the startNewSession function to reset the file input element
   const startNewSession = useCallback(() => {
@@ -1616,6 +1745,7 @@ export default function SearchHelper({
   }, [contacts])
 
   const confirmNewSession = useCallback(() => {
+    draftConflictRef.current = false
     // Package progress is retained independently of the personal draft.
     activePackageIdRef.current = null
     // Clear all data
@@ -1642,15 +1772,41 @@ export default function SearchHelper({
     localStorage.removeItem(storageKey("territoryPageRange"))
     localStorage.removeItem(storageKey("lastVerifiedId"))
     if (workspaceSlug) {
-      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, { method: "DELETE" })
-      setDraftRevision(0)
-      draftRevisionRef.current = 0
+      if (draftAutosaveTimerRef.current != null) {
+        window.clearTimeout(draftAutosaveTimerRef.current)
+        draftAutosaveTimerRef.current = null
+      }
+      draftClearInProgressRef.current = true
+      setDraftStatus("saving")
+      void (async () => {
+        try {
+          await draftWriteQueueRef.current.catch(() => undefined)
+          const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ draftSessionId: draftSessionIdRef.current }),
+          })
+          const result = await response.json()
+          if (response.status === 409 && result.code === "DRAFT_EDIT_SESSION_REPLACED") {
+            blockDraftEditing(result.server ?? null)
+            return
+          }
+          if (!response.ok) throw new Error(result.error || "Unable to clear the draft")
+          draftRevisionRef.current = 0
+          setDraftRevision(0)
+          setDraftStatus("saved")
+        } catch {
+          setDraftStatus("offline")
+        } finally {
+          draftClearInProgressRef.current = false
+        }
+      })()
     }
 
     setFileUploaded(false)
     setPackageAssignmentLocked(false)
     toast.success("New session started. All data has been cleared.")
-  }, [storageKey, workspaceSlug])
+  }, [blockDraftEditing, storageKey, workspaceSlug])
 
   // Function to get status icon
   const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
@@ -1804,40 +1960,55 @@ export default function SearchHelper({
   }, [])
 
   const reloadServerDraft = useCallback(() => {
-    if (!serverDraft) return
-    activePackageRevisionRef.current = serverDraft.packageAssignmentRevision ?? null
-    activePackageIdRef.current = serverDraft.packageId ?? null
-    setPackageAssignmentLocked(Boolean(serverDraft.packageId))
-    setContacts(Array.isArray(serverDraft.contacts) ? serverDraft.contacts : [])
-    setGlobalNotes(serverDraft.globalNotes || "")
-    setTerritoryZipcode(serverDraft.territoryZipcode || "")
-    setTerritoryPageRange(serverDraft.territoryPageRange || "")
-    setLastVerifiedId(serverDraft.lastVerifiedId || serverDraft.lastVerifiedContactId || null)
-    draftRevisionRef.current = Number(serverDraft.revision) || 0
-    setDraftRevision(draftRevisionRef.current)
+    if (!serverDraft || draftEditBlockedRef.current) return
+    applyServerDraft(serverDraft)
     setServerDraft(null)
+    draftConflictRef.current = false
     setDraftStatus("saved")
-  }, [serverDraft])
+  }, [applyServerDraft, serverDraft])
+
+  const switchDraftEditing = useCallback(async () => {
+    if (!workspaceSlug || !draftSessionIdRef.current || switchingDraftEditor) return
+    setSwitchingDraftEditor(true)
+    try {
+      await draftWriteQueueRef.current.catch(() => undefined)
+      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "switch", sessionId: draftSessionIdRef.current }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Unable to switch editing to this device.")
+      applyServerDraft(result.draft)
+      setServerDraft(null)
+      draftEditBlockedRef.current = false
+      setDraftEditBlocked(false)
+      draftReadyRef.current = true
+      setDraftStatus("saved")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to switch editing to this device.")
+    } finally {
+      setSwitchingDraftEditor(false)
+    }
+  }, [applyServerDraft, switchingDraftEditor, workspaceSlug])
 
   const keepLocalDraft = useCallback(async () => {
-    if (!workspaceSlug || !serverDraft) return
+    if (!workspaceSlug || !serverDraft || draftEditBlockedRef.current || !draftSessionIdRef.current) return
     try {
-      const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          revision: Number(serverDraft.revision) || 0,
+      await draftWriteQueueRef.current.catch(() => undefined)
+      if (draftEditBlockedRef.current) return
+      draftRevisionRef.current = Number(serverDraft.revision) || 0
+      const packageId = serverDraft.packageId === activePackageIdRef.current ? activePackageIdRef.current : null
+      const result = await saveDraftSnapshot({
           contacts,
           globalNotes,
           territoryZipcode,
           territoryPageRange,
           lastVerifiedId,
-          packageId: serverDraft.packageId === activePackageIdRef.current ? activePackageIdRef.current : null,
-          packageAssignmentRevision: activePackageRevisionRef.current,
-        }),
+          packageId,
+          packageAssignmentRevision: packageId == null ? null : activePackageRevisionRef.current,
       })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || "Unable to keep local draft")
+      if (!result) throw new Error("Unable to keep local draft")
       draftRevisionRef.current = result.revision
       setDraftRevision(result.revision)
       activePackageRevisionRef.current = result.packageAssignmentRevision ?? null
@@ -1845,13 +2016,40 @@ export default function SearchHelper({
       setPackageAssignmentLocked(Boolean(result.packageId))
       setServerDraft(null)
       setDraftStatus("saved")
-    } catch {
-      setDraftStatus("offline")
+    } catch (error) {
+      const code = (error as Error & { code?: string }).code
+      if (code !== "DRAFT_EDIT_SESSION_REPLACED" && code !== "DRAFT_CONFLICT") setDraftStatus("offline")
     }
-  }, [contacts, globalNotes, lastVerifiedId, serverDraft, territoryPageRange, territoryZipcode, workspaceSlug])
+  }, [contacts, draftSessionId, globalNotes, lastVerifiedId, saveDraftSnapshot, serverDraft, territoryPageRange, territoryZipcode, workspaceSlug])
 
   return (
     <TooltipProvider>
+      {workspaceSlug && (
+        <AlertDialog open={draftSessionLoading || draftEditBlocked} onOpenChange={() => undefined}>
+          <AlertDialogContent onEscapeKeyDown={(event) => event.preventDefault()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {draftSessionLoading ? "Loading your Excel" : serverDraft ? "Excel open on another device" : "Editing access unavailable"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {draftSessionLoading
+                  ? "Checking the latest saved draft before editing."
+                  : serverDraft
+                    ? "This Excel is currently being edited on another device. Switch editing to this device to continue. The other device will no longer be able to save changes."
+                    : "The app could not confirm editing access. Reconnect, then switch editing to this device to continue."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {!draftSessionLoading && (
+              <AlertDialogFooter>
+                <Button onClick={() => void switchDraftEditing()} disabled={switchingDraftEditor}>
+                  {switchingDraftEditor ? "Switching…" : "Switch editing to this device"}
+                </Button>
+              </AlertDialogFooter>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
       <FloatingProgress
         total={contacts.length}
         notChecked={notCheckedCount}
@@ -1863,6 +2061,7 @@ export default function SearchHelper({
       {workspaceSlug ? (
         <PackageDialogs
           slug={workspaceSlug}
+          draftSessionId={draftSessionId}
           pendingUpload={pendingPackageUpload}
           draftRevision={draftRevision}
           hasDraft={contacts.length > 0}
@@ -1877,8 +2076,11 @@ export default function SearchHelper({
           onDraftLoaded={loadPackageDraft}
           onDraftConflict={(draft) => {
             setServerDraft(draft)
+            draftConflictRef.current = true
             setDraftStatus("conflict")
           }}
+          onEditSessionConflict={(draft) => blockDraftEditing(draft)}
+          beforeDraftReplacement={beforeDraftReplacement}
         />
       ) : null}
 
@@ -2065,7 +2267,7 @@ export default function SearchHelper({
             <span className={`h-1.5 w-1.5 rounded-full ${draftStatus === "offline" || draftStatus === "conflict" ? "bg-amber-500" : draftStatus === "saving" || draftStatus === "loading" ? "bg-blue-500" : "bg-emerald-500"}`} />
             {draftStatus === "loading" ? "Loading draft" : draftStatus === "saving" ? "Saving" : draftStatus === "offline" ? "Offline · saved locally" : draftStatus === "conflict" ? "Draft conflict" : "Saved"}
           </span>
-          {draftStatus === "conflict" && (
+          {draftStatus === "conflict" && !draftEditBlocked && (
             <>
               <Button size="sm" variant="outline" className="h-8" onClick={reloadServerDraft}>Reload server copy</Button>
               <Button size="sm" className="h-8" onClick={keepLocalDraft}>Keep my copy</Button>

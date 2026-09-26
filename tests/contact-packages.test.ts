@@ -70,11 +70,16 @@ describe("draft replacement conflicts", () => {
     const { replaceDraft } = await import("@/lib/contact-packages")
     const { vi } = await import("vitest")
     const saved = { contacts: [{ id: "other-tab", notes: "Keep my work" }], revision: 1 }
-    const query = vi.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [saved] })
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ session_id: "123e4567-e89b-42d3-a456-426614174000" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [saved] })
     await expect(replaceDraft({ query } as any, {
       userId: 12, congregationId: 34, contacts: [], zipcode: "22301", pageStart: 1, pageEnd: 5, expectedRevision: 0,
+      draftSessionId: "123e4567-e89b-42d3-a456-426614174000",
     })).rejects.toMatchObject({ status: 409, server: { contacts: saved.contacts, revision: 1 } })
-    expect(query.mock.calls[1][0]).toContain("WHERE contact_drafts.revision = $6")
-    expect(query.mock.calls[1][1][5]).toBe(0)
+    expect(query.mock.calls[2][0]).toContain("WHERE contact_drafts.revision = $6")
+    expect(query.mock.calls[2][1][5]).toBe(0)
   })
 })

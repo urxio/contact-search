@@ -83,6 +83,7 @@ type DraftPayload = {
 
 type Props = {
   slug: string
+  draftSessionId: string | null
   pendingUpload: PendingPackageUpload | null
   draftRevision: number
   hasDraft: boolean
@@ -93,6 +94,8 @@ type Props = {
   onCancelUpload: () => void
   onDraftLoaded: (draft: DraftPayload, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => void
   onDraftConflict: (draft: DraftPayload) => void
+  onEditSessionConflict: (draft: DraftPayload) => void
+  beforeDraftReplacement: () => Promise<number>
 }
 
 function value<T>(row: PackageRow, camel: keyof PackageRow, snake: keyof PackageRow): T {
@@ -107,6 +110,7 @@ function isClaimableByViewer(row: PackageRow) {
 
 export function PackageDialogs({
   slug,
+  draftSessionId,
   pendingUpload,
   draftRevision,
   hasDraft,
@@ -117,6 +121,8 @@ export function PackageDialogs({
   onCancelUpload,
   onDraftLoaded,
   onDraftConflict,
+  onEditSessionConflict,
+  beforeDraftReplacement,
 }: Props) {
   const api = `/api/c/${encodeURIComponent(slug)}/packages`
   const [zipcodes, setZipcodes] = useState<ZipcodeRow[]>([])
@@ -254,6 +260,7 @@ export function PackageDialogs({
     setUploadAction(action)
     setBusy(true)
     try {
+      const revision = startNow ? await beforeDraftReplacement() : draftRevision
       const response = await fetch(api, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -266,10 +273,15 @@ export function PackageDialogs({
           pageStart: Number(pageStart),
           pageEnd: Number(pageEnd),
           startNow,
-          draftRevision,
+          draftRevision: revision,
+          draftSessionId,
         }),
       })
       const result = await response.json()
+      if (response.status === 409 && result.code === "DRAFT_EDIT_SESSION_REPLACED") {
+        onEditSessionConflict(result.server)
+        throw new Error("This Excel is being edited on another device. Switch editing to this device to continue.")
+      }
       if (response.status === 409 && result.server) {
         onDraftConflict(result.server)
         throw new Error("Your draft changed in another tab. Resolve it before starting this Excel.")
@@ -295,12 +307,17 @@ export function PackageDialogs({
   async function openPackage(row: PackageRow) {
     setBusy(true)
     try {
+      const revision = await beforeDraftReplacement()
       const response = await fetch(`${api}/${row.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "open", draftRevision }),
+        body: JSON.stringify({ action: "open", draftRevision: revision, draftSessionId }),
       })
       const result = await response.json()
+      if (response.status === 409 && result.code === "DRAFT_EDIT_SESSION_REPLACED") {
+        onEditSessionConflict(result.server)
+        throw new Error("This Excel is being edited on another device. Switch editing to this device to continue.")
+      }
       if (response.status === 409 && result.server) {
         onDraftConflict(result.server)
         throw new Error("Your draft changed in another tab. Resolve it before opening this Excel.")

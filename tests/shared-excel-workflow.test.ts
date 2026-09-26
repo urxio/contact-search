@@ -9,22 +9,27 @@ vi.mock("@/lib/auth", async (original) => ({
 }))
 
 const contact = { firstName: "Ana", lastName: "Martin", address: "1 Main St", city: "Alexandria", zipcode: "22301", phone: "" }
+const editorSessionId = "123e4567-e89b-42d3-a456-426614174000"
 const row = { id: 56, visibility: "shared", uploaded_by_user_id: 20, segment_id: 91, zipcode_id: 4,
   zipcode: "22301", city: "Alexandria", page_start: 1, page_end: 5, owner_user_id: null,
   owner: "", status: "Not started", stopped_at_page: null, name: "Shared Excel", contact_count: 1, contacts: [contact] }
 let current: any
 let draft: any
 let membership: any
+let activeDraftSessionId: string
 
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.MULTI_TENANT_ENABLED = "true"
   current = { ...row }
   draft = undefined
+  activeDraftSessionId = editorSessionId
   membership = { user: { id: 12, displayName: "Member" }, congregation: { id: 34 }, membership: { role: "member" } }
   mocks.auth.mockImplementation(async () => membership)
   mocks.admin.mockImplementation(async () => membership)
   mocks.query.mockImplementation(async (sql: string, args: any[] = []) => {
+    if (sql.includes("SELECT session_id FROM contact_draft_edit_sessions")) return { rows: [{ session_id: activeDraftSessionId }] }
+    if (sql.includes("INSERT INTO contact_draft_edit_sessions")) return { rows: [] }
     if (sql.includes("SELECT id,zipcode,total_pages FROM zt_zipcodes")) return { rows: [{ id: 4, zipcode: "22301", total_pages: 20 }] }
     if (sql.includes("INSERT INTO zt_segments")) return { rows: [{ id: 91 }] }
     if (sql.includes("INSERT INTO contact_packages")) return { rows: [{ id: 56 }] }
@@ -43,7 +48,7 @@ beforeEach(() => {
 async function action(body: object, method = "POST") {
   const route = await import("@/app/api/c/[slug]/packages/[id]/route")
   return route[method as "POST" | "PATCH" | "DELETE"](new NextRequest("https://search.example/api/c/central/packages/56", {
-    method, ...(method !== "DELETE" ? { body: JSON.stringify(body) } : {}),
+    method, ...(method !== "DELETE" ? { body: JSON.stringify({ ...body, ...("action" in body && body.action === "open" ? { draftSessionId: editorSessionId } : {}) }) } : {}),
   }), { params: { slug: "central", id: "56" } })
 }
 const writes = () => mocks.query.mock.calls.filter(([sql]) => /^(UPDATE|INSERT|DELETE)/.test(sql))
@@ -166,7 +171,7 @@ describe("Excel upload and listing", () => {
   })
 
   it("can save privately and start with a fresh draft", async () => {
-    const response = await upload({ visibility: "private", startNow: true, draftRevision: 0 })
+    const response = await upload({ visibility: "private", startNow: true, draftRevision: 0, draftSessionId: editorSessionId })
     expect(response.status).toBe(201)
     expect((await response.json()).draft.contacts).toHaveLength(1)
   })
@@ -224,7 +229,7 @@ describe("member draft progress", () => {
     mocks.query.mockImplementation((sql, args) => sql.includes("INSERT INTO contact_drafts") ? Promise.resolve({ rows: [saved] }) : normal(sql, args))
     const { PUT } = await import("@/app/api/c/[slug]/draft/route")
     const response = await PUT(new NextRequest("https://search.example/api/c/central/draft", {
-      method: "PUT", body: JSON.stringify({ contacts: saved.contacts, globalNotes: saved.global_notes, territoryZipcode: "22301", territoryPageRange: "1-5", revision: 1 }),
+      method: "PUT", body: JSON.stringify({ contacts: saved.contacts, globalNotes: saved.global_notes, territoryZipcode: "22301", territoryPageRange: "1-5", revision: 1, draftSessionId: editorSessionId }),
     }), { params: { slug: "central" } })
     expect(response.status).toBe(200)
     expect((await response.json()).contacts[0].notes).toBe("Verified")
@@ -235,7 +240,7 @@ describe("member draft progress", () => {
     draft = { contacts: [{ notes: "Newer work" }], revision: 3 }
     const { PUT } = await import("@/app/api/c/[slug]/draft/route")
     const response = await PUT(new NextRequest("https://search.example/api/c/central/draft", {
-      method: "PUT", body: JSON.stringify({ contacts: [], revision: 1 }),
+      method: "PUT", body: JSON.stringify({ contacts: [], revision: 1, draftSessionId: editorSessionId }),
     }), { params: { slug: "central" } })
     expect(response.status).toBe(409)
     expect((await response.json()).server.revision).toBe(3)
