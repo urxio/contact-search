@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ContactTable } from "@/components/home/ContactTable"
 import { ContactGrid } from "@/components/home/ContactGrid"
 import { OriginBottomBar } from "@/components/home/OriginBottomBar"
+import { flagForCountry } from "@/lib/country-flags"
 import type { EnhancedContact } from "@/types/contact"
 
 const contact: EnhancedContact = {
@@ -47,11 +48,15 @@ describe("Origin contact UI", () => {
       entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [{
         country: "France", explanation: "French surname.",
         sources: [{ title: "Surname history", url: "https://example.org/names/dupont" }],
+      }, {
+        country: "England", explanation: "English surname usage.",
+        sources: [{ title: "English surname record", url: "https://example.org/names/english" }],
       }] },
       onRefresh: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain("Possible origins")
     expect(markup).toContain("🇫🇷")
+    expect(markup).toContain(flagForCountry("England"))
     expect(markup).toContain('href="https://example.org/names/dupont"')
     expect(markup).toContain("Research again")
     expect(markup).toContain("Open Forebears")

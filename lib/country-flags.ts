@@ -23,8 +23,21 @@ for (const [name, code] of Object.entries({
   "cote d ivoire": "CI", turkey: "TR", "viet nam": "VN", burma: "MM",
 })) countryCodes.set(name, code)
 
+const subdivisionTags: Record<string, string> = {
+  england: "gbeng",
+  scotland: "gbsct",
+  wales: "gbwls",
+}
+
 export function flagForCountry(country: string): string | null {
-  const code = countryCodes.get(normalizeCountryName(country))
+  const normalized = normalizeCountryName(country)
+  const subdivisionTag = subdivisionTags[normalized]
+  if (subdivisionTag) {
+    return String.fromCodePoint(0x1f3f4,
+      ...[...subdivisionTag].map((letter) => 0xe0061 + letter.charCodeAt(0) - 97), 0xe007f)
+  }
+
+  const code = countryCodes.get(normalized)
   if (!code) return null
   return [...code].map((letter) => String.fromCodePoint(0x1f1e6 + letter.charCodeAt(0) - 65)).join("")
 }
