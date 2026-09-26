@@ -37,7 +37,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
     <aside
       ref={panelRef}
       aria-label={`Surname origin for ${surname}`}
-      className={`origin-glass-panel pointer-events-auto overflow-y-auto rounded-2xl border shadow-2xl ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
+      className={`origin-glass-panel pointer-events-auto overflow-y-auto rounded-2xl border ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
     >
       <div className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
@@ -55,7 +55,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
 
         <div className="mt-3" aria-live="polite">
           {loading ? (
-            <div role="status" className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
+            <div role="status" className="origin-glass-card flex items-start gap-3 rounded-xl border p-4">
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium">Researching surname…</p>
@@ -73,7 +73,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               <p className="text-sm font-medium">Possible origins</p>
               <div className="mt-2 grid gap-3 md:grid-cols-2">
                 {entry.origins.map((origin, index) => (
-                  <section key={`${origin.country}-${index}`} className="min-w-0 rounded-xl border bg-muted/20 p-4">
+                  <section key={`${origin.country}-${index}`} className="origin-glass-card min-w-0 rounded-xl border p-4">
                     <h3 className="text-base font-semibold">{index + 1}. {origin.country}</h3>
                     <p className="mt-2 text-sm leading-relaxed">{origin.explanation}</p>
                     <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
@@ -90,7 +90,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               <p className="mt-2 text-xs text-muted-foreground">Researched {new Date(entry.researchedAt).toLocaleDateString()}</p>
             </div>
           ) : entry ? (
-            <div className="rounded-lg border bg-muted/20 p-4">
+            <div className="origin-glass-card rounded-xl border p-4">
               <p className="font-medium">Origin unclear</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.

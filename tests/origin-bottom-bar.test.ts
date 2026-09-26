@@ -58,7 +58,7 @@ describe("Origin contact UI", () => {
     expect(markup).toContain("max-h-[60dvh]")
     expect(markup).toContain("origin-glass-panel")
     expect(markup).toContain("rounded-2xl")
-    expect(markup).toContain("shadow-2xl")
+    expect(markup).toContain("origin-glass-card")
     expect(markup).toContain("md:grid-cols-2")
     expect(markup).toContain('aria-label="Close origin panel"')
     expect(markup).toContain("not evidence of this contact")
