@@ -56,6 +56,7 @@ describe("Origin contact UI", () => {
     expect(markup).toContain("Open Forebears")
     expect(markup).not.toContain("origin-forebears-attention")
     expect(markup).toContain("max-h-[60dvh]")
+    expect(markup).toContain("origin-glass-panel")
     expect(markup).toContain("rounded-2xl")
     expect(markup).toContain("shadow-2xl")
     expect(markup).toContain("md:grid-cols-2")

@@ -37,7 +37,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
     <aside
       ref={panelRef}
       aria-label={`Surname origin for ${surname}`}
-      className={`pointer-events-auto overflow-y-auto rounded-2xl border bg-background shadow-2xl ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
+      className={`origin-glass-panel pointer-events-auto overflow-y-auto rounded-2xl border shadow-2xl ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
     >
       <div className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
