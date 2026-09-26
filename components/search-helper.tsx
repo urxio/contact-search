@@ -991,10 +991,8 @@ export default function SearchHelper({
         if (!response.ok) throw new Error(data.error || "Origin research failed")
         if (originLookupRequest.current !== lookupRequest) return
         const entry = data.entry as SurnameOriginEntry
-        if (entry.origins.length) {
-          setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
-          updateLastInteraction(contact.id)
-        }
+        setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
+        if (entry.origins.length) updateLastInteraction(contact.id)
         setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
           ? { ...current, entry, loading: false } : current)
       }).catch((error) => {

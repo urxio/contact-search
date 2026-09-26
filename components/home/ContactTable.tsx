@@ -148,6 +148,16 @@ export function ContactTable({
                         </Tooltip>
                       )}
                     </div>
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                      aria-label={`Research origin of ${contact.lastName || "surname"}`}
+                      className={`mt-2 gap-1.5 sm:hidden ${contact.checkedOnOrigin
+                        ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                        : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                    >
+                      <Globe className="h-4 w-4" /> Origin
+                    </Button>
                   </TableCell>
 
                   <TableCell>{contact.address}</TableCell>
@@ -200,14 +210,14 @@ export function ContactTable({
                         <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger>
+                        <TooltipTrigger asChild>
                           <Button
-                            variant={contact.checkedOnOrigin ? "secondary" : "outline"} size="icon"
+                            variant="outline" size="icon"
                             onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
                             aria-label={`Research origin of ${contact.lastName || "surname"}`}
-                            className={contact.checkedOnOrigin
-                              ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
+                            className={`hidden sm:inline-flex ${contact.checkedOnOrigin
+                              ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
                           >
                             <Globe className="h-4 w-4" />
                           </Button>

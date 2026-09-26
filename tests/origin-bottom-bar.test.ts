@@ -29,17 +29,35 @@ function renderWithTooltips(component: React.ReactElement) {
 }
 
 describe("Origin contact UI", () => {
-  it("shows the Origin action in both views without surname country badges", () => {
+  it("shows a green checked Origin action in the table, mobile table, and grid", () => {
     const table = renderWithTooltips(React.createElement(ContactTable, {
       ...handlers, onToggleSelectAll: vi.fn(),
     }))
     const grid = renderWithTooltips(React.createElement(ContactGrid, handlers))
     for (const markup of [table, grid]) {
       expect(markup).toContain('aria-label="Research origin of Dupont"')
+      expect(markup).toContain("border-green-300 bg-green-100 text-green-700")
       expect(markup).toContain("ring-indigo-500")
       expect(markup).not.toContain("Show saved surname countries")
     }
+    expect(table.match(/aria-label="Research origin of Dupont"/g)).toHaveLength(2)
+    expect(table).toContain("mt-2 gap-1.5 sm:hidden")
+    expect(table).toContain("hidden sm:inline-flex")
     expect(table).toContain("overflow-x-auto")
+  })
+
+  it("leaves the Origin action blue before a completed check", () => {
+    const unchecked = { ...contact, checkedOnOrigin: false }
+    const table = renderWithTooltips(React.createElement(ContactTable, {
+      ...handlers, contacts: [unchecked], onToggleSelectAll: vi.fn(),
+    }))
+    const grid = renderWithTooltips(React.createElement(ContactGrid, {
+      ...handlers, contacts: [unchecked],
+    }))
+    for (const markup of [table, grid]) {
+      expect(markup).toContain("bg-blue-50 hover:bg-blue-100")
+      expect(markup).not.toContain("border-green-300 bg-green-100 text-green-700")
+    }
   })
 
   it("shows sourced results in a responsive nonmodal bottom panel", () => {
