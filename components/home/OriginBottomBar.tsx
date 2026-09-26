@@ -18,10 +18,24 @@ type Props = {
 }
 
 export function OriginBottomBar({ contactName, surname, entry, loading, error, onRefresh, onClose, batchActionsVisible = false }: Props) {
+  const panelRef = React.useRef<HTMLElement>(null)
   const originUnclear = !loading && !error && entry !== null && entry.origins.length === 0
+
+  React.useEffect(() => {
+    const dismissOnOutsidePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return
+      const panel = panelRef.current
+      if (panel && event.target instanceof Node && !panel.contains(event.target)) onClose()
+    }
+
+    // Pointer down runs before a contact's click handler, so selecting another Origin button still opens it.
+    document.addEventListener("pointerdown", dismissOnOutsidePointerDown, true)
+    return () => document.removeEventListener("pointerdown", dismissOnOutsidePointerDown, true)
+  }, [onClose])
 
   return (
     <aside
+      ref={panelRef}
       aria-label={`Surname origin for ${surname}`}
       className={`pointer-events-auto overflow-y-auto rounded-2xl border bg-background shadow-2xl ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
     >
