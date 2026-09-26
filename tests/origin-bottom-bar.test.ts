@@ -54,6 +54,7 @@ describe("Origin contact UI", () => {
     expect(markup).toContain('href="https://example.org/names/dupont"')
     expect(markup).toContain("Research again")
     expect(markup).toContain("Open Forebears")
+    expect(markup).not.toContain("origin-forebears-attention")
     expect(markup).toContain("max-h-[60dvh]")
     expect(markup).toContain("rounded-2xl")
     expect(markup).toContain("shadow-2xl")
@@ -69,6 +70,8 @@ describe("Origin contact UI", () => {
       onRefresh: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain("Origin unclear")
+    expect(markup).toContain("Try searching Forebears")
+    expect(markup).toContain("origin-forebears-attention")
   })
 
   it("shows an animated and accessible loading state", () => {

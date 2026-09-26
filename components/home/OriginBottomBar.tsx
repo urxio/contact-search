@@ -18,6 +18,8 @@ type Props = {
 }
 
 export function OriginBottomBar({ contactName, surname, entry, loading, error, onRefresh, onClose, batchActionsVisible = false }: Props) {
+  const originUnclear = !loading && !error && entry !== null && entry.origins.length === 0
+
   return (
     <aside
       aria-label={`Surname origin for ${surname}`}
@@ -76,7 +78,9 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
           ) : entry ? (
             <div className="rounded-lg border bg-muted/20 p-4">
               <p className="font-medium">Origin unclear</p>
-              <p className="mt-1 text-sm text-muted-foreground">The web sources did not support a likely country of origin for this surname.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
+              </p>
             </div>
           ) : null}
         </div>
@@ -88,8 +92,11 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
             <Button size="sm" variant="outline" disabled={loading} onClick={onRefresh}>
               <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />Research again
             </Button>
-            <Button size="sm" variant="ghost" asChild>
-              <a href={forebearsSurnameUrl(surname)} target="_blank" rel="noopener noreferrer">Open Forebears</a>
+            <Button size="sm" variant={originUnclear ? "outline" : "ghost"}
+              className={originUnclear ? "origin-forebears-attention" : ""} asChild>
+              <a href={forebearsSurnameUrl(surname)} target="_blank" rel="noopener noreferrer">
+                Open Forebears{originUnclear && <ExternalLink className="ml-1 h-4 w-4" aria-hidden="true" />}
+              </a>
             </Button>
           </div>
         </div>
