@@ -51,6 +51,7 @@ describe("Origin contact UI", () => {
       onRefresh: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain("Possible origins")
+    expect(markup).toContain("🇫🇷")
     expect(markup).toContain('href="https://example.org/names/dupont"')
     expect(markup).toContain("Research again")
     expect(markup).toContain("Open Forebears")

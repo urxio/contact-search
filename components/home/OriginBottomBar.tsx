@@ -1,8 +1,9 @@
 "use client"
 
 import React from "react"
-import { ExternalLink, Loader2, RefreshCw, X } from "lucide-react"
+import { ExternalLink, Globe2, Loader2, RefreshCw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { flagForCountry } from "@/lib/country-flags"
 import { forebearsSurnameUrl } from "@/lib/surname-countries"
 import type { SurnameOriginEntry } from "@/lib/surname-origins"
 
@@ -72,20 +73,31 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
             <div>
               <p className="text-sm font-medium">Possible origins</p>
               <div className="mt-2 grid gap-3 md:grid-cols-2">
-                {entry.origins.map((origin, index) => (
-                  <section key={`${origin.country}-${index}`} className="origin-glass-card min-w-0 rounded-xl border p-4">
-                    <h3 className="text-base font-semibold">{index + 1}. {origin.country}</h3>
-                    <p className="mt-2 text-sm leading-relaxed">{origin.explanation}</p>
-                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
-                      {origin.sources.map((source) => (
-                        <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex min-w-0 items-center gap-1 text-sm text-primary underline underline-offset-2">
-                          {source.title || "View source"}<ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        </a>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                {entry.origins.map((origin, index) => {
+                  const flag = flagForCountry(origin.country)
+                  return (
+                    <section key={`${origin.country}-${index}`} className="origin-glass-card min-w-0 rounded-xl border p-4">
+                      <div className="flex items-center gap-3">
+                        <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-background/60 text-2xl leading-none shadow-sm">
+                          {flag || <Globe2 className="h-5 w-5 text-muted-foreground" />}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Possible origin {index + 1}</p>
+                          <h3 className="break-words text-base font-semibold">{origin.country}</h3>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-sm leading-relaxed">{origin.explanation}</p>
+                      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+                        {origin.sources.map((source) => (
+                          <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex min-w-0 items-center gap-1 text-sm text-primary underline underline-offset-2">
+                            {source.title || "View source"}<ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                })}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">Researched {new Date(entry.researchedAt).toLocaleDateString()}</p>
             </div>
