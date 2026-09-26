@@ -16,6 +16,7 @@ export interface EnhancedContact extends BaseContact {
   checkedOnTPS: boolean
   checkedOnOTM: boolean
   checkedOnForebears: boolean
+  checkedOnOrigin?: boolean
   needAddressUpdate: boolean
   needPhoneUpdate: boolean
   lastInteraction?: Date

@@ -40,9 +40,11 @@ import { StatsBar } from "@/components/home/StatsBar"
 import { BatchActionBar } from "@/components/home/BatchActionBar"
 import { ContactTable } from "@/components/home/ContactTable"
 import { ContactGrid } from "@/components/home/ContactGrid"
+import { OriginBottomBar } from "@/components/home/OriginBottomBar"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { useSearchActivity } from "@/hooks/use-search-activity"
-import { forebearsSurnameUrl, normalizeSurname, type SurnameCountryEntry } from "@/lib/surname-countries"
+import { normalizeSurname } from "@/lib/surname-countries"
+import type { SurnameOriginEntry } from "@/lib/surname-origins"
 
 // Add a useRef for the file input at the top of the component with the other state variables
 
@@ -143,36 +145,20 @@ export default function SearchHelper({
   const [territoryPageRange, setTerritoryPageRange] = useState("")
   const [configuredTerritoryZipcodes, setConfiguredTerritoryZipcodes] = useState<Set<string> | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [surnameCountries, setSurnameCountries] = useState<Record<string, SurnameCountryEntry>>({})
-  const [surnameCacheReady, setSurnameCacheReady] = useState(false)
-  const [onographAvailable, setOnographAvailable] = useState(false)
-  const [surnameLookup, setSurnameLookup] = useState<{
-    surname: string; contactId: string; entry: SurnameCountryEntry | null; loading: boolean
+  const [originLookup, setOriginLookup] = useState<{
+    surname: string; contactId: string; contactName: string
+    entry: SurnameOriginEntry | null; loading: boolean; error: string | null
   } | null>(null)
-  const surnameLookupRequest = useRef(0)
+  const originLookupRequest = useRef(0)
 
   useEffect(() => {
-    if (!workspaceSlug) { setSurnameCacheReady(true); return }
-    let active = true
-    setSurnameCacheReady(false)
-    setSurnameCountries({})
-    setOnographAvailable(false)
-    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-countries`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load saved surname countries")
-        return response.json()
-      })
-      .then((data) => {
-        if (!active) return
-        const entries: Record<string, SurnameCountryEntry> = Object.create(null)
-        for (const entry of data.entries ?? []) entries[entry.surname] = entry
-        setSurnameCountries(entries)
-        setOnographAvailable(Boolean(data.lookupAvailable))
-      })
-      .catch(() => { if (active) toast.error("Saved surname countries are temporarily unavailable") })
-      .finally(() => { if (active) setSurnameCacheReady(true) })
-    return () => { active = false }
-  }, [workspaceSlug])
+    if (!originLookup) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { originLookupRequest.current += 1; setOriginLookup(null) }
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [originLookup])
 
   // Add new state variables for efficiency features
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
@@ -713,6 +699,7 @@ export default function SearchHelper({
             checkedOnTPS: false,
             checkedOnOTM: false,
             checkedOnForebears: false,
+            checkedOnOrigin: false,
             needAddressUpdate: false,
             needPhoneUpdate: false,
             territoryStatus: false, // Initialize territory status
@@ -856,77 +843,42 @@ export default function SearchHelper({
     [updateLastInteraction],
   )
 
-  const markSurnameChecked = useCallback((contactId: string) => {
-    setContacts((current) => current.map((item) => item.id === contactId ? { ...item, checkedOnForebears: true } : item))
-    updateLastInteraction(contactId)
-  }, [updateLastInteraction])
-
-  const openForebears = useCallback((surname: string) => {
-    const url = forebearsSurnameUrl(surname)
-    const opened = window.open(url, "_blank")
-    if (opened) opened.opener = null
-    else window.location.assign(url)
-  }, [])
-
-  const searchOnForebears = useCallback(
-    (contact: EnhancedContact) => {
-      const lookupRequest = ++surnameLookupRequest.current
+  const searchOrigin = useCallback(
+    (contact: Pick<EnhancedContact, "id" | "lastName" | "fullName">, refresh = false) => {
+      const lookupRequest = ++originLookupRequest.current
       const surname = normalizeSurname(contact.lastName)
       if (!surname) {
-        toast.error("Last name is required for Forebears search")
+        toast.error("Last name is required for origin research")
         return
       }
+      setOriginLookup({ surname, contactId: contact.id, contactName: contact.fullName,
+        entry: null, loading: true, error: null })
       if (!workspaceSlug) {
-        openForebears(surname)
-        markSurnameChecked(contact.id)
+        setOriginLookup((current) => current && current.contactId === contact.id
+          ? { ...current, loading: false, error: "Origin research is available in a workspace." } : current)
         return
       }
-      if (!surnameCacheReady) { toast.info("Saved surname countries are still loading. Try again in a moment."); return }
-      const entry = surnameCountries[surname] ?? null
-      if (entry) {
-        if (!entry.countries.length) {
-          openForebears(surname)
-          markSurnameChecked(contact.id)
-          return
-        }
-        setSurnameLookup({ surname, contactId: contact.id, entry, loading: false })
-        markSurnameChecked(contact.id)
-        return
-      }
-      if (!onographAvailable) {
-        openForebears(surname)
-        markSurnameChecked(contact.id)
-        return
-      }
-      setSurnameLookup({ surname, contactId: contact.id, entry: null, loading: true })
-      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-countries`, {
+      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-origins`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "lookup", surname }),
+        body: JSON.stringify({ surname, refresh }),
       }).then(async (response) => {
         const data = await response.json()
-        if (!response.ok) throw new Error(data.error || "Country lookup failed")
-        if (surnameLookupRequest.current !== lookupRequest) return
-        const nextEntry = data.entry as SurnameCountryEntry | null
-        if (nextEntry) {
-          setSurnameCountries((current) => ({ ...current, [surname]: nextEntry }))
+        if (!response.ok) throw new Error(data.error || "Origin research failed")
+        if (originLookupRequest.current !== lookupRequest) return
+        const entry = data.entry as SurnameOriginEntry
+        if (entry.origins.length) {
+          setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
+          updateLastInteraction(contact.id)
         }
-        if (!nextEntry?.countries.length) {
-          setSurnameLookup(null)
-          openForebears(surname)
-          markSurnameChecked(contact.id)
-          return
-        }
-        markSurnameChecked(contact.id)
-        setSurnameLookup((current) => current?.surname === surname && current.contactId === contact.id
-          ? { ...current, entry: nextEntry, loading: false } : current)
-      }).catch(() => {
-        if (surnameLookupRequest.current !== lookupRequest) return
-        setSurnameLookup(null)
-        openForebears(surname)
-        markSurnameChecked(contact.id)
+        setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
+          ? { ...current, entry, loading: false } : current)
+      }).catch((error) => {
+        if (originLookupRequest.current !== lookupRequest) return
+        setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
+          ? { ...current, loading: false, error: error instanceof Error ? error.message : "Please try again." } : current)
       })
     },
-    [markSurnameChecked, onographAvailable, openForebears, surnameCacheReady, surnameCountries, workspaceSlug],
+    [updateLastInteraction, workspaceSlug],
   )
 
   // Update the handleStatusChange function
@@ -1064,6 +1016,7 @@ export default function SearchHelper({
       checkedOnTPS: false,
       checkedOnOTM: false,
       checkedOnForebears: false,
+      checkedOnOrigin: false,
       needAddressUpdate: false,
       needPhoneUpdate: false,
       territoryStatus: false,
@@ -2121,7 +2074,7 @@ export default function SearchHelper({
         </div>
       )}
 
-      <main className="container mx-auto py-8 px-4 pb-24">
+      <main className={`container mx-auto px-4 py-8 ${originLookup ? selectedContacts.length ? "pb-[75vh]" : "pb-[60vh]" : "pb-24"}`}>
 
         {/* Add Contact Dialog (main page) */}
         <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
@@ -2168,6 +2121,7 @@ export default function SearchHelper({
                   checkedOnTPS: false,
                   checkedOnOTM: false,
                   checkedOnForebears: false,
+                  checkedOnOrigin: false,
                   needAddressUpdate: false,
                   needPhoneUpdate: false,
                   territoryStatus: false,
@@ -2423,94 +2377,80 @@ export default function SearchHelper({
                 </div>
               </div>
 
-              {/* List View */}
-              {viewType === "list" && (
-                <ContactTable
-                  contacts={filteredContacts}
-                  selectedContacts={selectedContacts}
-                  lastVerifiedId={lastVerifiedId}
-                  onToggleSelectAll={toggleSelectAll}
-                  onToggleSelection={toggleContactSelection}
-                  onToggleExpanded={toggleContactExpanded}
-                  onStatusChange={handleStatusChange}
-                  onNotesChange={handleNotesChange}
-                  onFieldChange={updateContactField}
-                  onAddressUpdateChange={handleAddressUpdateChange}
-                  onPhoneUpdateChange={handlePhoneUpdateChange}
-                  onTerritoryStatusChange={handleTerritoryStatusChange}
-                  onSearchForebears={searchOnForebears}
-                  onSearchTPS={searchOnTruePeopleSearch}
-                  surnameCountries={surnameCountries}
-                  colorByArea={colorByArea}
-                  areaByZipcode={areaByZipcode}
-                  areaOrder={areaOrder}
-                />
-              )}
-              {/* Grid View */}
-              {viewType === "grid" && (
-                <ContactGrid
-                  contacts={filteredContacts}
-                  selectedContacts={selectedContacts}
-                  lastVerifiedId={lastVerifiedId}
-                  onToggleSelection={toggleContactSelection}
-                  onToggleExpanded={toggleContactExpanded}
-                  onStatusChange={handleStatusChange}
-                  onNotesChange={handleNotesChange}
-                  onFieldChange={updateContactField}
-                  onAddressUpdateChange={handleAddressUpdateChange}
-                  onPhoneUpdateChange={handlePhoneUpdateChange}
-                  onTerritoryStatusChange={handleTerritoryStatusChange}
-                  onSearchForebears={searchOnForebears}
-                  onSearchTPS={searchOnTruePeopleSearch}
-                  surnameCountries={surnameCountries}
-                  colorByArea={colorByArea}
-                  areaByZipcode={areaByZipcode}
-                  areaOrder={areaOrder}
-                />
-              )}
+              <div className="min-w-0">
+                  {/* List View */}
+                  {viewType === "list" && (
+                    <ContactTable
+                      contacts={filteredContacts}
+                      selectedContacts={selectedContacts}
+                      lastVerifiedId={lastVerifiedId}
+                      onToggleSelectAll={toggleSelectAll}
+                      onToggleSelection={toggleContactSelection}
+                      onToggleExpanded={toggleContactExpanded}
+                      onStatusChange={handleStatusChange}
+                      onNotesChange={handleNotesChange}
+                      onFieldChange={updateContactField}
+                      onAddressUpdateChange={handleAddressUpdateChange}
+                      onPhoneUpdateChange={handlePhoneUpdateChange}
+                      onTerritoryStatusChange={handleTerritoryStatusChange}
+                      onSearchOrigin={searchOrigin}
+                      onSearchTPS={searchOnTruePeopleSearch}
+                      activeOriginContactId={originLookup?.contactId}
+                      colorByArea={colorByArea}
+                      areaByZipcode={areaByZipcode}
+                      areaOrder={areaOrder}
+                    />
+                  )}
+                  {/* Grid View */}
+                  {viewType === "grid" && (
+                    <ContactGrid
+                      contacts={filteredContacts}
+                      selectedContacts={selectedContacts}
+                      lastVerifiedId={lastVerifiedId}
+                      onToggleSelection={toggleContactSelection}
+                      onToggleExpanded={toggleContactExpanded}
+                      onStatusChange={handleStatusChange}
+                      onNotesChange={handleNotesChange}
+                      onFieldChange={updateContactField}
+                      onAddressUpdateChange={handleAddressUpdateChange}
+                      onPhoneUpdateChange={handlePhoneUpdateChange}
+                      onTerritoryStatusChange={handleTerritoryStatusChange}
+                      onSearchOrigin={searchOrigin}
+                      onSearchTPS={searchOnTruePeopleSearch}
+                      activeOriginContactId={originLookup?.contactId}
+                      colorByArea={colorByArea}
+                      areaByZipcode={areaByZipcode}
+                      areaOrder={areaOrder}
+                    />
+                  )}
+              </div>
             </CardContent>
           </Card>
         )}
       </main>
 
-      {/* Floating Batch Action Box */}
-      <BatchActionBar
-        selectedCount={selectedContacts.length}
-        onClearSelection={() => setSelectedContacts([])}
-        onUpdateBatch={updateBatchStatus}
-        onMarkAsNotFrenchName={markSelectedAsNotFrenchName}
-        canMarkNotFrench={canMarkSelectedNotFrench}
-      />
-
-      <Dialog open={Boolean(surnameLookup)} onOpenChange={(open) => {
-        if (!open) { surnameLookupRequest.current += 1; setSurnameLookup(null) }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Countries for {surnameLookup?.surname}</DialogTitle>
-            <DialogDescription>
-              These are countries where the surname is found, not proof of this contact&apos;s ancestry or nationality.
-            </DialogDescription>
-          </DialogHeader>
-          {surnameLookup?.loading ? (
-            <p className="text-sm text-muted-foreground">Checking surname data…</p>
-          ) : (
-            <div className="space-y-4">
-              {surnameLookup?.entry?.countries.length ? (
-                <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                  <div className="font-medium">{surnameLookup.entry.countries.join(", ")}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {surnameLookup.entry.source === "onograph" ? "Most prevalent countries · OnoGraph" : "Saved by your team"}
-                  </div>
-                </div>
-              ) : null}
-              <Button variant="outline" size="sm" onClick={() => surnameLookup && openForebears(surnameLookup.surname)}>
-                Open Forebears
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <div className="container pointer-events-none fixed inset-x-0 bottom-0 z-50 mx-auto flex flex-col gap-3 px-10 pb-4 sm:pb-6">
+        {originLookup && (
+          <OriginBottomBar
+            contactName={originLookup.contactName}
+            surname={originLookup.surname}
+            entry={originLookup.entry}
+            loading={originLookup.loading}
+            error={originLookup.error}
+            batchActionsVisible={selectedContacts.length > 0}
+            onRefresh={() => searchOrigin({ id: originLookup.contactId, lastName: originLookup.surname,
+              fullName: originLookup.contactName }, true)}
+            onClose={() => { originLookupRequest.current += 1; setOriginLookup(null) }}
+          />
+        )}
+        <BatchActionBar
+          selectedCount={selectedContacts.length}
+          onClearSelection={() => setSelectedContacts([])}
+          onUpdateBatch={updateBatchStatus}
+          onMarkAsNotFrenchName={markSelectedAsNotFrenchName}
+          canMarkNotFrench={canMarkSelectedNotFrench}
+        />
+      </div>
 
       {/* ── Post-Submit New Session Dialog ── */}
       <Dialog open={isPostExportDialogOpen} onOpenChange={setIsPostExportDialogOpen}>

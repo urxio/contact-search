@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { areaColorClass } from "@/lib/area-colors"
-import { normalizeSurname, type SurnameCountryEntry } from "@/lib/surname-countries"
 
 interface ContactTableProps {
   contacts: EnhancedContact[]
@@ -30,9 +28,9 @@ interface ContactTableProps {
   onAddressUpdateChange: (id: string, v: boolean) => void
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
-  onSearchForebears: (contact: EnhancedContact) => void
+  onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
-  surnameCountries?: Record<string, SurnameCountryEntry>
+  activeOriginContactId?: string | null
   colorByArea?: boolean
   areaByZipcode?: Map<string, string>
   areaOrder?: string[]
@@ -51,16 +49,16 @@ export function ContactTable({
   onAddressUpdateChange,
   onPhoneUpdateChange,
   onTerritoryStatusChange,
-  onSearchForebears,
+  onSearchOrigin,
   onSearchTPS,
-  surnameCountries = {},
+  activeOriginContactId = null,
   colorByArea = false,
   areaByZipcode = new Map(),
   areaOrder = [],
 }: ContactTableProps) {
   return (
-    <ScrollArea className="rounded-md border">
-      <Table>
+    <div className="overflow-x-auto rounded-md border">
+      <Table className="min-w-[1100px]">
         <TableHeader>
           <TableRow>
             <TableHead className="w-[30px]">
@@ -98,6 +96,8 @@ export function ContactTable({
                 <TableRow
                   id={`contact-row-${contact.id}`}
                   className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${
+                    contact.id === activeOriginContactId ? "ring-2 ring-inset ring-indigo-500" : ""
+                  } ${
                     contact.id === lastVerifiedId ? "border-l-4 border-l-green-500 dark:border-l-green-400" : ""
                   }`}
                   onClick={() => onToggleExpanded(contact.id)}
@@ -112,11 +112,6 @@ export function ContactTable({
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {contact.fullName}
-                      {surnameCountries[normalizeSurname(contact.lastName)]?.countries.length > 0 && (
-                        <span className="rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-                          {surnameCountries[normalizeSurname(contact.lastName)].countries.join(", ")}
-                        </span>
-                      )}
                       {colorByArea && area && (
                         <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                           {area}
@@ -207,16 +202,17 @@ export function ContactTable({
                       <Tooltip>
                         <TooltipTrigger>
                           <Button
-                            variant={contact.checkedOnForebears ? "secondary" : "outline"} size="icon"
-                            onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
-                            className={contact.checkedOnForebears
+                            variant={contact.checkedOnOrigin ? "secondary" : "outline"} size="icon"
+                            onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                            aria-label={`Research origin of ${contact.lastName || "surname"}`}
+                            className={contact.checkedOnOrigin
                               ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
                               : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
                           >
                             <Globe className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{surnameCountries[normalizeSurname(contact.lastName)]?.countries.length ? "Show saved surname countries" : "Search on Forebears.io"}</TooltipContent>
+                        <TooltipContent>Research surname origin</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger>
@@ -301,6 +297,6 @@ export function ContactTable({
           })}
         </TableBody>
       </Table>
-    </ScrollArea>
+    </div>
   )
 }

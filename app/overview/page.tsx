@@ -135,8 +135,8 @@ const sections = [
       },
       {
         icon: <Globe className="h-5 w-5 text-indigo-500" />,
-        title: "Forebears.io",
-        desc: "Opens Forebears.io in a new tab with the contact's surname searched automatically. Useful for looking up the origin and frequency of a family name. Button turns green once clicked.",
+        title: "Surname Origin",
+        desc: "Opens a sidebar with up to two likely surname origins researched from web sources. The button turns green after a sourced result is shown. You can open Forebears from the sidebar for manual checking.",
       },
     ],
   },

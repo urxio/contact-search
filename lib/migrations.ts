@@ -230,6 +230,17 @@ const migrations: Migration[] = [{
     )`)
     await client.query(`CREATE INDEX surname_country_cache_updated_idx ON surname_country_cache(congregation_id,updated_at DESC)`)
   }
+},{
+  version:16,name:"shared surname origin research cache",async run(client){
+    await client.query(`CREATE TABLE surname_origin_cache (
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      surname TEXT NOT NULL CHECK(length(surname) BETWEEN 1 AND 120),
+      origins JSONB NOT NULL CHECK(jsonb_typeof(origins)='array'),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(congregation_id,surname)
+    )`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

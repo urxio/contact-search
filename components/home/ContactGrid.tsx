@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,7 +15,6 @@ import {
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { areaColorClass } from "@/lib/area-colors"
-import { normalizeSurname, type SurnameCountryEntry } from "@/lib/surname-countries"
 
 interface ContactGridProps {
   contacts: EnhancedContact[]
@@ -28,9 +28,9 @@ interface ContactGridProps {
   onAddressUpdateChange: (id: string, v: boolean) => void
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
-  onSearchForebears: (contact: EnhancedContact) => void
+  onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
-  surnameCountries?: Record<string, SurnameCountryEntry>
+  activeOriginContactId?: string | null
   colorByArea?: boolean
   areaByZipcode?: Map<string, string>
   areaOrder?: string[]
@@ -67,9 +67,9 @@ export function ContactGrid({
   onAddressUpdateChange,
   onPhoneUpdateChange,
   onTerritoryStatusChange,
-  onSearchForebears,
+  onSearchOrigin,
   onSearchTPS,
-  surnameCountries = {},
+  activeOriginContactId = null,
   colorByArea = false,
   areaByZipcode = new Map(),
   areaOrder = [],
@@ -80,7 +80,7 @@ export function ContactGrid({
         <Card
           key={contact.id}
           id={`contact-row-${contact.id}`}
-          className={`overflow-hidden cursor-pointer ${colorByArea ? areaColorClass(areaByZipcode.get(contact.zipcode.trim()), areaOrder) : ""} ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""}`}
+          className={`overflow-hidden cursor-pointer ${colorByArea ? areaColorClass(areaByZipcode.get(contact.zipcode.trim()), areaOrder) : ""} ${contact.id === lastVerifiedId ? "border-l-4 border-l-green-500" : ""} ${contact.id === activeOriginContactId ? "ring-2 ring-indigo-500" : ""}`}
           onClick={() => onToggleExpanded(contact.id)}
         >
           <CardHeader className="pb-2">
@@ -94,11 +94,6 @@ export function ContactGrid({
                   />
                   <CardTitle className="text-base">{contact.fullName}</CardTitle>
                 </div>
-                {surnameCountries[normalizeSurname(contact.lastName)]?.countries.length > 0 && (
-                  <span className="mt-1 inline-block rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-                    {surnameCountries[normalizeSurname(contact.lastName)].countries.join(", ")}
-                  </span>
-                )}
                 {colorByArea && areaByZipcode.get(contact.zipcode.trim()) && (
                   <span className="mt-1 inline-block rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                     {areaByZipcode.get(contact.zipcode.trim())}
@@ -170,16 +165,17 @@ export function ContactGrid({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={contact.checkedOnForebears ? "secondary" : "outline"} size="icon"
-                    onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
-                    className={contact.checkedOnForebears
+                    variant={contact.checkedOnOrigin ? "secondary" : "outline"} size="icon"
+                    onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                    aria-label={`Research origin of ${contact.lastName || "surname"}`}
+                    className={contact.checkedOnOrigin
                       ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
                       : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
                   >
                     <Globe className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{surnameCountries[normalizeSurname(contact.lastName)]?.countries.length ? "Show saved surname countries" : "Search on Forebears.io"}</TooltipContent>
+                <TooltipContent>Research surname origin</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

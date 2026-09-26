@@ -28,8 +28,8 @@ export function BatchActionBar({
   if (selectedCount === 0) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg p-4 z-50 transition-all duration-300 ease-in-out">
-      <div className="container mx-auto flex flex-wrap items-center justify-between gap-3">
+    <div className="pointer-events-auto rounded-2xl border bg-background p-4 shadow-lg transition-all duration-300 ease-in-out">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="font-medium whitespace-nowrap">{selectedCount} selected</span>
           <Button size="sm" variant="ghost" onClick={onClearSelection}>

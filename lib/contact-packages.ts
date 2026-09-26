@@ -55,7 +55,7 @@ export function freshDraftContacts(contacts: PackageContact[]) {
     return {
       ...contact, fullName: `${contact.firstName} ${contact.lastName}`.trim(), id: randomUUID(),
       status: duplicate ? "Duplicate" : "Not checked", notes: "", isExpanded: false,
-      checkedOnTPS: false, checkedOnOTM: false, checkedOnForebears: false,
+      checkedOnTPS: false, checkedOnOTM: false, checkedOnForebears: false, checkedOnOrigin: false,
       needAddressUpdate: false, needPhoneUpdate: false, territoryStatus: false,
     }
   })
