@@ -239,6 +239,7 @@ export default function SearchHelper({
   const draftClearInProgressRef = useRef(false)
   const activePackageIdRef = useRef<number | null>(null)
   const activePackageRevisionRef = useRef<number | null>(null)
+  const releasedPackageIdRef = useRef<number | null>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   // Debounced search to avoid re-filtering on every keystroke
@@ -1742,10 +1743,12 @@ export default function SearchHelper({
     }
   }, [contacts])
 
-  const confirmNewSession = useCallback(() => {
+  const clearCurrentSession = useCallback(() => {
     draftConflictRef.current = false
+    setServerDraft(null)
     // Package progress is retained independently of the personal draft.
     activePackageIdRef.current = null
+    activePackageRevisionRef.current = null
     // Clear all data
     setContacts([])
     setGlobalNotes("")
@@ -1776,9 +1779,10 @@ export default function SearchHelper({
       }
       draftClearInProgressRef.current = true
       setDraftStatus("saving")
-      void (async () => {
+      const pendingWrites = draftWriteQueueRef.current
+      const clearingDraft = (async () => {
         try {
-          await draftWriteQueueRef.current.catch(() => undefined)
+          await pendingWrites.catch(() => undefined)
           const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
@@ -1799,12 +1803,26 @@ export default function SearchHelper({
           draftClearInProgressRef.current = false
         }
       })()
+      draftWriteQueueRef.current = clearingDraft.then(() => undefined, () => undefined)
     }
 
     setFileUploaded(false)
     setPackageAssignmentLocked(false)
-    toast.success("New session started. All data has been cleared.")
   }, [blockDraftEditing, storageKey, workspaceSlug])
+
+  const confirmNewSession = useCallback(() => {
+    clearCurrentSession()
+    toast.success("New session started. All data has been cleared.")
+  }, [clearCurrentSession])
+
+  const handlePackageBrowserOpenChange = useCallback((open: boolean) => {
+    if (!open && releasedPackageIdRef.current != null) {
+      const releasedPackageId = releasedPackageIdRef.current
+      releasedPackageIdRef.current = null
+      if (activePackageIdRef.current === releasedPackageId) clearCurrentSession()
+    }
+    setPackageBrowserOpen(open)
+  }, [clearCurrentSession])
 
   // Function to get status icon
   const getStatusIcon = useCallback((status: EnhancedContact["status"]) => {
@@ -2066,7 +2084,19 @@ export default function SearchHelper({
           browseOpen={packageBrowserOpen}
           preferredPackageId={preferredPackageId}
           canManagePackages={workspace?.canManagePackages === true}
-          onBrowseOpenChange={setPackageBrowserOpen}
+          onBrowseOpenChange={handlePackageBrowserOpenChange}
+          onPackageReleased={(packageId) => {
+            releasedPackageIdRef.current = packageId
+            void refreshActivePackages()
+          }}
+          beforePackageRelease={async (packageId) => {
+            if (activePackageIdRef.current !== packageId) return
+            await beforeDraftReplacement()
+            await saveDraftSnapshot({
+              contacts, globalNotes, territoryZipcode, territoryPageRange, lastVerifiedId,
+              packageId, packageAssignmentRevision: activePackageRevisionRef.current,
+            })
+          }}
           onCancelUpload={() => {
             setPendingPackageUpload(null)
             if (fileInputRef.current) fileInputRef.current.value = ""

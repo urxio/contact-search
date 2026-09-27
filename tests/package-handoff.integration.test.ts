@@ -147,6 +147,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
   it("restores reviewed contacts, stable IDs, notes, flags, and last position after release and claim", async () => {
     const saved = await review()
     expect((await action({ action: "release" })).status).toBe(200)
+    expect((await query("SELECT count(*)::int count FROM contact_drafts WHERE user_id=1 AND package_id=$1", [packageId])).rows[0].count).toBe(0)
     state.userId = 2
     const resumed = await open()
     expect(resumed).toMatchObject({ contacts: saved.contacts, globalNotes: saved.globalNotes, lastVerifiedId: saved.lastVerifiedId, packageId, resumed: true })
@@ -229,12 +230,12 @@ describe("Excel progress handoffs with PostgreSQL", () => {
     state.userId = 2; state.role = "member"
     expect((await open()).contacts).toEqual(saved.contacts)
   })
-  it("rejects submission from a former assignee", async () => {
+  it("removes the former assignee's draft so it cannot be submitted", async () => {
     const saved = await review()
     await action({ action: "release" })
     const { POST } = await import("@/app/api/c/[slug]/submissions/route")
     const response = await POST(new NextRequest("https://search.example/api/c/central/submissions", { method: "POST", body: JSON.stringify({ draftRevision: saved.revision, draftSessionId: editorSessionA }) }), { params: { slug: "central" } })
-    expect(response.status).toBe(409)
+    expect(response.status).toBe(404)
   })
   it("retains deliberate contact deletions when resumed", async () => {
     const saved = await review()

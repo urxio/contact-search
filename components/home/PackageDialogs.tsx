@@ -91,6 +91,8 @@ type Props = {
   preferredPackageId?: number | null
   canManagePackages?: boolean
   onBrowseOpenChange: (open: boolean) => void
+  onPackageReleased: (packageId: number) => void
+  beforePackageRelease: (packageId: number) => Promise<void>
   onCancelUpload: () => void
   onDraftLoaded: (draft: DraftPayload, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => void
   onDraftConflict: (draft: DraftPayload) => void
@@ -118,6 +120,8 @@ export function PackageDialogs({
   preferredPackageId,
   canManagePackages = false,
   onBrowseOpenChange,
+  onPackageReleased,
+  beforePackageRelease,
   onCancelUpload,
   onDraftLoaded,
   onDraftConflict,
@@ -358,6 +362,7 @@ export function PackageDialogs({
   async function packageAction(row: PackageRow, action: "release" | "delete") {
     setBusy(true)
     try {
+      if (action === "release") await beforePackageRelease(row.id)
       const response = await fetch(`${api}/${row.id}`, action === "delete" ? { method: "DELETE" } : {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -365,6 +370,7 @@ export function PackageDialogs({
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || `Unable to ${action} Excel`)
+      if (action === "release") onPackageReleased(row.id)
       await refreshPackages()
       toast.success(action === "release" ? "Excel made available." : "Excel deleted.")
     } catch (error) {

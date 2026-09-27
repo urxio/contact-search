@@ -44,6 +44,7 @@ describe("package release", () => {
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ rows: [{ ...packageRow, visibility: "shared", owner_user_id: null, owner: "", status: "Not started" }] })
       .mockResolvedValueOnce({})
     const { POST } = await import("@/app/api/c/[slug]/packages/[id]/route")

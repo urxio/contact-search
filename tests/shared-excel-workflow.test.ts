@@ -127,11 +127,23 @@ describe("shared Excel permissions and lifecycle", () => {
     expect(writes()).toEqual([])
   })
 
-  it("releases the assignee's private Excel into shared availability without deleting their draft", async () => {
+  it("releases the assignee's private Excel and closes linked personal drafts", async () => {
     current = { ...row, visibility: "private", owner_user_id: 12, status: "In progress" }
     expect((await action({ action: "release" })).status).toBe(200)
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("SET visibility='shared'"), [56, 34])
-    expect(writes().some(([sql]) => sql.includes("contact_drafts"))).toBe(false)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM contact_drafts WHERE package_id=$1"), [56, 34])
+  })
+
+  it("rejects a stale save after the Excel has been made available", async () => {
+    current = { ...row, owner_user_id: null, assignment_revision: 2 }
+    draft = { contacts: [contact], revision: 3, package_id: 56, package_assignment_revision: 1 }
+    const { PUT } = await import("@/app/api/c/[slug]/draft/route")
+    const response = await PUT(new NextRequest("https://search.example/api/c/central/draft", {
+      method: "PUT",
+      body: JSON.stringify({ contacts: [contact], revision: 3, draftSessionId: editorSessionId, packageId: 56, packageAssignmentRevision: 1 }),
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(409)
+    expect(writes()).toEqual([])
   })
 
   it("prevents unrelated members from releasing work", async () => {
