@@ -142,7 +142,7 @@ describe("Excel progress handoffs with PostgreSQL", () => {
     expect(migratedProgress).toMatchObject({ contacts: [{ id: "legacy-id", status: "Not French" }], globalNotes: "Existing notes", lastVerifiedId: "legacy-id" })
   })
   it("applies the handoff migration", async () => {
-    expect((await query("SELECT max(version) AS version FROM schema_migrations")).rows[0].version).toBe(17)
+    expect((await query("SELECT max(version) AS version FROM schema_migrations")).rows[0].version).toBe(18)
   })
   it("restores reviewed contacts, stable IDs, notes, flags, and last position after release and claim", async () => {
     const saved = await review()

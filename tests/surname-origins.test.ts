@@ -10,7 +10,7 @@ vi.mock("@/lib/auth", async (original) => ({
 }))
 
 const context = { params: { slug: "central" } }
-const request = (body: object) => new NextRequest("https://search.example/api/c/central/surname-origins", {
+const request = (body: object, slug = "central") => new NextRequest(`https://search.example/api/c/${slug}/surname-origins`, {
   method: "POST", headers: { origin: "https://search.example", host: "search.example", "Content-Type": "application/json" },
   body: JSON.stringify(body),
 })
@@ -70,7 +70,7 @@ describe("origin response validation", () => {
   })
 })
 
-describe("workspace surname origins", () => {
+describe("platform surname origin cache", () => {
   it("rejects invalid surnames before reading cache or calling OpenAI", async () => {
     const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
     const response = await POST(request({ surname: "  " }), context)
@@ -78,7 +78,31 @@ describe("workspace surname origins", () => {
     expect(mocks.query).not.toHaveBeenCalled()
   })
 
-  it("reuses a cache entry scoped to the member's workspace", async () => {
+  it("reuses a cached surname across workspaces after checking membership", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key"
+    const cache = new Map<string, ReturnType<typeof row>>()
+    mocks.query.mockImplementation(async (sql: string, values: string[]) => {
+      if (sql.includes("INSERT INTO platform_surname_origin_cache")) {
+        cache.set(values[0], row(values[0], JSON.parse(values[1])))
+        return { rows: [] }
+      }
+      const cached = cache.get(values[0])
+      return { rows: cached ? [cached] : [] }
+    })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => researchResponse() })
+    vi.stubGlobal("fetch", fetchMock)
+    const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+    expect((await POST(request({ surname: "Dupont" }), context)).status).toBe(200)
+    mocks.member.mockResolvedValueOnce({ user: { id: 56 }, congregation: { id: 78 } })
+    const response = await POST(request({ surname: " DUPONT " }, "west"), { params: { slug: "west" } })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ cached: true, entry: { origins: [sourcedOrigin] } })
+    expect(mocks.member).toHaveBeenLastCalledWith("west")
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE surname=$1"), ["dupont"])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("returns an existing platform cache entry without an API call", async () => {
     mocks.query.mockResolvedValueOnce({ rows: [row("dupré", [sourcedOrigin])] })
     const fetchMock = vi.fn()
     vi.stubGlobal("fetch", fetchMock)
@@ -86,8 +110,17 @@ describe("workspace surname origins", () => {
     const response = await POST(request({ surname: " Dupré " }), context)
     expect(response.status).toBe(200)
     expect((await response.json()).entry.origins).toEqual([sourcedOrigin])
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("congregation_id=$1"), [34, "dupré"])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE surname=$1"), ["dupré"])
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("does not expose the shared cache without workspace membership", async () => {
+    const { AuthError } = await import("@/lib/auth")
+    mocks.member.mockRejectedValueOnce(new AuthError(403, "Access denied"))
+    const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+    const response = await POST(request({ surname: "Dupont" }), context)
+    expect(response.status).toBe(403)
+    expect(mocks.query).not.toHaveBeenCalled()
   })
 
   it("requires a web search, caches verified sources, and refreshes instead of reading cache", async () => {
@@ -104,16 +137,16 @@ describe("workspace surname origins", () => {
     expect(apiBody.tools[0].type).toBe("openrouter:web_search")
     expect(apiBody.tool_choice).toBe("required")
     expect(apiBody.input).toBe(JSON.stringify({ surname: "dupont" }))
-    const insert = mocks.query.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO surname_origin_cache"))
-    expect(insert?.[1]?.slice(0, 2)).toEqual([34, "dupont"])
-    expect(JSON.parse(insert?.[1]?.[2])).toEqual([sourcedOrigin])
+    const insert = mocks.query.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO platform_surname_origin_cache"))
+    expect(insert?.[1]?.[0]).toBe("dupont")
+    expect(JSON.parse(insert?.[1]?.[1])).toEqual([sourcedOrigin])
 
     mocks.query.mockClear()
     mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row("dupont", [sourcedOrigin])] })
     const refreshed = await POST(request({ surname: "Dupont", refresh: true }), context)
     expect(refreshed.status).toBe(200)
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(mocks.query.mock.calls[0][0]).toContain("INSERT INTO surname_origin_cache")
+    expect(mocks.query.mock.calls[0][0]).toContain("INSERT INTO platform_surname_origin_cache")
   })
 
   it("returns an inconclusive result when the model's countries have no verified sources", async () => {
@@ -127,7 +160,7 @@ describe("workspace surname origins", () => {
     const response = await POST(request({ surname: "Unknown" }), context)
     expect(response.status).toBe(200)
     expect((await response.json()).entry.origins).toEqual([])
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO surname_origin_cache"), [34, "unknown", "[]"])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO platform_surname_origin_cache"), ["unknown", "[]"])
   })
 
   it("reports configuration and upstream failures without saving a result", async () => {

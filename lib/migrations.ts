@@ -251,6 +251,19 @@ const migrations: Migration[] = [{
       PRIMARY KEY(user_id,congregation_id)
     )`)
   }
+},{
+  version:18,name:"platform surname origin research cache",async run(client){
+    await client.query(`CREATE TABLE platform_surname_origin_cache (
+      surname TEXT PRIMARY KEY CHECK(length(surname) BETWEEN 1 AND 120),
+      origins JSONB NOT NULL CHECK(jsonb_typeof(origins)='array'),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`)
+    await client.query(`INSERT INTO platform_surname_origin_cache(surname,origins,created_at,updated_at)
+      SELECT DISTINCT ON (surname) surname,origins,created_at,updated_at
+      FROM surname_origin_cache
+      ORDER BY surname,updated_at DESC,congregation_id DESC`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

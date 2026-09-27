@@ -6,7 +6,7 @@ import { apiError, assertMultiTenantEnabled, type RouteContext } from "../../_sh
 
 type CacheRow = { surname: string; origins: SurnameOrigin[]; updated_at: Date }
 const headers = { "Cache-Control": "no-store" }
-const selectEntry = `SELECT surname,origins,updated_at FROM surname_origin_cache WHERE congregation_id=$1 AND surname=$2`
+const selectEntry = `SELECT surname,origins,updated_at FROM platform_surname_origin_cache WHERE surname=$1`
 
 function serialize(row: CacheRow) {
   return { surname: row.surname, origins: row.origins, researchedAt: row.updated_at.toISOString() }
@@ -51,13 +51,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(req)
-    const auth = await requireMembership(params.slug)
+    await requireMembership(params.slug)
     const body = await req.json()
     const surname = normalizeSurname(body?.surname)
     if (!validSurname(surname)) return NextResponse.json({ error: "A valid surname is required." }, { status: 400, headers })
     const refresh = body?.refresh === true
     if (!refresh) {
-      const cached = await pool.query<CacheRow>(selectEntry, [auth.congregation.id, surname])
+      const cached = await pool.query<CacheRow>(selectEntry, [surname])
       if (cached.rows[0]) return NextResponse.json({ entry: serialize(cached.rows[0]), cached: true }, { headers })
     }
     const key = process.env.OPENROUTER_API_KEY
@@ -70,11 +70,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Origin research is temporarily unavailable. Please try again." }, { status: 502, headers })
     }
     await pool.query(
-      `INSERT INTO surname_origin_cache(congregation_id,surname,origins) VALUES($1,$2,$3::jsonb)
-       ON CONFLICT(congregation_id,surname) DO UPDATE SET origins=EXCLUDED.origins,updated_at=NOW()`,
-      [auth.congregation.id, surname, JSON.stringify(origins)],
+      `INSERT INTO platform_surname_origin_cache(surname,origins) VALUES($1,$2::jsonb)
+       ON CONFLICT(surname) DO UPDATE SET origins=EXCLUDED.origins,updated_at=NOW()`,
+      [surname, JSON.stringify(origins)],
     )
-    const result = await pool.query<CacheRow>(selectEntry, [auth.congregation.id, surname])
+    const result = await pool.query<CacheRow>(selectEntry, [surname])
     return NextResponse.json({ entry: serialize(result.rows[0]), cached: false }, { headers })
   } catch (error) { return apiError(error) }
 }
