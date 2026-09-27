@@ -427,6 +427,7 @@ export function PackageDialogs({
     const canManage = Boolean(value<boolean>(row, "canManage", "can_manage"))
     const canOpen = value<boolean>(row, "canOpen", "can_open") !== false && row.state !== "completed"
     const isClaim = isClaimableByViewer(row)
+    const openLabel = isClaim ? "Claim" : row.state === "available" ? "Open" : row.hasSavedProgress ? "Resume" : "Open"
     const packageStatus = row.state ? row.state.replace("_", " ") : row.status
     const assignedToAnotherMember = library && row.segment?.ownerUserId != null && !isAssignedToViewer
     const updatedAt = value<string | Date>(row, "updatedAt", "updated_at")
@@ -442,7 +443,7 @@ export function PackageDialogs({
           {library ? <div className="mt-1 space-y-0.5 text-xs font-normal text-muted-foreground"><p>Uploaded by {uploader}</p><p>{assignedOwner ? `Assigned to ${assignedOwner}` : "Unassigned"}</p></div> : <p className="mt-1 text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>}
         </div>
         <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-          {!assignedToAnotherMember ? <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{isClaim ? "Claim" : row.hasSavedProgress ? "Resume" : "Open"}</Button> : null}
+          {!assignedToAnotherMember ? <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
           {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
         </div>
       </div>
