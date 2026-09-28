@@ -226,7 +226,7 @@ export default function SearchHelper({
   const [draftStatus, setDraftStatus] = useState<DraftStatus>(workspaceSlug ? "loading" : "saved")
   const [serverDraft, setServerDraft] = useState<any>(null)
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null)
-  const [draftSessionLoading, setDraftSessionLoading] = useState(Boolean(workspaceSlug))
+  const [draftSessionLoading, setDraftSessionLoading] = useState(true)
   const [draftEditBlocked, setDraftEditBlocked] = useState(false)
   const [switchingDraftEditor, setSwitchingDraftEditor] = useState(false)
   const draftReadyRef = useRef(false)
@@ -994,6 +994,7 @@ export default function SearchHelper({
         toast.error("Last name is required for origin research")
         return
       }
+      toast.dismiss("welcome-back")
       setOriginLookup({ surname, contactId: contact.id, contactName: contact.fullName,
         entry: null, loading: true, error: null })
       if (!workspaceSlug) {
@@ -1289,20 +1290,20 @@ export default function SearchHelper({
     }
   }, [])
 
-  // Notify user to resume from last verified contact when they return to the site
-  const resumeToastShown = useRef(false)
+  // Offer resume only for the draft restored at startup, never for a new contact interaction.
+  const resumeToastChecked = useRef(false)
   useEffect(() => {
-    if (resumeToastShown.current) return
-    if (!lastVerifiedId || contacts.length === 0) return
+    if (resumeToastChecked.current || !draftReadyRef.current || draftSessionLoading) return
+    resumeToastChecked.current = true
+    if (draftEditBlocked || originLookup || !lastVerifiedId || contacts.length === 0) return
 
     const lastContact = contacts.find((c) => c.id === lastVerifiedId)
     if (!lastContact) return
 
-    resumeToastShown.current = true
-
     // Small delay so the page has rendered the contact rows first
     const timer = setTimeout(() => {
       toast("Welcome back!", {
+        id: "welcome-back",
         description: `Pick up where you left off — last verified: ${lastContact.fullName}`,
         duration: 8000,
         action: {
@@ -1320,7 +1321,7 @@ export default function SearchHelper({
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [lastVerifiedId, contacts])
+  }, [contacts, draftEditBlocked, draftSessionLoading, lastVerifiedId, originLookup])
 
   // Add keyboard shortcuts for batch operations
   // Add this to the useEffect for keyboard shortcuts
