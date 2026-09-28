@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Check, FileSpreadsheet, MoreHorizontal, PackageOpen, Search, UserRound, UsersRound } from "lucide-react"
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
+import { Archive, Check, ChevronDown, FileSpreadsheet, MoreHorizontal, PackageOpen, Search, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -137,6 +137,8 @@ export function PackageDialogs({
   const [libraryVisibility, setLibraryVisibility] = useState("all")
   const [name, setName] = useState("")
   const [zipcode, setZipcode] = useState("")
+  const [zipPickerOpen, setZipPickerOpen] = useState(false)
+  const [showAllZipcodes, setShowAllZipcodes] = useState(false)
   const [pageStart, setPageStart] = useState("")
   const [pageEnd, setPageEnd] = useState("")
   const [busy, setBusy] = useState(false)
@@ -151,8 +153,11 @@ export function PackageDialogs({
   const [editName, setEditName] = useState("")
   const [editVisibility, setEditVisibility] = useState<"shared" | "private">("shared")
   const handledPreferredPackage = useRef<number | null>(null)
+  const zipPickerRef = useRef<HTMLDivElement>(null)
+  const zipInputRef = useRef<HTMLInputElement>(null)
 
   const selectedZip = useMemo(() => zipcodes.find((item) => item.zipcode === zipcode), [zipcode, zipcodes])
+  const visibleZipcodes = useMemo(() => zipcodes.filter((item) => showAllZipcodes || item.zipcode.includes(zipcode)), [showAllZipcodes, zipcode, zipcodes])
   const packageSections = useMemo(() => [
     {
       id: "my-excels",
@@ -192,6 +197,8 @@ export function PackageDialogs({
     if (!pendingUpload) return
     setName(pendingUpload.filename.replace(/\.(xlsx?|xls)$/i, ""))
     setZipcode("")
+    setZipPickerOpen(false)
+    setShowAllZipcodes(false)
     setPageStart("")
     setPageEnd("")
   }, [pendingUpload])
@@ -253,6 +260,27 @@ export function PackageDialogs({
   function applyDraft(result: any) {
     const draft = result.draft ?? result
     onDraftLoaded(draft, result.package)
+  }
+
+  function handleZipPickerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && zipPickerOpen) {
+      event.preventDefault()
+      setZipPickerOpen(false)
+      zipInputRef.current?.focus()
+      return
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    event.preventDefault()
+    if (!zipPickerOpen) {
+      setShowAllZipcodes(true)
+      setZipPickerOpen(true)
+      return
+    }
+    const options = Array.from(zipPickerRef.current?.querySelectorAll<HTMLButtonElement>("[data-zip-option]:not(:disabled)") ?? [])
+    if (!options.length) return
+    const current = options.indexOf(document.activeElement as HTMLButtonElement)
+    const next = event.key === "ArrowDown" ? Math.min(current + 1, options.length - 1) : Math.max(current - 1, 0)
+    options[next]?.focus()
   }
 
   async function savePackage(action: UploadAction) {
@@ -472,8 +500,14 @@ export function PackageDialogs({
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="package-zipcode">ZIP code</Label>
-              <div className="relative">
+              <div
+                ref={zipPickerRef}
+                className="relative"
+                onKeyDown={handleZipPickerKeyDown}
+                onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setZipPickerOpen(false) }}
+              >
                 <Input
+                  ref={zipInputRef}
                   id="package-zipcode"
                   type="text"
                   inputMode="numeric"
@@ -481,13 +515,42 @@ export function PackageDialogs({
                   maxLength={5}
                   placeholder="Type or choose a ZIP code"
                   value={zipcode}
-                  onChange={(event) => setZipcode(event.target.value.replace(/\D/g, ""))}
+                  onChange={(event) => {
+                    setZipcode(event.target.value.replace(/\D/g, ""))
+                    setShowAllZipcodes(false)
+                    setZipPickerOpen(true)
+                  }}
                   className="admin-field h-11 rounded-xl pr-12"
                 />
-                <Select value={selectedZip?.zipcode ?? ""} onValueChange={setZipcode}>
-                  <SelectTrigger aria-label="Browse configured ZIP codes" className="absolute right-px top-px h-[calc(100%-2px)] w-11 rounded-l-none rounded-r-xl border-0 border-l bg-transparent px-3 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-ring [&>span]:sr-only"><SelectValue placeholder="Browse ZIPs" /></SelectTrigger>
-                  <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode} disabled={item.total_pages < 1}>{item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}</SelectItem>)}</SelectContent>
-                </Select>
+                <button
+                  type="button"
+                  aria-label="Browse configured ZIP codes"
+                  aria-expanded={zipPickerOpen}
+                  aria-haspopup="listbox"
+                  aria-controls="package-zipcode-options"
+                  onClick={() => {
+                    if (zipPickerOpen && showAllZipcodes) setZipPickerOpen(false)
+                    else { setShowAllZipcodes(true); setZipPickerOpen(true) }
+                    zipInputRef.current?.focus()
+                  }}
+                  className="absolute right-px top-px flex h-[calc(100%-2px)] w-11 items-center justify-center rounded-r-xl border-l bg-background text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                </button>
+                {zipPickerOpen ? <div id="package-zipcode-options" role="listbox" aria-label="Configured ZIP codes" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 shadow-lg">
+                  {visibleZipcodes.length ? visibleZipcodes.map((item) => <button
+                    key={item.id}
+                    type="button"
+                    role="option"
+                    aria-selected={item.zipcode === zipcode}
+                    data-zip-option
+                    disabled={item.total_pages < 1}
+                    onClick={() => { setZipcode(item.zipcode); setZipPickerOpen(false); zipInputRef.current?.focus() }}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent"
+                  >
+                    {item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}
+                  </button>) : <p className="px-3 py-3 text-sm text-muted-foreground">No configured ZIP codes match.</p>}
+                </div> : null}
               </div>
               {zipcode.length === 5 && !selectedZip ? <p className="text-xs text-amber-600 dark:text-amber-400">This ZIP is not configured in Team Progress.</p> : null}
             </div>
