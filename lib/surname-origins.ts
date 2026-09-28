@@ -6,6 +6,7 @@ export type SurnameOriginEntry = {
   surname: string
   origins: SurnameOrigin[]
   researchedAt: string
+  reviewedAt?: string | null
 }
 
 type WebOutput = {

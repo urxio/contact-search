@@ -100,7 +100,9 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
                   )
                 })}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Researched {new Date(entry.researchedAt).toLocaleDateString()}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {entry.reviewedAt ? "Manually reviewed" : "Researched"} {new Date(entry.researchedAt).toLocaleDateString()}
+              </p>
             </div>
           ) : entry ? (
             <div className="origin-glass-card rounded-xl border p-4">

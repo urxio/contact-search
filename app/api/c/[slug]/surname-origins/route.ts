@@ -4,12 +4,13 @@ import { requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { normalizeSurname, parseOriginResponse, validSurname, type SurnameOrigin } from "@/lib/surname-origins"
 import { apiError, assertMultiTenantEnabled, type RouteContext } from "../../_shared"
 
-type CacheRow = { surname: string; origins: SurnameOrigin[]; updated_at: Date }
+type CacheRow = { surname: string; origins: SurnameOrigin[]; updated_at: Date; reviewed_at: Date | null }
 const headers = { "Cache-Control": "no-store" }
-const selectEntry = `SELECT surname,origins,updated_at FROM platform_surname_origin_cache WHERE surname=$1`
+const selectEntry = `SELECT surname,origins,updated_at,reviewed_at FROM platform_surname_origin_cache WHERE surname=$1`
 
 function serialize(row: CacheRow) {
-  return { surname: row.surname, origins: row.origins, researchedAt: row.updated_at.toISOString() }
+  return { surname: row.surname, origins: row.origins, researchedAt: row.updated_at.toISOString(),
+    reviewedAt: row.reviewed_at?.toISOString() ?? null }
 }
 
 async function research(surname: string, key: string): Promise<SurnameOrigin[]> {
@@ -47,18 +48,31 @@ async function research(surname: string, key: string): Promise<SurnameOrigin[]> 
   return parseOriginResponse(await response.json())
 }
 
+async function recordUnclearContact(surname: string, congregationId: number, body: Record<string, unknown>) {
+  const contactId = typeof body.contactId === "string" ? body.contactId.trim() : ""
+  const contactName = typeof body.contactName === "string" ? body.contactName.trim() : ""
+  if (!contactId || contactId.length > 200 || !contactName || contactName.length > 200) return
+  await pool.query(
+    `INSERT INTO platform_surname_origin_review_contacts(surname,congregation_id,contact_id,contact_name)
+     VALUES($1,$2,$3,$4) ON CONFLICT(surname,congregation_id,contact_id)
+     DO UPDATE SET contact_name=EXCLUDED.contact_name,updated_at=NOW()`,
+    [surname, congregationId, contactId, contactName],
+  )
+}
+
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     validateMutationOrigin(req)
-    await requireMembership(params.slug)
+    const access = await requireMembership(params.slug)
     const body = await req.json()
     const surname = normalizeSurname(body?.surname)
     if (!validSurname(surname)) return NextResponse.json({ error: "A valid surname is required." }, { status: 400, headers })
     const refresh = body?.refresh === true
-    if (!refresh) {
-      const cached = await pool.query<CacheRow>(selectEntry, [surname])
-      if (cached.rows[0]) return NextResponse.json({ entry: serialize(cached.rows[0]), cached: true }, { headers })
+    const cached = await pool.query<CacheRow>(selectEntry, [surname])
+    if (cached.rows[0] && (!refresh || cached.rows[0].reviewed_at)) {
+      if (cached.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
+      return NextResponse.json({ entry: serialize(cached.rows[0]), cached: true }, { headers })
     }
     const key = process.env.OPENROUTER_API_KEY
     if (!key) return NextResponse.json({ error: "Origin research is not configured." }, { status: 503, headers })
@@ -71,10 +85,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
     await pool.query(
       `INSERT INTO platform_surname_origin_cache(surname,origins) VALUES($1,$2::jsonb)
-       ON CONFLICT(surname) DO UPDATE SET origins=EXCLUDED.origins,updated_at=NOW()`,
+       ON CONFLICT(surname) DO UPDATE SET origins=EXCLUDED.origins,updated_at=NOW(),reviewed_at=NULL,reviewed_by_user_id=NULL
+       WHERE platform_surname_origin_cache.reviewed_at IS NULL`,
       [surname, JSON.stringify(origins)],
     )
     const result = await pool.query<CacheRow>(selectEntry, [surname])
+    if (result.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
+    else if (!result.rows[0].reviewed_at) await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
     return NextResponse.json({ entry: serialize(result.rows[0]), cached: false }, { headers })
   } catch (error) { return apiError(error) }
 }

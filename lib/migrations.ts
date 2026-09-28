@@ -264,6 +264,20 @@ const migrations: Migration[] = [{
       FROM surname_origin_cache
       ORDER BY surname,updated_at DESC,congregation_id DESC`)
   }
+},{
+  version:19,name:"unclear surname origin review contacts",async run(client){
+    await client.query(`ALTER TABLE platform_surname_origin_cache
+      ADD COLUMN reviewed_at TIMESTAMPTZ,
+      ADD COLUMN reviewed_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL`)
+    await client.query(`CREATE TABLE platform_surname_origin_review_contacts (
+      surname TEXT NOT NULL REFERENCES platform_surname_origin_cache(surname) ON DELETE CASCADE,
+      congregation_id BIGINT NOT NULL REFERENCES congregations(id) ON DELETE CASCADE,
+      contact_id TEXT NOT NULL,
+      contact_name TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(surname,congregation_id,contact_id)
+    )`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

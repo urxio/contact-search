@@ -142,11 +142,26 @@ describe("platform surname origin cache", () => {
     expect(JSON.parse(insert?.[1]?.[1])).toEqual([sourcedOrigin])
 
     mocks.query.mockClear()
-    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row("dupont", [sourcedOrigin])] })
+    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [row("dupont", [sourcedOrigin])] })
     const refreshed = await POST(request({ surname: "Dupont", refresh: true }), context)
     expect(refreshed.status).toBe(200)
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(mocks.query.mock.calls[0][0]).toContain("INSERT INTO platform_surname_origin_cache")
+    expect(mocks.query.mock.calls[0][0]).toContain("SELECT surname,origins")
+    expect(mocks.query.mock.calls[1][0]).toContain("INSERT INTO platform_surname_origin_cache")
+  })
+
+  it("keeps a platform owner's manual country when a workspace requests a refresh", async () => {
+    const manual = { ...row("unknown", [{ country: "France", explanation: "Set by the platform owner after manual review.", sources: [] }]),
+      reviewed_at: new Date("2026-09-26") }
+    mocks.query.mockResolvedValueOnce({ rows: [manual] })
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+    const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+    const response = await POST(request({ surname: "Unknown", refresh: true }), context)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ cached: true, entry: { origins: [{ country: "France" }] } })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it("returns an inconclusive result when the model's countries have no verified sources", async () => {
@@ -161,6 +176,17 @@ describe("platform surname origin cache", () => {
     expect(response.status).toBe(200)
     expect((await response.json()).entry.origins).toEqual([])
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO platform_surname_origin_cache"), ["unknown", "[]"])
+  })
+
+  it("records the contact for a cached unclear surname", async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [row("unknown", [])] }).mockResolvedValue({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+    const response = await POST(request({ surname: "Unknown", contactId: "person-1", contactName: "Alice Unknown" }), context)
+    expect(response.status).toBe(200)
+    expect(mocks.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO platform_surname_origin_review_contacts"),
+      ["unknown", 34, "person-1", "Alice Unknown"],
+    )
   })
 
   it("reports configuration and upstream failures without saving a result", async () => {

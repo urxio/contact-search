@@ -118,6 +118,7 @@ describeWithDatabase("multi-congregation database isolation", () => {
       { version: 16, name: "shared surname origin research cache" },
       { version: 17, name: "single active draft editor" },
       { version: 18, name: "platform surname origin research cache" },
+      { version: 19, name: "unclear surname origin review contacts" },
     ])
   })
 

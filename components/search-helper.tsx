@@ -1019,7 +1019,7 @@ export default function SearchHelper({
       }
       void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-origins`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ surname, refresh }),
+        body: JSON.stringify({ surname, refresh, contactId: contact.id, contactName: contact.fullName }),
       }).then(async (response) => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || "Origin research failed")
