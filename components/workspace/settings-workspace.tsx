@@ -1,7 +1,7 @@
 "use client"
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowDown, ArrowUp, Check, Clock3, Copy, FileSpreadsheet, Loader2, MailPlus, MapPinned, Pencil, Save, Search, Settings2, Trash2, UserRound, UsersRound } from "lucide-react"
+import { ArrowDown, ArrowUp, Check, Clock3, Copy, FileSpreadsheet, Loader2, MailPlus, MapPinned, Pencil, RefreshCw, Save, Search, Settings2, Trash2, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -111,6 +111,8 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [invitationsLoading, setInvitationsLoading] = useState(true)
   const [revokingInvitationId, setRevokingInvitationId] = useState<number | null>(null)
+  const [refreshingInvitationId, setRefreshingInvitationId] = useState<number | null>(null)
+  const [refreshedInviteUrl, setRefreshedInviteUrl] = useState("")
   const [legacyIdentityId, setLegacyIdentityId] = useState("")
   const [members, setMembers] = useState<Member[]>([])
   const [legacyIdentities, setLegacyIdentities] = useState<LegacyIdentity[]>([])
@@ -477,8 +479,44 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   }
 
   async function copyInvitation() {
-    await navigator.clipboard.writeText(inviteUrl)
-    toast.success("Invitation link copied")
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      toast.success("Invitation link copied")
+    } catch {
+      toast.error("Could not copy the link. Select the URL above to copy it.")
+    }
+  }
+
+  async function refreshInvitation(invitation: Invitation) {
+    setRefreshingInvitationId(invitation.id)
+    try {
+      const response = await fetch(`/api/c/${slug}/invitations/${invitation.id}/refresh`, { method: "POST" })
+      const result = await response.json() as InvitationResult & { error?: string }
+      if (!response.ok) throw new Error(result.error || "Invitation could not be refreshed")
+      const url = result.inviteUrl
+      if (!url) throw new Error("The refreshed invitation link was not returned")
+      setRefreshedInviteUrl(url)
+      loadInvitations()
+      try {
+        await navigator.clipboard.writeText(url)
+        toast.success("New invitation link copied")
+      } catch {
+        toast.error("Link refreshed, but clipboard copy failed. Copy it from the dialog.")
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invitation could not be refreshed")
+    } finally {
+      setRefreshingInvitationId(null)
+    }
+  }
+
+  async function copyRefreshedInvitation() {
+    try {
+      await navigator.clipboard.writeText(refreshedInviteUrl)
+      toast.success("Invitation link copied")
+    } catch {
+      toast.error("Could not copy the link. Select the URL above to copy it.")
+    }
   }
 
   function resetInvitationDialog() {
@@ -674,6 +712,21 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <CardDescription>Create a secure link to copy and share manually.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <Dialog open={Boolean(refreshedInviteUrl)} onOpenChange={(open) => { if (!open) setRefreshedInviteUrl("") }}>
+              <DialogContent className="rounded-2xl sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-base font-semibold">Refreshed invitation</DialogTitle>
+                  <DialogDescription>This new link expires in seven days and can be accepted once.</DialogDescription>
+                </DialogHeader>
+                <div className="rounded-xl bg-muted p-4">
+                  <p className="break-all text-sm font-normal leading-relaxed">{refreshedInviteUrl}</p>
+                </div>
+                <Button type="button" onClick={copyRefreshedInvitation} className="admin-primary-button min-h-11 w-full rounded-xl">
+                  <Copy aria-hidden="true" />
+                  Copy invitation link
+                </Button>
+              </DialogContent>
+            </Dialog>
             <Dialog onOpenChange={(open) => !open && resetInvitationDialog()}>
               <DialogTrigger asChild>
                 <Button className="admin-primary-button min-h-11 rounded-xl">
@@ -767,6 +820,12 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                           </p>
                           {invitation.legacyDisplayName ? <p className="mt-1 text-xs font-normal text-muted-foreground">Historical work: {invitation.legacyDisplayName}</p> : null}
                         </div>
+                        {status === "Expired" ? (
+                          <Button type="button" variant="outline" disabled={refreshingInvitationId !== null} onClick={() => refreshInvitation(invitation)} className="min-h-11 rounded-xl">
+                            {refreshingInvitationId === invitation.id ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+                            Refresh &amp; copy
+                          </Button>
+                        ) : null}
                         {status === "Pending" ? (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

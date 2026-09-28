@@ -100,3 +100,56 @@ describe("congregation invitation records", () => {
     await expect(response.json()).resolves.toMatchObject({ token: "invite-token" })
   })
 })
+
+describe("refreshing expired invitations", () => {
+  function refreshRequest() {
+    return new NextRequest("https://search.example/api/c/central/invitations/7/refresh", {
+      method: "POST",
+      headers: { origin: "https://search.example", host: "search.example" },
+    })
+  }
+
+  it("issues a new link with the expired invitation's email, role, and historical identity", async () => {
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [{
+      email: "invitee@example.test", role: "admin", legacyIdentityId: 81,
+    }] })
+    mocks.issueInvitation.mockResolvedValueOnce({
+      token: "new-token", expiresAt: new Date("2026-10-05T12:00:00.000Z"),
+    })
+    const { POST } = await import("@/app/api/c/[slug]/invitations/[id]/refresh/route")
+    const request = refreshRequest()
+
+    const response = await POST(request, { params: { slug: "central", id: "7" } })
+
+    expect(response.status).toBe(201)
+    expect(mocks.validateMutationOrigin).toHaveBeenCalledWith(request)
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("congregation_id = $2")
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("expires_at <= NOW()")
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("accepted_at IS NULL")
+    expect(mocks.poolQuery.mock.calls[0][0]).toContain("revoked_at IS NULL")
+    expect(mocks.poolQuery.mock.calls[0][1]).toEqual([7, 34])
+    expect(mocks.issueInvitation).toHaveBeenCalledWith({
+      congregationId: 34,
+      email: "invitee@example.test",
+      role: "admin",
+      legacyIdentityId: 81,
+      createdByUserId: 12,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      inviteUrl: "https://search.example/join/new-token",
+    })
+    expect(mocks.auditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      action: "invitation.refreshed", targetId: "7",
+    }))
+  })
+
+  it("does not refresh an invitation outside the workspace or without expired status", async () => {
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/invitations/[id]/refresh/route")
+
+    const response = await POST(refreshRequest(), { params: { slug: "central", id: "7" } })
+
+    expect(response.status).toBe(404)
+    expect(mocks.issueInvitation).not.toHaveBeenCalled()
+  })
+})
