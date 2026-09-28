@@ -260,6 +260,10 @@ export function PackageDialogs({
       toast.error("Add an Excel name, ZIP code, and complete page range.")
       return
     }
+    if (!/^\d{5}$/.test(zipcode) || !selectedZip) {
+      toast.error("Enter a configured five-digit ZIP code or choose one from the list.")
+      return
+    }
     const startNow = action === "start"
     const visibility = action === "share" ? "shared" : "private"
     setUploadAction(action)
@@ -467,11 +471,25 @@ export function PackageDialogs({
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>ZIP code</Label>
-              <Select value={zipcode} onValueChange={setZipcode}>
-                <SelectTrigger className="admin-field h-11 rounded-xl"><SelectValue placeholder="Choose a configured ZIP" /></SelectTrigger>
-                <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode} disabled={item.total_pages < 1}>{item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}</SelectItem>)}</SelectContent>
-              </Select>
+              <Label htmlFor="package-zipcode">ZIP code</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="package-zipcode"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  maxLength={5}
+                  placeholder="Type ZIP code"
+                  value={zipcode}
+                  onChange={(event) => setZipcode(event.target.value.replace(/\D/g, ""))}
+                  className="admin-field h-11 min-w-0 flex-1 rounded-xl"
+                />
+                <Select value={selectedZip?.zipcode ?? ""} onValueChange={setZipcode}>
+                  <SelectTrigger aria-label="Choose a configured ZIP from the list" className="admin-field h-11 w-40 shrink-0 rounded-xl"><SelectValue placeholder="Browse ZIPs" /></SelectTrigger>
+                  <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode} disabled={item.total_pages < 1}>{item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {zipcode.length === 5 && !selectedZip ? <p className="text-xs text-amber-600 dark:text-amber-400">This ZIP is not configured in Team Progress.</p> : null}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label htmlFor="package-page-start">Start page</Label><Input id="package-page-start" type="number" min={1} max={selectedZip?.total_pages} value={pageStart} onChange={(event) => setPageStart(event.target.value)} className="admin-field h-11 rounded-xl" /></div>
