@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search,
+  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search, Sparkles,
   ChevronDown, ChevronRight,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
@@ -28,6 +28,7 @@ interface ContactTableProps {
   onAddressUpdateChange: (id: string, v: boolean) => void
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
+  onSearchForebears: (contact: EnhancedContact) => void
   onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
   activeOriginContactId?: string | null
@@ -49,6 +50,7 @@ export function ContactTable({
   onAddressUpdateChange,
   onPhoneUpdateChange,
   onTerritoryStatusChange,
+  onSearchForebears,
   onSearchOrigin,
   onSearchTPS,
   activeOriginContactId = null,
@@ -90,6 +92,7 @@ export function ContactTable({
                       : ""
             const area = areaByZipcode.get(contact.zipcode.trim())
             const rowColorClass = colorByArea ? areaColorClass(area, areaOrder) : statusColorClass
+            const hasSurname = Boolean(contact.lastName?.trim())
 
             return (
               <React.Fragment key={contact.id}>
@@ -148,16 +151,28 @@ export function ContactTable({
                         </Tooltip>
                       )}
                     </div>
-                    <Button
-                      variant="outline" size="sm"
-                      onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
-                      aria-label={`Research origin of ${contact.lastName || "surname"}`}
-                      className={`mt-2 gap-1.5 sm:hidden ${contact.checkedOnOrigin
-                        ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
-                        : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
-                    >
-                      <Globe className="h-4 w-4" /> Origin
-                    </Button>
+                    <div className="mt-2 flex flex-wrap gap-1.5 sm:hidden">
+                      <Button
+                        variant="outline" size="sm" disabled={!hasSurname}
+                        onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
+                        aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
+                        className={`gap-1.5 ${contact.checkedOnForebears
+                          ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                      >
+                        <Globe className="h-4 w-4" /> Forebears
+                      </Button>
+                      <Button
+                        variant="outline" size="sm" disabled={!hasSurname}
+                        onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                        aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
+                        className={`gap-1.5 ${contact.checkedOnOrigin
+                          ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                      >
+                        <Sparkles className="h-4 w-4" /> Luna
+                      </Button>
+                    </div>
                   </TableCell>
 
                   <TableCell>{contact.address}</TableCell>
@@ -213,16 +228,33 @@ export function ContactTable({
                         <TooltipTrigger asChild>
                           <Button
                             variant="outline" size="icon"
-                            onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
-                            aria-label={`Research origin of ${contact.lastName || "surname"}`}
-                            className={`hidden sm:inline-flex ${contact.checkedOnOrigin
+                            disabled={!hasSurname}
+                            onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
+                            aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
+                            className={`hidden sm:inline-flex ${contact.checkedOnForebears
                               ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
                               : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
                           >
                             <Globe className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Research surname origin</TooltipContent>
+                        <TooltipContent>{hasSurname ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline" size="icon"
+                            disabled={!hasSurname}
+                            onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                            aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
+                            className={`hidden sm:inline-flex ${contact.checkedOnOrigin
+                              ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{hasSurname ? "Research surname origin with Luna" : "A last name is required"}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger>

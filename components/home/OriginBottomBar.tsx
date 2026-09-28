@@ -14,11 +14,12 @@ type Props = {
   loading: boolean
   error: string | null
   onRefresh: () => void
+  onOpenForebears: () => void
   onClose: () => void
   batchActionsVisible?: boolean
 }
 
-export function OriginBottomBar({ contactName, surname, entry, loading, error, onRefresh, onClose, batchActionsVisible = false }: Props) {
+export function OriginBottomBar({ contactName, surname, entry, loading, error, onRefresh, onOpenForebears, onClose, batchActionsVisible = false }: Props) {
   const panelRef = React.useRef<HTMLElement>(null)
   const originUnclear = !loading && !error && entry !== null && entry.origins.length === 0
 
@@ -29,7 +30,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
       if (panel && event.target instanceof Node && !panel.contains(event.target)) onClose()
     }
 
-    // Pointer down runs before a contact's click handler, so selecting another Origin button still opens it.
+    // Pointer down runs before a contact's click handler, so selecting another Luna button still opens it.
     document.addEventListener("pointerdown", dismissOnOutsidePointerDown, true)
     return () => document.removeEventListener("pointerdown", dismissOnOutsidePointerDown, true)
   }, [onClose])
@@ -37,13 +38,13 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
   return (
     <aside
       ref={panelRef}
-      aria-label={`Surname origin for ${surname}`}
+      aria-label={`Luna surname origin for ${surname}`}
       className={`origin-glass-panel pointer-events-auto overflow-y-auto rounded-2xl border ${batchActionsVisible ? "max-h-[40dvh] lg:max-h-[35dvh]" : "max-h-[60dvh] lg:max-h-[45dvh]"}`}
     >
       <div className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Surname origin</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Luna surname origin research</p>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className="break-words text-lg font-semibold leading-tight">{surname}</h2>
               <p className="text-sm text-muted-foreground">Contact: {contactName}</p>
@@ -59,7 +60,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
             <div role="status" className="origin-glass-card flex items-start gap-3 rounded-xl border p-4">
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
               <div>
-                <p className="text-sm font-medium">Researching surname…</p>
+                <p className="text-sm font-medium">Luna is researching this surname…</p>
                 <p className="mt-1 text-sm text-muted-foreground">Searching web sources for likely historical origins.</p>
               </div>
             </div>
@@ -120,7 +121,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
             </Button>
             <Button size="sm" variant={originUnclear ? "outline" : "ghost"}
               className={originUnclear ? "origin-forebears-attention" : ""} asChild>
-              <a href={forebearsSurnameUrl(surname)} target="_blank" rel="noopener noreferrer">
+              <a href={forebearsSurnameUrl(surname)} target="_blank" rel="noopener noreferrer" onClick={onOpenForebears}>
                 Open Forebears{originUnclear && <ExternalLink className="ml-1 h-4 w-4" aria-hidden="true" />}
               </a>
             </Button>

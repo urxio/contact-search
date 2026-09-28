@@ -11,6 +11,7 @@ import {
   Import,
   Search,
   Globe,
+  Sparkles,
   ShieldCheck,
   CheckCircle2,
   CircleSlash,
@@ -135,8 +136,13 @@ const sections = [
       },
       {
         icon: <Globe className="h-5 w-5 text-indigo-500" />,
-        title: "Surname Origin",
-        desc: "Opens a sidebar with up to two likely surname origins researched from web sources. The button turns green after a sourced result is shown. You can open Forebears from the sidebar for manual checking.",
+        title: "Forebears surname lookup",
+        desc: "Opens Forebears in a new tab for manual surname research. The globe button turns green after you open it.",
+      },
+      {
+        icon: <Sparkles className="h-5 w-5 text-indigo-500" />,
+        title: "Luna surname origin research",
+        desc: "Opens a bottom panel with up to two possible surname origins from web sources. The Luna button turns green after research completes, even when the origin is unclear. You can also open Forebears from the panel.",
       },
     ],
   },

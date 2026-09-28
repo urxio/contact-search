@@ -21,42 +21,76 @@ const handlers = {
   onToggleSelection: vi.fn(), onToggleExpanded: vi.fn(), onStatusChange: vi.fn(),
   onNotesChange: vi.fn(), onFieldChange: vi.fn(), onAddressUpdateChange: vi.fn(),
   onPhoneUpdateChange: vi.fn(), onTerritoryStatusChange: vi.fn(),
-  onSearchOrigin: vi.fn(), onSearchTPS: vi.fn(), activeOriginContactId: "one",
+  onSearchForebears: vi.fn(), onSearchOrigin: vi.fn(), onSearchTPS: vi.fn(),
+  activeOriginContactId: "one",
 }
 
 function renderWithTooltips(component: React.ReactElement) {
   return renderToString(React.createElement(TooltipProvider, null, component))
 }
 
+function actionTags(markup: string, label: string) {
+  return (markup.match(/<button\b[^>]*>/g) ?? []).filter((tag) => tag.includes(`aria-label="${label}"`))
+}
+
 describe("Origin contact UI", () => {
-  it("shows a green checked Origin action in the table, mobile table, and grid", () => {
+  it("shows separate Forebears and Luna actions in the table, mobile table, and grid", () => {
     const table = renderWithTooltips(React.createElement(ContactTable, {
       ...handlers, onToggleSelectAll: vi.fn(),
     }))
     const grid = renderWithTooltips(React.createElement(ContactGrid, handlers))
-    for (const markup of [table, grid]) {
-      expect(markup).toContain('aria-label="Research origin of Dupont"')
-      expect(markup).toContain("border-green-300 bg-green-100 text-green-700")
+    for (const [markup, count] of [[table, 2], [grid, 1]] as const) {
+      const forebears = actionTags(markup, "Search Dupont on Forebears")
+      const luna = actionTags(markup, "Research Dupont with Luna")
+      expect(forebears).toHaveLength(count)
+      expect(luna).toHaveLength(count)
+      expect(forebears.every((tag) => !tag.includes("border-green-300 bg-green-100 text-green-700"))).toBe(true)
+      expect(luna.every((tag) => tag.includes("border-green-300 bg-green-100 text-green-700"))).toBe(true)
       expect(markup).toContain("ring-indigo-500")
-      expect(markup).not.toContain("Show saved surname countries")
     }
-    expect(table.match(/aria-label="Research origin of Dupont"/g)).toHaveLength(2)
-    expect(table).toContain("mt-2 gap-1.5 sm:hidden")
+    expect(table).toContain("flex flex-wrap gap-1.5 sm:hidden")
     expect(table).toContain("hidden sm:inline-flex")
     expect(table).toContain("overflow-x-auto")
+    expect(table).toContain("Forebears")
+    expect(table).toContain("Luna")
   })
 
-  it("leaves the Origin action blue before a completed check", () => {
-    const unchecked = { ...contact, checkedOnOrigin: false }
+  it("tracks Forebears and Luna checked states independently", () => {
+    for (const [checkedOnForebears, checkedOnOrigin] of [[true, false], [false, true], [false, false]] as const) {
+      const candidate = { ...contact, checkedOnForebears, checkedOnOrigin }
+      const table = renderWithTooltips(React.createElement(ContactTable, {
+        ...handlers, contacts: [candidate], onToggleSelectAll: vi.fn(),
+      }))
+      const grid = renderWithTooltips(React.createElement(ContactGrid, {
+        ...handlers, contacts: [candidate],
+      }))
+      for (const markup of [table, grid]) {
+        for (const [label, checked] of [
+          ["Search Dupont on Forebears", checkedOnForebears],
+          ["Research Dupont with Luna", checkedOnOrigin],
+        ] as const) {
+          const tags = actionTags(markup, label)
+          expect(tags.length).toBeGreaterThan(0)
+          expect(tags.every((tag) => tag.includes("border-green-300 bg-green-100 text-green-700"))).toBe(checked)
+        }
+      }
+    }
+  })
+
+  it("disables both surname actions when a contact has no last name", () => {
+    const missingSurname = { ...contact, lastName: " " }
     const table = renderWithTooltips(React.createElement(ContactTable, {
-      ...handlers, contacts: [unchecked], onToggleSelectAll: vi.fn(),
+      ...handlers, contacts: [missingSurname], onToggleSelectAll: vi.fn(),
     }))
     const grid = renderWithTooltips(React.createElement(ContactGrid, {
-      ...handlers, contacts: [unchecked],
+      ...handlers, contacts: [missingSurname],
     }))
     for (const markup of [table, grid]) {
-      expect(markup).toContain("bg-blue-50 hover:bg-blue-100")
-      expect(markup).not.toContain("border-green-300 bg-green-100 text-green-700")
+      for (const label of ["Search surname on Forebears", "Research surname with Luna"]) {
+        const tags = actionTags(markup, label)
+        expect(tags.length).toBeGreaterThan(0)
+        expect(tags.every((tag) => tag.includes("disabled"))).toBe(true)
+      }
     }
   })
 
@@ -70,7 +104,7 @@ describe("Origin contact UI", () => {
         country: "England", explanation: "English surname usage.",
         sources: [{ title: "English surname record", url: "https://example.org/names/english" }],
       }] },
-      onRefresh: vi.fn(), onClose: vi.fn(),
+      onRefresh: vi.fn(), onOpenForebears: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain("Possible origins")
     expect(markup).toContain("🇫🇷")
@@ -78,6 +112,8 @@ describe("Origin contact UI", () => {
     expect(markup).toContain('href="https://example.org/names/dupont"')
     expect(markup).toContain("Research again")
     expect(markup).toContain("Open Forebears")
+    expect(markup).toContain('href="https://forebears.io/surnames/dupont"')
+    expect(markup).toContain('aria-label="Luna surname origin for dupont"')
     expect(markup).not.toContain("origin-forebears-attention")
     expect(markup).toContain("max-h-[60dvh]")
     expect(markup).toContain("origin-glass-panel")
@@ -92,7 +128,7 @@ describe("Origin contact UI", () => {
     const markup = renderToString(React.createElement(OriginBottomBar, {
       contactName: "Ana Dupont", surname: "dupont", loading: false, error: null,
       entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] },
-      onRefresh: vi.fn(), onClose: vi.fn(),
+      onRefresh: vi.fn(), onOpenForebears: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain("Origin unclear")
     expect(markup).toContain("Try searching Forebears")
@@ -102,10 +138,10 @@ describe("Origin contact UI", () => {
   it("shows an animated and accessible loading state", () => {
     const markup = renderToString(React.createElement(OriginBottomBar, {
       contactName: "Ana Dupont", surname: "dupont", loading: true, error: null,
-      entry: null, onRefresh: vi.fn(), onClose: vi.fn(),
+      entry: null, onRefresh: vi.fn(), onOpenForebears: vi.fn(), onClose: vi.fn(),
     }))
     expect(markup).toContain('role="status"')
-    expect(markup).toContain("Researching surname…")
+    expect(markup).toContain("Luna is researching this surname…")
     expect(markup).toContain("motion-safe:animate-spin")
   })
 })

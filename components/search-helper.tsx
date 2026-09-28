@@ -43,7 +43,7 @@ import { ContactGrid } from "@/components/home/ContactGrid"
 import { OriginBottomBar } from "@/components/home/OriginBottomBar"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { useSearchActivity } from "@/hooks/use-search-activity"
-import { normalizeSurname } from "@/lib/surname-countries"
+import { forebearsSurnameUrl, normalizeSurname } from "@/lib/surname-countries"
 import type { SurnameOriginEntry } from "@/lib/surname-origins"
 
 // Add a useRef for the file input at the top of the component with the other state variables
@@ -957,6 +957,21 @@ export default function SearchHelper({
     },
     [updateLastInteraction],
   )
+
+  const markForebearsChecked = useCallback((contactId: string) => {
+    setContacts((current) => current.map((item) => item.id === contactId
+      ? { ...item, checkedOnForebears: true } : item))
+    updateLastInteraction(contactId)
+  }, [updateLastInteraction])
+
+  const searchOnForebears = useCallback((contact: EnhancedContact) => {
+    if (!normalizeSurname(contact.lastName)) {
+      toast.error("Last name is required for Forebears search")
+      return
+    }
+    markForebearsChecked(contact.id)
+    window.open(forebearsSurnameUrl(contact.lastName), "_blank", "noopener,noreferrer")
+  }, [markForebearsChecked])
 
   // Update the copyAndSearchOTM function to copy contact name and use the new URL
   const copyAndSearchOTM = useCallback(
@@ -2641,6 +2656,7 @@ export default function SearchHelper({
                       onAddressUpdateChange={handleAddressUpdateChange}
                       onPhoneUpdateChange={handlePhoneUpdateChange}
                       onTerritoryStatusChange={handleTerritoryStatusChange}
+                      onSearchForebears={searchOnForebears}
                       onSearchOrigin={searchOrigin}
                       onSearchTPS={searchOnTruePeopleSearch}
                       activeOriginContactId={originLookup?.contactId}
@@ -2663,6 +2679,7 @@ export default function SearchHelper({
                       onAddressUpdateChange={handleAddressUpdateChange}
                       onPhoneUpdateChange={handlePhoneUpdateChange}
                       onTerritoryStatusChange={handleTerritoryStatusChange}
+                      onSearchForebears={searchOnForebears}
                       onSearchOrigin={searchOrigin}
                       onSearchTPS={searchOnTruePeopleSearch}
                       activeOriginContactId={originLookup?.contactId}
@@ -2688,6 +2705,7 @@ export default function SearchHelper({
             batchActionsVisible={selectedContacts.length > 0}
             onRefresh={() => searchOrigin({ id: originLookup.contactId, lastName: originLookup.surname,
               fullName: originLookup.contactName }, true)}
+            onOpenForebears={() => markForebearsChecked(originLookup.contactId)}
             onClose={() => { originLookupRequest.current += 1; setOriginLookup(null) }}
           />
         )}

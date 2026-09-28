@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search,
+  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search, Sparkles,
   CheckCircle2, XCircle, RefreshCw, CircleSlash,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
@@ -28,6 +28,7 @@ interface ContactGridProps {
   onAddressUpdateChange: (id: string, v: boolean) => void
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
+  onSearchForebears: (contact: EnhancedContact) => void
   onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
   activeOriginContactId?: string | null
@@ -67,6 +68,7 @@ export function ContactGrid({
   onAddressUpdateChange,
   onPhoneUpdateChange,
   onTerritoryStatusChange,
+  onSearchForebears,
   onSearchOrigin,
   onSearchTPS,
   activeOriginContactId = null,
@@ -166,16 +168,33 @@ export function ContactGrid({
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline" size="icon"
-                    onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
-                    aria-label={`Research origin of ${contact.lastName || "surname"}`}
-                    className={contact.checkedOnOrigin
+                    disabled={!contact.lastName?.trim()}
+                    onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
+                    aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
+                    className={contact.checkedOnForebears
                       ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
                       : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
                   >
                     <Globe className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Research surname origin</TooltipContent>
+                <TooltipContent>{contact.lastName?.trim() ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline" size="icon"
+                    disabled={!contact.lastName?.trim()}
+                    onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                    aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
+                    className={contact.checkedOnOrigin
+                      ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                      : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{contact.lastName?.trim() ? "Research surname origin with Luna" : "A last name is required"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
