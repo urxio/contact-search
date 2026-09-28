@@ -38,8 +38,6 @@ type MySegment = {
   package_id?: number | null
 }
 
-type SegmentFilter = "All" | "In progress" | "Not started" | "Completed"
-
 function pct(a: number, total: number) {
   return total > 0 ? Math.round((a / total) * 100) : 0
 }
@@ -395,8 +393,7 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
   const [editing, setEditing]             = useState<Record<number, { stopped_at_page: string; status: string; page_start: string; page_end: string }>>({})
   const [saving, setSaving]               = useState<Set<number>>(new Set())
   const [confirming, setConfirming]       = useState<Set<number>>(new Set())
-  const [statusFilter, setStatusFilter]   = useState<SegmentFilter>("All")
-  const [segmentSearch, setSegmentSearch] = useState("")
+  const [completedOpen, setCompletedOpen] = useState(false)
   const [editErrors, setEditErrors]       = useState<Record<number, string>>({})
 
   const load = () => {
@@ -460,22 +457,15 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
   if (segments.length === 0) return (
     <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
       <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Your segments</p>
-      <p className="text-sm text-gray-400">You don&apos;t have any assigned segments yet.</p>
+      <p className="text-sm text-gray-400">You don&apos;t have any assigned Excel ranges yet.</p>
     </div>
   )
 
-  const statusCounts: Record<SegmentFilter, number> = {
-    All: segments.length,
-    "In progress": segments.filter(s => s.status === "In progress").length,
-    "Not started": segments.filter(s => s.status === "Not started").length,
-    Completed: segments.filter(s => s.status === "Completed").length,
-  }
-  const search = segmentSearch.trim().toLowerCase()
-  const visibleSegments = segments.filter(seg =>
-    (statusFilter === "All" || seg.status === statusFilter) &&
-    (!search || `${seg.city} ${seg.zipcode}`.toLowerCase().includes(search))
-  )
-  const showActions = canManage || segments.some(segment => Boolean(segment.package_id) && segment.status !== "Completed")
+  const inProgress = segments.filter(s => s.status === "In progress")
+  const notStarted = segments.filter(s => s.status === "Not started")
+  const completed  = segments.filter(s => s.status === "Completed")
+  const active     = [...inProgress, ...notStarted]
+  const showActions = canManage || active.some(segment => Boolean(segment.package_id))
 
   const renderSegRow = (seg: MySegment) => {
     const isEditing    = !!editing[seg.id]
@@ -586,31 +576,20 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
   return (
     <div className="mb-8 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
       {/* Panel header */}
-      <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
         <span className="text-base font-semibold text-gray-700 dark:text-gray-300">
           Your segments
           <span className="ml-2 text-sm font-normal text-gray-400">({segments.length})</span>
         </span>
-        <span className="text-sm text-gray-500 dark:text-gray-400">All assigned page ranges, including completed work</span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3 dark:border-gray-800">
-        <div className="flex max-w-full gap-1 overflow-x-auto" role="group" aria-label="Filter your segments by status">
-          {(["All", "In progress", "Not started", "Completed"] as const).map(status => (
-            <button key={status} type="button" onClick={() => setStatusFilter(status)} aria-pressed={statusFilter === status}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === status
-                ? "bg-indigo-600 text-white"
-                : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"}`}>
-              {status} ({statusCounts[status]})
-            </button>
-          ))}
+        <div className="flex gap-3 text-sm text-gray-400">
+          {inProgress.length > 0 && <span className="text-amber-500 font-medium">{inProgress.length} in progress</span>}
+          {notStarted.length > 0 && <span>{notStarted.length} not started</span>}
+          {completed.length  > 0 && <span className="text-green-600 font-medium">{completed.length} done</span>}
         </div>
-        <input type="search" value={segmentSearch} onChange={event => setSegmentSearch(event.target.value)}
-          aria-label="Search your segments by city or ZIP code" placeholder="Search city or ZIP"
-          className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white sm:ml-auto sm:w-52" />
       </div>
 
-      {visibleSegments.length > 0 ? (
+      {/* Active segments table (In progress + Not started) */}
+      {active.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -623,12 +602,39 @@ function MySegmentsPanel({ userName, canManage, apiBase = "/api/territories", te
               </tr>
             </thead>
             <tbody>
-              {visibleSegments.map(seg => renderSegRow(seg))}
+              {active.map(seg => renderSegRow(seg))}
             </tbody>
           </table>
         </div>
-      ) : (
-        <p className="px-5 py-6 text-sm text-gray-500 dark:text-gray-400">No segments match these filters.</p>
+      )}
+
+      {active.length === 0 && completed.length > 0 && (
+        <p className="px-5 py-4 text-sm text-gray-400">All your segments are completed 🎉</p>
+      )}
+
+      {/* Completed dropdown */}
+      {completed.length > 0 && (
+        <div className="border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={() => setCompletedOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+              Completed ({completed.length})
+            </span>
+            <span className={`transition-transform duration-200 ${completedOpen ? "rotate-180" : ""}`}>▾</span>
+          </button>
+          {completedOpen && (
+            <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-800">
+              <table className="w-full text-sm">
+                <tbody>
+                  {completed.map(seg => renderSegRow(seg))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
