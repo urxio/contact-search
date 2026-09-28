@@ -157,11 +157,12 @@ export function PackageDialogs({
     {
       id: "my-excels",
       title: "Private Excels",
-      description: "Excels assigned to you, plus private Excels you uploaded or can administer.",
+      description: "Excels assigned to you, plus your unassigned private uploads.",
       emptyTitle: "No private Excels",
       emptyDescription: "Private Excels you can access will appear here.",
       icon: UserRound,
-      rows: packages.filter((row) => row.visibility === "private" || value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer")),
+      rows: packages.filter((row) => value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer") ||
+        (row.visibility === "private" && value<boolean>(row, "isMine", "is_mine") && row.state === "available")),
     },
     {
       id: "congregation-excels",
@@ -429,7 +430,7 @@ export function PackageDialogs({
     const isClaim = isClaimableByViewer(row)
     const openLabel = isClaim ? "Claim" : row.state === "available" ? "Open" : row.hasSavedProgress ? "Resume" : "Open"
     const packageStatus = row.state ? row.state.replace("_", " ") : row.status
-    const assignedToAnotherMember = library && row.segment?.ownerUserId != null && !isAssignedToViewer
+    const assignedToAnotherMember = row.segment?.ownerUserId != null && !isAssignedToViewer
     const updatedAt = value<string | Date>(row, "updatedAt", "updated_at")
     const updatedLabel = updatedAt ? new Date(updatedAt).toLocaleDateString() : null
 

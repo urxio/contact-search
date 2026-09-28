@@ -73,6 +73,14 @@ describe("shared Excel permissions and lifecycle", () => {
     expect(mocks.query).toHaveBeenCalledWith("ROLLBACK")
   })
 
+  it("does not let an admin take over another member's assignment by opening it", async () => {
+    membership.membership.role = "admin"
+    current = { ...row, visibility: "private", owner_user_id: 99, status: "In progress" }
+    const response = await action({ action: "open", draftRevision: 0 })
+    expect(response.status).toBe(409)
+    expect(writes()).toEqual([])
+  })
+
   it("rejects completed work", async () => {
     current.status = "Completed"
     expect((await action({ action: "open", draftRevision: 0 })).status).toBe(409)
@@ -199,7 +207,7 @@ describe("Excel upload and listing", () => {
     const result = await response.json()
     expect(result.packages).toHaveLength(1)
     expect(result.packages[0]).not.toHaveProperty("contacts")
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("cp.congregation_id=$1"), [34, false, 12, false])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("cp.congregation_id=$1"), [34, 12, false])
   })
 
   it("lists shared files for their assignee but hides them from other members", async () => {
@@ -230,6 +238,15 @@ describe("Excel upload and listing", () => {
     expect(result.packages[0].uploader.id).toBe(99)
     expect(result.packages[0].segment.owner).toBe("Assigned member")
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("s.status <> 'Completed'"), [34])
+  })
+
+  it("keeps another member's private assignment out of an admin's My Excels", async () => {
+    membership.membership.role = "admin"
+    current = { ...row, visibility: "private", uploaded_by_user_id: 12, owner_user_id: 98, status: "In progress" }
+    const { GET } = await import("@/app/api/c/[slug]/packages/route")
+    const response = await GET(new NextRequest("https://search.example/api/c/central/packages"), { params: { slug: "central" } })
+    expect((await response.json()).packages).toEqual([])
+    expect(mocks.query.mock.calls[0][0]).toContain("s.owner_user_id IS NULL")
   })
 })
 

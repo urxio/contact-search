@@ -26,7 +26,7 @@ describe("active package alerts", () => {
     const response = await GET(new NextRequest("https://search.example/api/c/central/packages?active=mine"), { params: { slug: "central" } })
 
     expect(response.status).toBe(200)
-    expect(mocks.poolQuery).toHaveBeenCalledWith(expect.stringContaining("s.owner_user_id=$3"), [34, false, 12, true])
+    expect(mocks.poolQuery).toHaveBeenCalledWith(expect.stringContaining("s.owner_user_id=$2"), [34, 12, true])
     expect(mocks.poolQuery.mock.calls[0][0]).toContain("s.status <> 'Completed'")
   })
 })

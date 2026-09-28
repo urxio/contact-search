@@ -26,9 +26,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       : `${PACKAGE_LIST_SELECT}
         WHERE cp.congregation_id=$1
           AND s.status <> 'Completed'
-          AND ($4::boolean AND s.owner_user_id=$3 OR NOT $4::boolean AND ($2::boolean OR cp.visibility='shared' OR cp.uploaded_by_user_id=$3 OR s.owner_user_id=$3))
+          AND ($3::boolean AND s.owner_user_id=$2 OR NOT $3::boolean AND
+            (s.owner_user_id=$2 OR (s.owner_user_id IS NULL AND (cp.visibility='shared' OR cp.uploaded_by_user_id=$2))))
         ORDER BY cp.created_at DESC,cp.id DESC`,
-      library ? [auth.congregation.id] : [auth.congregation.id, manageAll, auth.user.id, activeForMe])
+      library ? [auth.congregation.id] : [auth.congregation.id, auth.user.id, activeForMe])
     return NextResponse.json({
       packages: result.rows
         .filter(row => library || activeForMe || isPackageBrowsable(row, auth.user.id))

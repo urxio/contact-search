@@ -50,6 +50,19 @@ describe("contact packages", () => {
     expect(value.isMine).toBe(true)
   })
 
+  it("does not offer an admin Resume for an Excel assigned to someone else", () => {
+    const row = {
+      id: 5, name: "Assigned pages", visibility: "private", contact_count: 1,
+      uploaded_by_user_id: 10, segment_id: 9, zipcode: "22301", city: "Alexandria",
+      page_start: 4, page_end: 5, owner_user_id: 22, owner: "Martus",
+      status: "In progress", stopped_at_page: null,
+    }
+    expect(serializePackage(row, 10, true).canOpen).toBe(false)
+    expect(serializePackage(row, 22, false).canOpen).toBe(true)
+    expect(isPackageBrowsable(row, 10)).toBe(false)
+    expect(isPackageBrowsable(row, 22)).toBe(true)
+  })
+
   it("shows shared Excels assigned to the viewer but hides them from other members", () => {
     const assigned = { id: 14, visibility: "shared", owner_user_id: 22 }
     expect(isPackageBrowsable(assigned, 22)).toBe(true)

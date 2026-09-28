@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: Context) {
       if (!Number.isSafeInteger(revision) || revision < 0 || !isDraftEditSessionId(body?.draftSessionId)) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Draft revision and editing session are required." }, { status: 400 }) }
       if (row.status === "Completed") { await client.query("ROLLBACK"); return NextResponse.json({ error: "Completed Excels cannot be opened." }, { status: 409 }) }
       const ownerUserId = row.owner_user_id == null ? null : Number(row.owner_user_id)
-      if (ownerUserId && ownerUserId !== auth.user.id && !manageAll) { await client.query("ROLLBACK"); return NextResponse.json({ error: "This Excel is assigned to another member." }, { status: 409 }) }
+      if (ownerUserId && ownerUserId !== auth.user.id) { await client.query("ROLLBACK"); return NextResponse.json({ error: "This Excel is assigned to another member. Reassign it before opening." }, { status: 409 }) }
       await assertNoSegmentConflict(client,{congregationId:auth.congregation.id,zipcodeId:Number(row.zipcode_id),pageStart:Number(row.page_start),pageEnd:Number(row.page_end),excludeSegmentId:Number(row.segment_id)})
       const owner = auth.membership?.displayName || auth.user.displayName
       await client.query(`UPDATE zt_segments SET owner=$1,owner_user_id=$2,status='In progress',updated_at=NOW() WHERE id=$3 AND congregation_id=$4`, [owner,auth.user.id,row.segment_id,auth.congregation.id])

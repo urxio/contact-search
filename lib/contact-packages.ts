@@ -136,15 +136,14 @@ export function serializePackage(row: any, viewerUserId: number, manageAll: bool
     },
     hasSavedProgress: row.has_saved_progress ?? (row.saved_progress != null),
     state, canManage: manageAll || Number(row.uploaded_by_user_id) === viewerUserId, canAssign: manageAll,
-    canOpen: row.status !== "Completed" && (manageAll || isAvailable || ownerUserId === viewerUserId),
+    canOpen: row.status !== "Completed" && (ownerUserId === viewerUserId || (isAvailable && (manageAll || row.visibility === "shared" || Number(row.uploaded_by_user_id) === viewerUserId))),
   }
 }
 
 export function isPackageBrowsable(row: any, viewerUserId: number) {
   if (row.status === "Completed") return false
-  if (row.visibility !== "shared") return true
-  if (row.owner_user_id == null) return true
-  return Number(row.owner_user_id) === viewerUserId
+  if (row.owner_user_id != null) return Number(row.owner_user_id) === viewerUserId
+  return row.visibility === "shared" || Number(row.uploaded_by_user_id) === viewerUserId
 }
 
 function packageSelect(includePayload: boolean) {
