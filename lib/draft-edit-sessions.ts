@@ -41,14 +41,17 @@ export async function claimDraftEditSession(client: PoolClient, input: {
     [input.userId, input.congregationId, input.sessionId],
   )
   const current = await client.query(
-    `SELECT session_id FROM contact_draft_edit_sessions
+    `SELECT session_id,updated_at > NOW() - INTERVAL '2 minutes' AS is_recent
+     FROM contact_draft_edit_sessions
      WHERE user_id=$1 AND congregation_id=$2 FOR UPDATE`,
     [input.userId, input.congregationId],
   )
   const activeSessionId = current.rows[0]?.session_id
-  if (activeSessionId !== input.sessionId && activeSessionId != null && !input.switchEditing) {
-    const draft = await client.query(DRAFT_SELECT, [input.userId, input.congregationId])
-    return { acquired: false as const, server: serializeServerDraft(draft.rows[0]) }
+  const draft = await client.query(DRAFT_SELECT, [input.userId, input.congregationId])
+  const savedDraft = draft.rows[0]
+  const hasExcel = savedDraft?.package_id != null || (Array.isArray(savedDraft?.contacts) && savedDraft.contacts.length > 0)
+  if (activeSessionId !== input.sessionId && activeSessionId != null && !input.switchEditing && current.rows[0].is_recent && hasExcel) {
+    return { acquired: false as const, server: serializeServerDraft(savedDraft) }
   }
 
   if (activeSessionId !== input.sessionId) {
@@ -65,8 +68,21 @@ export async function claimDraftEditSession(client: PoolClient, input: {
     )
   }
 
-  const draft = await client.query(DRAFT_SELECT, [input.userId, input.congregationId])
-  return { acquired: true as const, draft: serializeServerDraft(draft.rows[0]) }
+  return { acquired: true as const, draft: serializeServerDraft(savedDraft) }
+}
+
+/** Keep an open editor's lease active without granting a replaced session access. */
+export async function refreshDraftEditSession(client: PoolClient, input: {
+  userId: number
+  congregationId: number
+  sessionId: string
+}) {
+  await assertDraftEditSession(client, input)
+  await client.query(
+    `UPDATE contact_draft_edit_sessions SET updated_at=NOW()
+     WHERE user_id=$1 AND congregation_id=$2 AND session_id=$3`,
+    [input.userId, input.congregationId, input.sessionId],
+  )
 }
 
 /** Hold the session row lock through the caller's transaction so a switch cannot race a save. */

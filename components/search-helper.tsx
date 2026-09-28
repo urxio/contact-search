@@ -546,6 +546,23 @@ export default function SearchHelper({
   }, [applyServerDraft, authenticatedDisplayName, blockDraftEditing, draftSessionStorageKey, storageKey, storagePrefix, workspaceSlug])
 
   useEffect(() => {
+    if (!workspaceSlug || !draftSessionId || draftSessionLoading || draftEditBlocked || contacts.length === 0) return
+    const heartbeat = () => {
+      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/draft/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "heartbeat", sessionId: draftSessionId }),
+      }).then(async (response) => {
+        if (response.status !== 409) return
+        const result = await response.json()
+        if (result.code === "DRAFT_EDIT_SESSION_REPLACED") blockDraftEditing(result.server ?? null)
+      }).catch(() => undefined)
+    }
+    const timer = window.setInterval(heartbeat, 30_000)
+    return () => window.clearInterval(timer)
+  }, [blockDraftEditing, contacts.length, draftEditBlocked, draftSessionId, draftSessionLoading, workspaceSlug])
+
+  useEffect(() => {
     if (!workspaceSlug) return
     fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/settings`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)

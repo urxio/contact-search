@@ -28,7 +28,7 @@ async function action(body: object) {
     : body
   return POST(new NextRequest(`https://search.example/api/c/central/packages/${packageId}`, { method: "POST", body: JSON.stringify(payload) }), { params: { slug: "central", id: String(packageId) } })
 }
-async function editSession(sessionId: string, action: "open" | "switch" = "open") {
+async function editSession(sessionId: string, action: "open" | "switch" | "heartbeat" = "open") {
   const { POST } = await import("@/app/api/c/[slug]/draft/session/route")
   return POST(new NextRequest("https://search.example/api/c/central/draft/session", {
     method: "POST", body: JSON.stringify({ action, sessionId }),
@@ -94,6 +94,32 @@ beforeEach(async () => {
 })
 
 describe("Excel progress handoffs with PostgreSQL", () => {
+  it("does not report another device when no Excel has been opened", async () => {
+    expect((await editSession(editorSessionA)).status).toBe(200)
+    expect((await editSession(editorSessionB)).status).toBe(200)
+    expect((await query("SELECT session_id FROM contact_draft_edit_sessions WHERE user_id=1")).rows[0].session_id).toBe(editorSessionB)
+  })
+
+  it("does not report another device for an empty saved draft", async () => {
+    expect((await editSession(editorSessionA)).status).toBe(200)
+    expect((await save({ contacts: [], revision: 0 })).status).toBe(200)
+    expect((await editSession(editorSessionB)).status).toBe(200)
+  })
+
+  it("lets a new device resume an Excel after the previous editor goes inactive", async () => {
+    await open()
+    await query("UPDATE contact_draft_edit_sessions SET updated_at=NOW() - INTERVAL '3 minutes' WHERE user_id=1")
+    expect((await editSession(editorSessionB)).status).toBe(200)
+    expect((await save({ contacts: [contact], revision: 1 }, {}, editorSessionA)).status).toBe(409)
+  })
+
+  it("keeps an open Excel protected while its editor sends heartbeats", async () => {
+    await open()
+    await query("UPDATE contact_draft_edit_sessions SET updated_at=NOW() - INTERVAL '3 minutes' WHERE user_id=1")
+    expect((await editSession(editorSessionA, "heartbeat")).status).toBe(200)
+    expect((await editSession(editorSessionB)).status).toBe(409)
+  })
+
   it("requires an explicit device switch and fences saves from the previous editor", async () => {
     const oldDeviceDraft = await open()
     const blocked = await editSession(editorSessionB)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { requireMembership, validateMutationOrigin } from "@/lib/auth"
-import { claimDraftEditSession, isDraftEditSessionId } from "@/lib/draft-edit-sessions"
+import { claimDraftEditSession, DraftEditSessionConflict, isDraftEditSessionId, refreshDraftEditSession } from "@/lib/draft-edit-sessions"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
@@ -12,13 +12,22 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const body = await req.json()
     const action = body?.action
     const sessionId = body?.sessionId
-    if ((action !== "open" && action !== "switch") || !isDraftEditSessionId(sessionId)) {
+    if ((action !== "open" && action !== "switch" && action !== "heartbeat") || !isDraftEditSessionId(sessionId)) {
       return NextResponse.json({ error: "A valid editing session is required." }, { status: 400 })
     }
 
     const client = await pool.connect()
     try {
       await client.query("BEGIN")
+      if (action === "heartbeat") {
+        await refreshDraftEditSession(client, {
+          userId: auth.user.id,
+          congregationId: auth.congregation.id,
+          sessionId,
+        })
+        await client.query("COMMIT")
+        return NextResponse.json({ success: true })
+      }
       const result = await claimDraftEditSession(client, {
         userId: auth.user.id,
         congregationId: auth.congregation.id,
@@ -36,6 +45,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ draft: result.draft })
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined)
+      if (error instanceof DraftEditSessionConflict) {
+        return NextResponse.json({ error: error.message, code: error.code, server: error.server }, { status: 409 })
+      }
       throw error
     } finally {
       client.release()
