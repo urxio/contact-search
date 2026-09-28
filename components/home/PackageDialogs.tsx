@@ -472,20 +472,20 @@ export function PackageDialogs({
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="package-zipcode">ZIP code</Label>
-              <div className="flex gap-2">
+              <div className="relative">
                 <Input
                   id="package-zipcode"
                   type="text"
                   inputMode="numeric"
                   autoComplete="postal-code"
                   maxLength={5}
-                  placeholder="Type ZIP code"
+                  placeholder="Type or choose a ZIP code"
                   value={zipcode}
                   onChange={(event) => setZipcode(event.target.value.replace(/\D/g, ""))}
-                  className="admin-field h-11 min-w-0 flex-1 rounded-xl"
+                  className="admin-field h-11 rounded-xl pr-12"
                 />
                 <Select value={selectedZip?.zipcode ?? ""} onValueChange={setZipcode}>
-                  <SelectTrigger aria-label="Choose a configured ZIP from the list" className="admin-field h-11 w-40 shrink-0 rounded-xl"><SelectValue placeholder="Browse ZIPs" /></SelectTrigger>
+                  <SelectTrigger aria-label="Browse configured ZIP codes" className="absolute right-px top-px h-[calc(100%-2px)] w-11 rounded-l-none rounded-r-xl border-0 border-l bg-transparent px-3 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-ring [&>span]:sr-only"><SelectValue placeholder="Browse ZIPs" /></SelectTrigger>
                   <SelectContent>{zipcodes.map((item) => <SelectItem key={item.id} value={item.zipcode} disabled={item.total_pages < 1}>{item.zipcode} · {item.city}{item.total_pages < 1 ? " · setup needed" : ""}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
