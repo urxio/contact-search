@@ -58,7 +58,7 @@ export function ContactTable({
 }: ContactTableProps) {
   return (
     <div className="overflow-x-auto rounded-md border">
-      <Table className="w-full table-fixed xl:table-auto xl:min-w-[1100px]">
+      <Table className="min-w-[1100px]">
         <TableHeader>
           <TableRow>
             <TableHead className="w-[30px]">
@@ -69,11 +69,11 @@ export function ContactTable({
             </TableHead>
             <TableHead className="w-[150px]">Name</TableHead>
             <TableHead>Address</TableHead>
-            <TableHead className="hidden xl:table-cell">City</TableHead>
-            <TableHead className="hidden xl:table-cell">Zipcode</TableHead>
-            <TableHead className="hidden xl:table-cell">Phone</TableHead>
-            <TableHead className="w-[172px]">Status</TableHead>
-            <TableHead className="w-[172px] text-right">Actions</TableHead>
+            <TableHead>City</TableHead>
+            <TableHead>Zipcode</TableHead>
+            <TableHead>Phone</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -109,8 +109,8 @@ export function ContactTable({
                     />
                   </TableCell>
 
-                  <TableCell className="break-words font-medium">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
                       {contact.fullName}
                       {colorByArea && area && (
                         <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
@@ -160,10 +160,10 @@ export function ContactTable({
                     </Button>
                   </TableCell>
 
-                  <TableCell className="break-words">{contact.address}</TableCell>
-                  <TableCell className="hidden xl:table-cell">{contact.city}</TableCell>
-                  <TableCell className="hidden xl:table-cell">{contact.zipcode}</TableCell>
-                  <TableCell className="hidden xl:table-cell">{contact.phone}</TableCell>
+                  <TableCell>{contact.address}</TableCell>
+                  <TableCell>{contact.city}</TableCell>
+                  <TableCell>{contact.zipcode}</TableCell>
+                  <TableCell>{contact.phone}</TableCell>
 
                   <TableCell>
                     <Select
@@ -195,7 +195,7 @@ export function ContactTable({
                     </Select>
                   </TableCell>
 
-                  <TableCell className="whitespace-nowrap text-right">
+                  <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
                       <Tooltip>
                         <TooltipTrigger>
