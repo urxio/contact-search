@@ -1149,20 +1149,20 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
         </Dialog>
 
         <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!importApplying) setImportDialogOpen(open) }}>
-          <DialogContent className="admin-material max-h-[85vh] overflow-hidden rounded-2xl sm:max-w-4xl">
-            <DialogHeader>
+          <DialogContent className="admin-material flex max-h-[85dvh] flex-col overflow-hidden rounded-2xl sm:max-w-4xl">
+            <DialogHeader className="shrink-0">
               <DialogTitle className="text-base font-semibold">Review Excel import</DialogTitle>
               <DialogDescription className="text-sm font-normal leading-relaxed">
                 Review {importFileName} before updating territory coverage and Team Progress. Existing conflicts keep their current mapping unless you choose the uploaded values.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-wrap gap-2" aria-label="Import summary">
+            <div className="flex shrink-0 flex-wrap gap-2" aria-label="Import summary">
               <Badge variant="secondary">{importRows.filter((row) => row.status === "new").length} new</Badge>
               <Badge variant="secondary">{importRows.filter((row) => row.status === "conflict").length} conflicts</Badge>
               <Badge variant="outline">{importRows.filter((row) => row.status === "unchanged").length} unchanged</Badge>
               {importRows.some((row) => row.status === "invalid") ? <Badge variant="destructive">{importRows.filter((row) => row.status === "invalid").length} invalid</Badge> : null}
             </div>
-            <div className="min-h-0 overflow-auto rounded-xl border">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border">
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="border-b">
@@ -1200,7 +1200,7 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                 </tbody>
               </table>
             </div>
-            <DialogFooter>
+            <DialogFooter className="shrink-0">
               <Button type="button" variant="outline" disabled={importApplying} onClick={() => setImportDialogOpen(false)} className="min-h-11 rounded-xl">Cancel</Button>
               <Button type="button" disabled={importApplying || importRows.every((row) => row.status === "invalid")} onClick={applyTerritoryImport} className="admin-primary-button min-h-11 rounded-xl">
                 {importApplying ? <Loader2 className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet aria-hidden="true" />}
