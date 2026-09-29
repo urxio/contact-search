@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getCurrentSession } from "@/lib/auth"
 import { pool } from "@/lib/db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   const current = await getCurrentSession()
   if (!current) return NextResponse.json({ user: null, memberships: [] }, { status: 401 })
