@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Database, LayoutGrid, Settings, ShieldCheck } from "lucide-react"
+import { Database, Globe2, LayoutGrid, ShieldCheck } from "lucide-react"
 
 import { ThemeSwitcher } from "@/components/theme-switcher"
 
@@ -22,9 +22,9 @@ export function PlatformHeader() {
             <Database className="h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Dictionary</span>
           </Link>
-          <Link href="/platform/settings" aria-label="Platform settings" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Settings className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Settings</span>
+          <Link href="/platform/origins" aria-label="Origin unclear" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Globe2 className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Origin unclear</span>
           </Link>
           <ThemeSwitcher className="h-11 w-11 rounded-xl shadow-none hover:translate-y-0 hover:bg-muted" />
         </nav>
