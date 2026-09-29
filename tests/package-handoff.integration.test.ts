@@ -138,6 +138,30 @@ describe("Excel progress handoffs with PostgreSQL", () => {
     expect((await newSave.json()).globalNotes).toBe("Saved from the switched device")
   })
 
+  it("saves the full draft without reading contact payloads back on the success path", async () => {
+    const opened = await open()
+    const contacts = [{ ...opened.contacts[0], notes: "Call after 6" }]
+    const querySpy = vi.spyOn(state.db, "query")
+
+    const response = await save(opened, { contacts, globalNotes: "Continue tomorrow", lastVerifiedId: contacts[0].id })
+    const saveQueries: string[] = querySpy.mock.calls.map((call: unknown[]) => String(call[0]))
+    querySpy.mockRestore()
+    expect(response.status).toBe(200)
+    const saved = await response.json()
+    expect(saved).toMatchObject({ contacts, globalNotes: "Continue tomorrow", lastVerifiedId: contacts[0].id, packageId })
+    expect((await query("SELECT contacts,global_notes FROM contact_drafts WHERE user_id=1")).rows[0])
+      .toMatchObject({ contacts, global_notes: "Continue tomorrow" })
+    const draftReads = saveQueries.filter(sql => sql.includes("FROM contact_drafts") && sql.startsWith("SELECT"))
+    expect(draftReads).toHaveLength(2)
+    for (const sql of draftReads) {
+      expect(sql).toContain("SELECT revision,package_id,package_assignment_revision")
+      expect(sql).not.toMatch(/\bcontacts\b/)
+    }
+    expect(saveQueries.find(sql => sql.includes("FOR UPDATE OF cp,s"))).not.toContain("cp.contacts")
+    expect(saveQueries.find(sql => sql.includes("INSERT INTO contact_drafts"))).not.toContain("RETURNING *")
+    expect(saveQueries.find(sql => sql.includes("INSERT INTO contact_drafts"))).not.toContain("RETURNING contacts")
+  })
+
   it("lists package summaries without contact payloads and retains saved-progress status", async () => {
     const { GET } = await import("@/app/api/c/[slug]/packages/route")
     const { PACKAGE_LIST_SELECT, PACKAGE_SELECT, serializePackage } = await import("@/lib/contact-packages")
