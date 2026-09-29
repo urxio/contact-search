@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { ensureSchema, pool } from "@/lib/db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(req: NextRequest) {
   await ensureSchema()
   const owner = req.nextUrl.searchParams.get("owner")?.trim()
