@@ -34,7 +34,7 @@ type Props = { open: boolean; onDismiss: () => void }
 export function UpdateAnnouncement({ open, onDismiss }: Props) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onDismiss() }}>
-      <DialogContent className="max-w-md gap-0 overflow-hidden border-0 p-0 shadow-2xl sm:rounded-2xl">
+      <DialogContent className="max-h-[92vh] max-w-lg gap-0 overflow-y-auto border-0 p-0 shadow-2xl sm:rounded-2xl">
         <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 px-6 pb-6 pt-8 text-white">
           <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" aria-hidden />
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30">
@@ -45,6 +45,17 @@ export function UpdateAnnouncement({ open, onDismiss }: Props) {
           <DialogDescription className="mt-2 text-sm text-white/85">
             We changed how Forebears opens to help prevent 403 errors, and added Luna as a fallback.
           </DialogDescription>
+        </div>
+        <div className="border-b bg-slate-900">
+          <video
+            className="aspect-video w-full"
+            poster="/whats-new/forebears-tab-switch.jpg"
+            autoPlay muted loop playsInline preload="metadata"
+            aria-label="Animation: click the globe, then switch to your open Forebears tab to see the search."
+          >
+            <source src="/whats-new/forebears-tab-switch.webm" type="video/webm" />
+            <source src="/whats-new/forebears-tab-switch.mp4" type="video/mp4" />
+          </video>
         </div>
         <ul className="space-y-4 px-6 py-6">
           {highlights.map(({ icon: Icon, tone, title, body }) => (
