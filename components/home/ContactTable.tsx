@@ -117,6 +117,20 @@ export function ContactTable({
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {contact.fullName}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button" variant="ghost" size="icon"
+                            disabled={!contact.lastName?.trim()}
+                            onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                            aria-label={`Copy surname ${contact.lastName?.trim() || ""}`.trim()}
+                            className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
+                      </Tooltip>
                       {colorByArea && area && (
                         <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                           {area}
@@ -163,14 +177,6 @@ export function ContactTable({
                           : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
                       >
                         <Globe className="h-4 w-4" /> Forebears
-                      </Button>
-                      <Button
-                        variant="outline" size="sm" disabled={!hasSurname}
-                        onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
-                        aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
-                        className="gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
-                      >
-                        <Copy className="h-4 w-4" /> Copy
                       </Button>
                       <Button
                         variant="outline" size="sm" disabled={!hasSurname}
@@ -249,20 +255,6 @@ export function ContactTable({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>{hasSurname ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline" size="icon"
-                            disabled={!hasSurname}
-                            onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
-                            aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
-                            className="hidden sm:inline-flex bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{hasSurname ? "Copy surname (search with Forebears open on the side)" : "A last name is required"}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

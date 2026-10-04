@@ -97,6 +97,20 @@ export function ContactGrid({
                     onClick={(e) => e.stopPropagation()}
                   />
                   <CardTitle className="text-base">{contact.fullName}</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button" variant="ghost" size="icon"
+                        disabled={!contact.lastName?.trim()}
+                        onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                        aria-label={`Copy surname ${contact.lastName?.trim() || ""}`.trim()}
+                        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
+                  </Tooltip>
                 </div>
                 {colorByArea && areaByZipcode.get(contact.zipcode.trim()) && (
                   <span className="mt-1 inline-block rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
@@ -181,20 +195,6 @@ export function ContactGrid({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{contact.lastName?.trim() ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline" size="icon"
-                    disabled={!contact.lastName?.trim()}
-                    onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
-                    aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
-                    className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{contact.lastName?.trim() ? "Copy surname (search with Forebears open on the side)" : "A last name is required"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
