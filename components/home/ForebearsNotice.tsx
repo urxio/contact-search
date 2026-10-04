@@ -29,7 +29,7 @@ export function ForebearsNotice({ notice, onDone }: { notice: ForebearsNoticeSta
         </span>
         <div className="min-w-0">
           <p className="truncate text-base font-semibold">&ldquo;{notice.surname}&rdquo; searched on Forebears</p>
-          <p className="text-sm text-muted-foreground">Switch to your open Forebears tab to see it.</p>
+          <p className="text-sm text-muted-foreground">Switch to your open Forebears tab.</p>
         </div>
       </div>
     </div>

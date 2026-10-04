@@ -966,7 +966,7 @@ export default function SearchHelper({
   }, [updateLastInteraction])
 
   const lastForebearsOpenRef = useRef(0)
-  const forebearsWindowRef = useRef<Window | null>(null)
+  const forebearsOpenedRef = useRef(false)
   const [forebearsNotice, setForebearsNotice] = useState<ForebearsNoticeState>(null)
   const clearForebearsNotice = useCallback(() => setForebearsNotice(null), [])
 
@@ -1001,19 +1001,18 @@ export default function SearchHelper({
     markForebearsChecked(contact.id)
     await copySurname(contact.lastName)
     const surname = contact.lastName.trim()
-    const url = forebearsSurnameUrl(contact.lastName)
-    const existing = forebearsWindowRef.current
-    const reusing = Boolean(existing && !existing.closed)
     const now = Date.now()
-    if (reusing) setForebearsNotice({ surname, id: now })
+    // Browsers can drop the window handle, so remember "opened before" for this browser session instead.
+    let openedBefore = forebearsOpenedRef.current
+    try { openedBefore = openedBefore || window.sessionStorage.getItem("forebears-tab-opened") === "1" } catch { /* storage unavailable */ }
+    if (openedBefore) setForebearsNotice({ surname, id: now })
     if (now - lastForebearsOpenRef.current < 2000) return
     lastForebearsOpenRef.current = now
-    if (reusing && existing) {
-      try { existing.location.href = url } catch { window.open(url, "forebears") }
-      try { existing.focus() } catch { /* browsers may block focusing another tab */ }
-      return
-    }
-    forebearsWindowRef.current = window.open(url, "forebears")
+    // The named target reloads the existing Forebears tab, or opens it if it was closed.
+    const forebearsWindow = window.open(forebearsSurnameUrl(contact.lastName), "forebears")
+    forebearsOpenedRef.current = true
+    try { window.sessionStorage.setItem("forebears-tab-opened", "1") } catch { /* storage unavailable */ }
+    try { forebearsWindow?.focus() } catch { /* browsers may block focusing another tab */ }
   }, [copySurname, markForebearsChecked])
 
   // Update the copyAndSearchOTM function to copy contact name and use the new URL
