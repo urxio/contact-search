@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { PageFrame } from "./page-frame"
 
 type Change = { icon: LucideIcon; tone: string; title: string; body: string }
-type Release = { id: string; date: string; title: string; summary: string; changes: Change[] }
+type Video = { id: string; title: string; description: string }
+type Release = { id: string; date: string; title: string; summary: string; changes: Change[]; videos?: Video[] }
 
 // Newest first. Add a new entry here for each announcement.
 const releases: Release[] = [
@@ -34,6 +35,10 @@ const releases: Release[] = [
         title: "Luna is your Forebears fallback",
         body: "Tap the sparkle button to have Luna research a surname's likely origin, with sources. It's a helpful clue, so double-check unclear results on Forebears.",
       },
+    ],
+    videos: [
+      { id: "forebears-tab-switch", title: "Search with one Forebears tab", description: "Click the globe, then switch to your open Forebears tab." },
+      { id: "luna-fallback", title: "Luna when Forebears shows a 403", description: "Click the sparkle button to research the surname origin." },
     ],
   },
 ]
@@ -65,6 +70,30 @@ export function WhatsNew() {
                     </li>
                   ))}
                 </ul>
+                {release.videos?.length ? (
+                  <div className="mt-6 border-t pt-5">
+                    <h3 className="text-sm font-semibold">See how it works</h3>
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+                      {release.videos.map((video) => (
+                        <figure key={video.id} className="overflow-hidden rounded-xl border bg-slate-900">
+                          <video
+                            className="aspect-video w-full"
+                            poster={`/whats-new/${video.id}.jpg`}
+                            controls muted loop playsInline preload="metadata"
+                            aria-label={video.title}
+                          >
+                            <source src={`/whats-new/${video.id}.webm`} type="video/webm" />
+                            <source src={`/whats-new/${video.id}.mp4`} type="video/mp4" />
+                          </video>
+                          <figcaption className="bg-background px-4 py-3">
+                            <p className="text-sm font-semibold">{video.title}</p>
+                            <p className="mt-0.5 text-sm text-muted-foreground">{video.description}</p>
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </li>

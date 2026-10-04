@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Copy, Globe, ShieldCheck, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,9 +30,16 @@ const highlights = [
   },
 ]
 
+const clips = [
+  { id: "forebears-tab-switch", label: "Forebears tab", alt: "Animation: click the globe, then switch to your open Forebears tab to see the search." },
+  { id: "luna-fallback", label: "Luna fallback", alt: "Animation: if Forebears shows a 403 error, click the sparkle button to have Luna research the surname origin." },
+] as const
+
 type Props = { open: boolean; onDismiss: () => void }
 
 export function UpdateAnnouncement({ open, onDismiss }: Props) {
+  const [clipId, setClipId] = useState<(typeof clips)[number]["id"]>(clips[0].id)
+  const clip = clips.find((item) => item.id === clipId) ?? clips[0]
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onDismiss() }}>
       <DialogContent className="max-h-[92vh] max-w-lg gap-0 overflow-y-auto border-0 p-0 shadow-2xl sm:rounded-2xl">
@@ -47,14 +55,26 @@ export function UpdateAnnouncement({ open, onDismiss }: Props) {
           </DialogDescription>
         </div>
         <div className="border-b bg-slate-900">
+          <div className="flex gap-1 px-4 pt-3" role="tablist" aria-label="Update walkthroughs">
+            {clips.map((item) => (
+              <button
+                key={item.id} type="button" role="tab" aria-selected={item.id === clipId}
+                onClick={() => setClipId(item.id)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${item.id === clipId ? "bg-white text-slate-900" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <video
-            className="aspect-video w-full"
-            poster="/whats-new/forebears-tab-switch.jpg"
+            key={clip.id}
+            className="mt-3 aspect-video w-full"
+            poster={`/whats-new/${clip.id}.jpg`}
             autoPlay muted loop playsInline preload="metadata"
-            aria-label="Animation: click the globe, then switch to your open Forebears tab to see the search."
+            aria-label={clip.alt}
           >
-            <source src="/whats-new/forebears-tab-switch.webm" type="video/webm" />
-            <source src="/whats-new/forebears-tab-switch.mp4" type="video/mp4" />
+            <source src={`/whats-new/${clip.id}.webm`} type="video/webm" />
+            <source src={`/whats-new/${clip.id}.mp4`} type="video/mp4" />
           </video>
         </div>
         <ul className="space-y-4 px-6 py-6">
