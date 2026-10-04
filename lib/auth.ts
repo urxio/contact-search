@@ -16,7 +16,7 @@ export type AuthUser = {
   email: string
   displayName: string
   isPlatformAdmin: boolean
-  preferences: { theme?: "light" | "dark"; defaultWorkspaceView?: "search" | "team" }
+  preferences: { theme?: "light" | "dark"; defaultWorkspaceView?: "search" | "team"; seenUpdates?: string[] }
 }
 export type CongregationAccess = {
   user: AuthUser

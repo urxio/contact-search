@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { WorkspaceShell } from "./workspace-shell"
 import { WorkspaceRuntimeProvider } from "./workspace-context"
+import { CURRENT_UPDATE_ID, UpdateAnnouncement } from "./update-announcement"
 import type { WorkspaceAccount, WorkspaceSummary } from "./types"
 
 type SessionPayload = {
@@ -15,6 +16,7 @@ type SessionPayload = {
     is_platform_admin?: boolean
     preferences?: {
       defaultWorkspaceView?: "search" | "team"
+      seenUpdates?: string[]
     }
   }
   memberships?: Array<{
@@ -34,6 +36,7 @@ type WorkspaceShellLoaderProps = {
 
 export function WorkspaceShellLoader({ slug, fallbackName, children }: WorkspaceShellLoaderProps) {
   const [session, setSession] = useState<SessionPayload | null>(null)
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -71,6 +74,19 @@ export function WorkspaceShellLoader({ slug, fallbackName, children }: Workspace
     return () => window.removeEventListener("search-helper:preferences-updated", updatePreferences)
   }, [])
 
+  const showAnnouncement = Boolean(session?.user)
+    && !announcementDismissed
+    && !(session?.user?.preferences?.seenUpdates ?? []).includes(CURRENT_UPDATE_ID)
+
+  function dismissAnnouncement() {
+    setAnnouncementDismissed(true)
+    void fetch(`/api/c/${encodeURIComponent(slug)}/updates/seen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateId: CURRENT_UPDATE_ID }),
+    }).catch(() => undefined)
+  }
+
   const workspaces = useMemo<WorkspaceSummary[]>(() => {
     if (!session?.memberships?.length) {
       return [{ name: fallbackName, slug, role: "member" }]
@@ -104,6 +120,7 @@ export function WorkspaceShellLoader({ slug, fallbackName, children }: Workspace
       <WorkspaceShell activeWorkspace={activeWorkspace} workspaces={workspaces} account={account}>
         {children}
       </WorkspaceShell>
+      <UpdateAnnouncement open={showAnnouncement} onDismiss={dismissAnnouncement} />
     </WorkspaceRuntimeProvider>
   )
 }
