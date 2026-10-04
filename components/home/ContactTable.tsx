@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search, Sparkles,
+  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Copy, Search, Sparkles,
   ChevronDown, ChevronRight,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
@@ -29,6 +29,7 @@ interface ContactTableProps {
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
   onSearchForebears: (contact: EnhancedContact) => void
+  onCopyForebearsSurname: (contact: EnhancedContact) => void
   onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
   activeOriginContactId?: string | null
@@ -51,6 +52,7 @@ export function ContactTable({
   onPhoneUpdateChange,
   onTerritoryStatusChange,
   onSearchForebears,
+  onCopyForebearsSurname,
   onSearchOrigin,
   onSearchTPS,
   activeOriginContactId = null,
@@ -164,6 +166,14 @@ export function ContactTable({
                       </Button>
                       <Button
                         variant="outline" size="sm" disabled={!hasSurname}
+                        onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                        aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
+                        className="gap-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
+                      >
+                        <Copy className="h-4 w-4" /> Copy
+                      </Button>
+                      <Button
+                        variant="outline" size="sm" disabled={!hasSurname}
                         onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
                         aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
                         className={`gap-1.5 ${contact.checkedOnOrigin
@@ -239,6 +249,20 @@ export function ContactTable({
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>{hasSurname ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline" size="icon"
+                            disabled={!hasSurname}
+                            onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                            aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
+                            className="hidden sm:inline-flex bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{hasSurname ? "Copy surname (search with Forebears open on the side)" : "A last name is required"}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

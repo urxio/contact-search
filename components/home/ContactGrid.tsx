@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Search, Sparkles,
+  Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Copy, Search, Sparkles,
   CheckCircle2, XCircle, RefreshCw, CircleSlash,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
@@ -29,6 +29,7 @@ interface ContactGridProps {
   onPhoneUpdateChange: (id: string, v: boolean) => void
   onTerritoryStatusChange: (id: string, v: boolean) => void
   onSearchForebears: (contact: EnhancedContact) => void
+  onCopyForebearsSurname: (contact: EnhancedContact) => void
   onSearchOrigin: (contact: EnhancedContact) => void
   onSearchTPS: (contact: EnhancedContact) => void
   activeOriginContactId?: string | null
@@ -69,6 +70,7 @@ export function ContactGrid({
   onPhoneUpdateChange,
   onTerritoryStatusChange,
   onSearchForebears,
+  onCopyForebearsSurname,
   onSearchOrigin,
   onSearchTPS,
   activeOriginContactId = null,
@@ -179,6 +181,20 @@ export function ContactGrid({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{contact.lastName?.trim() ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline" size="icon"
+                    disabled={!contact.lastName?.trim()}
+                    onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                    aria-label={`Copy ${contact.lastName?.trim() || "surname"} to search on Forebears`}
+                    className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{contact.lastName?.trim() ? "Copy surname (search with Forebears open on the side)" : "A last name is required"}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

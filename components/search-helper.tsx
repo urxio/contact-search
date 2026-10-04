@@ -964,14 +964,46 @@ export default function SearchHelper({
     updateLastInteraction(contactId)
   }, [updateLastInteraction])
 
-  const searchOnForebears = useCallback((contact: EnhancedContact) => {
+  const lastForebearsOpenRef = useRef(0)
+
+  const copySurname = useCallback(async (surname: string) => {
+    try {
+      await navigator.clipboard.writeText(surname.trim())
+      return true
+    } catch {
+      toast.error("Failed to copy surname to clipboard")
+      return false
+    }
+  }, [])
+
+  // Copy only: lets users search with Forebears already open in another window, with no page load.
+  const copyForebearsSurname = useCallback(async (contact: EnhancedContact) => {
+    if (!normalizeSurname(contact.lastName)) {
+      toast.error("Last name is required for Forebears search")
+      return
+    }
+    if (await copySurname(contact.lastName)) {
+      markForebearsChecked(contact.id)
+      toast.success(`Copied "${contact.lastName.trim()}"`)
+    }
+  }, [copySurname, markForebearsChecked])
+
+  // Reuses one named Forebears tab and copies the surname, so rapid clicks don't hammer the site.
+  const searchOnForebears = useCallback(async (contact: EnhancedContact) => {
     if (!normalizeSurname(contact.lastName)) {
       toast.error("Last name is required for Forebears search")
       return
     }
     markForebearsChecked(contact.id)
-    window.open(forebearsSurnameUrl(contact.lastName), "_blank", "noopener,noreferrer")
-  }, [markForebearsChecked])
+    const copied = await copySurname(contact.lastName)
+    const now = Date.now()
+    if (now - lastForebearsOpenRef.current < 2000) {
+      if (copied) toast.info(`Copied "${contact.lastName.trim()}". Forebears was just opened, paste it there.`)
+      return
+    }
+    lastForebearsOpenRef.current = now
+    window.open(forebearsSurnameUrl(contact.lastName), "forebears")
+  }, [copySurname, markForebearsChecked])
 
   // Update the copyAndSearchOTM function to copy contact name and use the new URL
   const copyAndSearchOTM = useCallback(
@@ -2657,6 +2689,7 @@ export default function SearchHelper({
                       onPhoneUpdateChange={handlePhoneUpdateChange}
                       onTerritoryStatusChange={handleTerritoryStatusChange}
                       onSearchForebears={searchOnForebears}
+                      onCopyForebearsSurname={copyForebearsSurname}
                       onSearchOrigin={searchOrigin}
                       onSearchTPS={searchOnTruePeopleSearch}
                       activeOriginContactId={originLookup?.contactId}
@@ -2680,6 +2713,7 @@ export default function SearchHelper({
                       onPhoneUpdateChange={handlePhoneUpdateChange}
                       onTerritoryStatusChange={handleTerritoryStatusChange}
                       onSearchForebears={searchOnForebears}
+                      onCopyForebearsSurname={copyForebearsSurname}
                       onSearchOrigin={searchOrigin}
                       onSearchTPS={searchOnTruePeopleSearch}
                       activeOriginContactId={originLookup?.contactId}
