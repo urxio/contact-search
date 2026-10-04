@@ -14,6 +14,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   UsersRound,
 } from "lucide-react"
 
@@ -225,6 +226,12 @@ export function WorkspaceShell({
                       Instructions
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
+                    <Link href={`/c/${activeWorkspace.slug}/whats-new`}>
+                      <Sparkles aria-hidden="true" />
+                      What&apos;s new
+                    </Link>
+                  </DropdownMenuItem>
                   {canAdmin ? (
                     <>
                       <DropdownMenuSeparator />
@@ -299,6 +306,12 @@ export function WorkspaceShell({
                         <Link href={`/c/${activeWorkspace.slug}/instructions`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <BookOpen className="h-4 w-4" aria-hidden="true" />
                           Instructions
+                        </Link>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Link href={`/c/${activeWorkspace.slug}/whats-new`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <Sparkles className="h-4 w-4" aria-hidden="true" />
+                          What&apos;s new
                         </Link>
                       </SheetClose>
                       {canAdmin ? (
