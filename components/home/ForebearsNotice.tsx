@@ -1,0 +1,37 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Globe } from "lucide-react"
+
+export type ForebearsNoticeState = { surname: string; id: number } | null
+
+// Brief, non-blocking card in the middle of the screen. Clicks pass through it
+// and it fades on its own, so repeated searches never need dismissing.
+export function ForebearsNotice({ notice, onDone }: { notice: ForebearsNoticeState; onDone: () => void }) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!notice) return
+    setVisible(true)
+    const hide = window.setTimeout(() => setVisible(false), 2200)
+    const clear = window.setTimeout(onDone, 2600)
+    return () => { window.clearTimeout(hide); window.clearTimeout(clear) }
+  }, [notice, onDone])
+
+  if (!notice) return null
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-4" role="status" aria-live="polite">
+      <div
+        className={`flex max-w-sm items-center gap-4 rounded-2xl border bg-background/95 px-6 py-5 shadow-2xl ring-1 ring-black/5 backdrop-blur transition-all duration-300 motion-reduce:transition-none ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+          <Globe className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold">&ldquo;{notice.surname}&rdquo; searched on Forebears</p>
+          <p className="text-sm text-muted-foreground">Switch to your open Forebears tab to see it.</p>
+        </div>
+      </div>
+    </div>
+  )
+}

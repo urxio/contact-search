@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createContact as persistContact } from "@/actions/contact-actions"
 import { toast } from "sonner"
+import { ForebearsNotice, type ForebearsNoticeState } from "@/components/home/ForebearsNotice"
 import { FloatingProgress } from "@/components/ui/floating-progress"
 import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name-detection"
 // Home sub-components
@@ -965,6 +966,9 @@ export default function SearchHelper({
   }, [updateLastInteraction])
 
   const lastForebearsOpenRef = useRef(0)
+  const forebearsWindowRef = useRef<Window | null>(null)
+  const [forebearsNotice, setForebearsNotice] = useState<ForebearsNoticeState>(null)
+  const clearForebearsNotice = useCallback(() => setForebearsNotice(null), [])
 
   const copySurname = useCallback(async (surname: string) => {
     try {
@@ -995,14 +999,21 @@ export default function SearchHelper({
       return
     }
     markForebearsChecked(contact.id)
-    const copied = await copySurname(contact.lastName)
+    await copySurname(contact.lastName)
+    const surname = contact.lastName.trim()
+    const url = forebearsSurnameUrl(contact.lastName)
+    const existing = forebearsWindowRef.current
+    const reusing = Boolean(existing && !existing.closed)
     const now = Date.now()
-    if (now - lastForebearsOpenRef.current < 2000) {
-      if (copied) toast.info(`Copied "${contact.lastName.trim()}". Forebears was just opened, paste it there.`)
+    if (reusing) setForebearsNotice({ surname, id: now })
+    if (now - lastForebearsOpenRef.current < 2000) return
+    lastForebearsOpenRef.current = now
+    if (reusing && existing) {
+      try { existing.location.href = url } catch { window.open(url, "forebears") }
+      try { existing.focus() } catch { /* browsers may block focusing another tab */ }
       return
     }
-    lastForebearsOpenRef.current = now
-    window.open(forebearsSurnameUrl(contact.lastName), "forebears")
+    forebearsWindowRef.current = window.open(url, "forebears")
   }, [copySurname, markForebearsChecked])
 
   // Update the copyAndSearchOTM function to copy contact name and use the new URL
@@ -2727,6 +2738,8 @@ export default function SearchHelper({
           </Card>
         )}
       </main>
+
+      <ForebearsNotice notice={forebearsNotice} onDone={clearForebearsNotice} />
 
       <div className="container pointer-events-none fixed inset-x-0 bottom-0 z-50 mx-auto flex flex-col gap-3 px-10 pb-4 sm:pb-6">
         {originLookup && (
