@@ -1069,6 +1069,15 @@ export default function SearchHelper({
         const entry = data.entry as SurnameOriginEntry
         setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
         if (entry.origins.length) updateLastInteraction(contact.id)
+        else {
+          // Luna found nothing, so open Forebears for a manual check. This runs after an async fetch,
+          // so the browser may block the tab; the panel keeps a highlighted Forebears button as a fallback.
+          const forebearsTab = window.open(forebearsSurnameUrl(surname), "_blank")
+          if (forebearsTab) {
+            forebearsTab.opener = null
+            markForebearsChecked(contact.id)
+          } else toast.info("Origin unclear. Use the highlighted Open Forebears button to check manually.")
+        }
         setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
           ? { ...current, entry, loading: false } : current)
       }).catch((error) => {
@@ -1077,7 +1086,7 @@ export default function SearchHelper({
           ? { ...current, loading: false, error: error instanceof Error ? error.message : "Please try again." } : current)
       })
     },
-    [updateLastInteraction, workspaceSlug],
+    [markForebearsChecked, updateLastInteraction, workspaceSlug],
   )
 
   // Update the handleStatusChange function
