@@ -7,6 +7,8 @@ export type SurnameOriginEntry = {
   origins: SurnameOrigin[]
   researchedAt: string
   reviewedAt?: string | null
+  // Set only on a fresh lookup: Luna's general search found nothing, so it also searched Forebears.
+  forebearsFallback?: boolean
 }
 
 type WebOutput = {

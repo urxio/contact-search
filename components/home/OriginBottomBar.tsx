@@ -61,7 +61,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium">Luna is researching this surname…</p>
-                <p className="mt-1 text-sm text-muted-foreground">Searching web sources for likely historical origins.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Searching web sources for likely historical origins. If nothing turns up, Luna will also check Forebears.</p>
               </div>
             </div>
           ) : error ? (
@@ -102,13 +102,14 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {entry.reviewedAt ? "Manually reviewed" : "Researched"} {new Date(entry.researchedAt).toLocaleDateString()}
+                {entry.forebearsFallback && " · Found by Luna's fallback search on Forebears"}
               </p>
             </div>
           ) : entry ? (
             <div className="origin-glass-card rounded-xl border p-4">
               <p className="font-medium">Origin unclear</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
+                {entry.forebearsFallback && "Luna's general search found nothing, so it also searched Forebears. "}The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
               </p>
             </div>
           ) : null}

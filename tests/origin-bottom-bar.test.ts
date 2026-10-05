@@ -94,6 +94,22 @@ describe("Origin contact UI", () => {
     }
   })
 
+  it("tells the user when Luna fell back to searching Forebears", () => {
+    const props = { contactName: "Ana Dupont", surname: "dupont", loading: false, error: null,
+      onRefresh: vi.fn(), onOpenForebears: vi.fn(), onClose: vi.fn() }
+    const unclear = renderToString(React.createElement(OriginBottomBar, { ...props,
+      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [], forebearsFallback: true } }))
+    expect(unclear).toContain("also searched Forebears")
+    const found = renderToString(React.createElement(OriginBottomBar, { ...props,
+      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", forebearsFallback: true, origins: [{
+        country: "France", explanation: "French surname.",
+        sources: [{ title: "Forebears", url: "https://forebears.io/surnames/dupont" }] }] } }))
+    expect(found).toContain("fallback search on Forebears")
+    const plain = renderToString(React.createElement(OriginBottomBar, { ...props,
+      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] } }))
+    expect(plain).not.toContain("also searched Forebears")
+  })
+
   it("shows sourced results in a responsive nonmodal bottom panel", () => {
     const markup = renderToString(React.createElement(OriginBottomBar, {
       contactName: "Ana Dupont", surname: "dupont", loading: false, error: null,

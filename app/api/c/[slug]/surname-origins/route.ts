@@ -81,11 +81,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!key) return NextResponse.json({ error: "Origin research is not configured." }, { status: 503, headers })
 
     let origins: SurnameOrigin[]
+    let forebearsFallback = false
     try {
       origins = await research(surname, key)
       // Luna's general search found nothing, so have it look at Forebears itself before calling the origin unclear.
       if (!origins.length) {
-        try { origins = await research(surname, key, true) }
+        try { origins = await research(surname, key, true); forebearsFallback = true }
         catch (error) { console.error("Forebears origin check failed:", error) }
       }
     }
@@ -102,6 +103,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const result = await pool.query<CacheRow>(selectEntry, [surname])
     if (result.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
     else if (!result.rows[0].reviewed_at) await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
-    return NextResponse.json({ entry: serialize(result.rows[0]), cached: false }, { headers })
+    return NextResponse.json({ entry: { ...serialize(result.rows[0]), forebearsFallback }, cached: false }, { headers })
   } catch (error) { return apiError(error) }
 }
