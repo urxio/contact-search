@@ -83,9 +83,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     let origins: SurnameOrigin[]
     let forebearsFallback = false
     try {
-      origins = await research(surname, key)
+      // Temporary experiment: set SURNAME_ORIGIN_FOREBEARS_ONLY=1 to skip the general search and use Forebears alone.
+      if (process.env.SURNAME_ORIGIN_FOREBEARS_ONLY === "1") {
+        origins = await research(surname, key, true)
+        forebearsFallback = true
+      } else origins = await research(surname, key)
       // Luna's general search found nothing, so have it look at Forebears itself before calling the origin unclear.
-      if (!origins.length) {
+      if (!origins.length && !forebearsFallback) {
         try { origins = await research(surname, key, true); forebearsFallback = true }
         catch (error) { console.error("Forebears origin check failed:", error) }
       }
