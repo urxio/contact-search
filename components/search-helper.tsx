@@ -170,6 +170,7 @@ export default function SearchHelper({
   const [originLookup, setOriginLookup] = useState<{
     surname: string; contactId: string; contactName: string
     entry: SurnameOriginEntry | null; loading: boolean; error: string | null
+    progress: string | null; forebearsTab: "opened" | "blocked" | null
   } | null>(null)
   const originLookupRequest = useRef(0)
 
@@ -1053,31 +1054,54 @@ export default function SearchHelper({
       }
       toast.dismiss("welcome-back")
       setOriginLookup({ surname, contactId: contact.id, contactName: contact.fullName,
-        entry: null, loading: true, error: null })
+        entry: null, loading: true, error: null, progress: "Step 1 of 3: searching the web for the surname's likely origin.",
+        forebearsTab: null })
       if (!workspaceSlug) {
         setOriginLookup((current) => current && current.contactId === contact.id
           ? { ...current, loading: false, error: "Origin research is available in a workspace." } : current)
         return
       }
-      void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-origins`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ surname, refresh, contactId: contact.id, contactName: contact.fullName }),
-      }).then(async (response) => {
+      const isCurrent = () => originLookupRequest.current === lookupRequest
+      const post = async (stage: "web" | "forebears") => {
+        const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/surname-origins`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ surname, refresh, stage, contactId: contact.id, contactName: contact.fullName }),
+        })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || "Origin research failed")
-        if (originLookupRequest.current !== lookupRequest) return
-        const entry = data.entry as SurnameOriginEntry
+        return data as { entry: SurnameOriginEntry; cached: boolean }
+      }
+      const update = (patch: Partial<NonNullable<typeof originLookup>>) =>
+        setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
+          ? { ...current, ...patch } : current)
+      void (async () => {
+        let { entry, cached } = await post("web")
+        if (!isCurrent()) return
+        // Step 2: the web search found nothing, so read the surname's Forebears page (fresh lookups only).
+        if (!entry.origins.length && !cached) {
+          update({ progress: "Step 2 of 3: the web search found nothing, so Luna is checking Forebears for the countries where this surname is most common." })
+          ;({ entry } = await post("forebears"))
+          if (!isCurrent()) return
+        }
         setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
-        if (entry.origins.length) updateLastInteraction(contact.id)
-        setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
-          ? { ...current, entry, loading: false } : current)
-      }).catch((error) => {
-        if (originLookupRequest.current !== lookupRequest) return
-        setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
-          ? { ...current, loading: false, error: error instanceof Error ? error.message : "Please try again." } : current)
+        if (entry.origins.length) {
+          updateLastInteraction(contact.id)
+          update({ entry, loading: false, progress: null })
+          return
+        }
+        // Step 3: nothing found anywhere, so open Forebears for the user. The browser may block a tab opened after a delay.
+        const forebearsTab = window.open(forebearsSurnameUrl(surname), "_blank")
+        if (forebearsTab) {
+          forebearsTab.opener = null
+          markForebearsChecked(contact.id)
+        } else toast.info("Origin unclear. Use the highlighted Open Forebears button to check manually.")
+        update({ entry, loading: false, progress: null, forebearsTab: forebearsTab ? "opened" : "blocked" })
+      })().catch((error) => {
+        if (!isCurrent()) return
+        update({ loading: false, progress: null, error: error instanceof Error ? error.message : "Please try again." })
       })
     },
-    [updateLastInteraction, workspaceSlug],
+    [markForebearsChecked, updateLastInteraction, workspaceSlug],
   )
 
   // Update the handleStatusChange function
@@ -2748,6 +2772,8 @@ export default function SearchHelper({
             entry={originLookup.entry}
             loading={originLookup.loading}
             error={originLookup.error}
+            progress={originLookup.progress}
+            forebearsTab={originLookup.forebearsTab}
             batchActionsVisible={selectedContacts.length > 0}
             onRefresh={() => searchOrigin({ id: originLookup.contactId, lastName: originLookup.surname,
               fullName: originLookup.contactName }, true)}

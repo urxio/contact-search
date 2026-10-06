@@ -89,6 +89,30 @@ async function recordUnclearContact(surname: string, congregationId: number, bod
   )
 }
 
+// Second step of a lookup, run only after the web search came back unclear: read the surname's Forebears page.
+async function forebearsStage(surname: string, row: CacheRow | undefined, body: Record<string, unknown>, access: { congregation: { id: number } }) {
+  if (!row) return NextResponse.json({ error: "Search the web for this surname first." }, { status: 409, headers })
+  if (row.reviewed_at || row.origins.length) return NextResponse.json({ entry: serialize(row), cached: true }, { headers })
+  const key = process.env.OPENROUTER_API_KEY
+  if (!key) return NextResponse.json({ error: "Origin research is not configured." }, { status: 503, headers })
+  let origins: SurnameOrigin[] = []
+  let forebearsUnavailable = false
+  try { origins = await researchForebears(surname, key) }
+  catch (error) { forebearsUnavailable = true; console.error("Forebears origin check failed:", error) }
+  if (origins.length) {
+    await pool.query(
+      `UPDATE platform_surname_origin_cache SET origins=$2::jsonb,updated_at=NOW() WHERE surname=$1 AND reviewed_at IS NULL`,
+      [surname, JSON.stringify(origins)],
+    )
+    await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
+  } else await recordUnclearContact(surname, access.congregation.id, body)
+  const result = await pool.query<CacheRow>(selectEntry, [surname])
+  return NextResponse.json({
+    entry: { ...serialize(result.rows[0]), forebearsFallback: !forebearsUnavailable, forebearsUnavailable },
+    cached: false,
+  }, { headers })
+}
+
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
@@ -99,6 +123,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!validSurname(surname)) return NextResponse.json({ error: "A valid surname is required." }, { status: 400, headers })
     const refresh = body?.refresh === true
     const cached = await pool.query<CacheRow>(selectEntry, [surname])
+    if (body?.stage === "forebears") return forebearsStage(surname, cached.rows[0], body, access)
     if (cached.rows[0] && (!refresh || cached.rows[0].reviewed_at)) {
       if (cached.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
       return NextResponse.json({ entry: serialize(cached.rows[0]), cached: true }, { headers })
@@ -107,20 +132,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!key) return NextResponse.json({ error: "Origin research is not configured." }, { status: 503, headers })
 
     let origins: SurnameOrigin[]
-    let forebearsFallback = false
-    let forebearsUnavailable = false
-    try {
-      // Temporary experiment: set SURNAME_ORIGIN_FOREBEARS_ONLY=1 to skip the general search and use Forebears alone.
-      if (process.env.SURNAME_ORIGIN_FOREBEARS_ONLY === "1") {
-        origins = await researchForebears(surname, key)
-        forebearsFallback = true
-      } else origins = await research(surname, key)
-      // Luna's general search found nothing, so have it look at Forebears itself before calling the origin unclear.
-      if (!origins.length && !forebearsFallback) {
-        try { origins = await researchForebears(surname, key); forebearsFallback = true }
-        catch (error) { forebearsUnavailable = true; console.error("Forebears origin check failed:", error) }
-      }
-    }
+    try { origins = await research(surname, key) }
     catch (error) {
       console.error("Origin research failed:", error)
       return NextResponse.json({ error: "Origin research is temporarily unavailable. Please try again." }, { status: 502, headers })
@@ -134,6 +146,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const result = await pool.query<CacheRow>(selectEntry, [surname])
     if (result.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
     else if (!result.rows[0].reviewed_at) await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
-    return NextResponse.json({ entry: { ...serialize(result.rows[0]), forebearsFallback, forebearsUnavailable }, cached: false }, { headers })
+    return NextResponse.json({ entry: serialize(result.rows[0]), cached: false }, { headers })
   } catch (error) { return apiError(error) }
 }

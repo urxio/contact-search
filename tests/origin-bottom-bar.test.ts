@@ -94,24 +94,26 @@ describe("Origin contact UI", () => {
     }
   })
 
-  it("tells the user when Luna fell back to searching Forebears", () => {
-    const props = { contactName: "Ana Dupont", surname: "dupont", loading: false, error: null,
+  it("tells the user what Luna is doing at every step", () => {
+    const props = { contactName: "Ana Dupont", surname: "dupont", error: null,
       onRefresh: vi.fn(), onOpenForebears: vi.fn(), onClose: vi.fn() }
-    const unclear = renderToString(React.createElement(OriginBottomBar, { ...props,
-      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [], forebearsFallback: true } }))
-    expect(unclear).toContain("also searched Forebears")
-    const found = renderToString(React.createElement(OriginBottomBar, { ...props,
-      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", forebearsFallback: true, origins: [{
-        country: "France", explanation: "French surname.",
-        sources: [{ title: "Forebears", url: "https://forebears.io/surnames/dupont" }] }] } }))
-    expect(found).toContain("fallback search on Forebears")
-    const unavailable = renderToString(React.createElement(OriginBottomBar, { ...props,
-      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [], forebearsUnavailable: true } }))
+    const render = (extra: Record<string, unknown>) => renderToString(React.createElement(OriginBottomBar, { ...props, loading: false, ...extra } as never))
+    const entry = { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] }
+
+    expect(render({ loading: true, entry: null })).toContain("Step 1 of 3")
+    expect(render({ loading: true, entry: null, progress: "Step 2 of 3: the web search found nothing, so Luna is checking Forebears." }))
+      .toContain("Step 2 of 3")
+
+    const opened = render({ entry: { ...entry, forebearsFallback: true }, forebearsTab: "opened" })
+    expect(opened).toContain("web search did not find")
+    expect(opened).toContain("checked Forebears but it listed no countries")
+    expect(opened).toContain("opened Forebears in a new tab")
+
+    const unavailable = render({ entry: { ...entry, forebearsUnavailable: true }, forebearsTab: "blocked" })
     expect(unavailable).toContain("could not read Forebears")
-    expect(unavailable).not.toContain("also searched Forebears")
-    const plain = renderToString(React.createElement(OriginBottomBar, { ...props,
-      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] } }))
-    expect(plain).not.toContain("also searched Forebears")
+    expect(unavailable).toContain("blocked the new Forebears tab")
+
+    expect(render({ entry })).toContain("Try searching Forebears")
   })
 
   it("shows sourced results in a responsive nonmodal bottom panel", () => {

@@ -13,13 +13,17 @@ type Props = {
   entry: SurnameOriginEntry | null
   loading: boolean
   error: string | null
+  // What Luna is doing right now, shown while loading.
+  progress?: string | null
+  // Outcome of opening Forebears for the user once Luna's searches found nothing.
+  forebearsTab?: "opened" | "blocked" | null
   onRefresh: () => void
   onOpenForebears: () => void
   onClose: () => void
   batchActionsVisible?: boolean
 }
 
-export function OriginBottomBar({ contactName, surname, entry, loading, error, onRefresh, onOpenForebears, onClose, batchActionsVisible = false }: Props) {
+export function OriginBottomBar({ contactName, surname, entry, loading, error, progress = null, forebearsTab = null, onRefresh, onOpenForebears, onClose, batchActionsVisible = false }: Props) {
   const panelRef = React.useRef<HTMLElement>(null)
   const originUnclear = !loading && !error && entry !== null && entry.origins.length === 0
 
@@ -61,7 +65,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium">Luna is researching this surname…</p>
-                <p className="mt-1 text-sm text-muted-foreground">Searching web sources for likely historical origins. If nothing turns up, Luna will also check Forebears.</p>
+                <p className="mt-1 text-sm text-muted-foreground">{progress ?? "Step 1 of 3: searching the web for the surname's likely origin."}</p>
               </div>
             </div>
           ) : error ? (
@@ -108,10 +112,14 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
           ) : entry ? (
             <div className="origin-glass-card rounded-xl border p-4">
               <p className="font-medium">Origin unclear</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {entry.forebearsFallback && "Luna's general search found nothing, so it also searched Forebears. "}
-                {entry.forebearsUnavailable && "Luna's general search found nothing, and it could not read Forebears this time. "}The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
-              </p>
+              <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                <li>Step 1: Luna&apos;s web search did not find a likely country of origin.</li>
+                {entry.forebearsUnavailable && <li>Step 2: Luna could not read Forebears this time.</li>}
+                {entry.forebearsFallback && <li>Step 2: Luna checked Forebears but it listed no countries.</li>}
+                {forebearsTab === "opened" && <li>Step 3: Luna opened Forebears in a new tab so you can check it yourself. Where a surname is common does not prove its origin.</li>}
+                {forebearsTab === "blocked" && <li>Step 3: Your browser blocked the new Forebears tab. Use the highlighted Open Forebears button below.</li>}
+                {!forebearsTab && <li>Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.</li>}
+              </ul>
             </div>
           ) : null}
         </div>

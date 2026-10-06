@@ -189,6 +189,47 @@ describe("platform surname origin cache", () => {
     )
   })
 
+  describe("Forebears stage", () => {
+    const forebearsPage = (content: string) => ({ ok: true, json: async () => ({ status: "completed",
+      output: [{ type: "openrouter:web_fetch", url: "https://forebears.io/surnames/ajina", content }] }) })
+
+    it("saves the Forebears countries for an unclear surname", async () => {
+      process.env.OPENROUTER_API_KEY = "test-key"
+      mocks.query.mockResolvedValueOnce({ rows: [row("ajina", [])] }).mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row("ajina", [{ ...sourcedOrigin, country: "Nigeria" }])] })
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(forebearsPage("Most prevalent in: Nigeria\n\nHighest density in: Lebanon\n")))
+      const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+      const response = await POST(request({ surname: "Ajina", stage: "forebears" }), context)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ cached: false, entry: { forebearsFallback: true, forebearsUnavailable: false } })
+      expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("UPDATE platform_surname_origin_cache"),
+        ["ajina", expect.stringContaining("Lebanon")])
+    })
+
+    it("retries once and then reports Forebears as unavailable", async () => {
+      process.env.OPENROUTER_API_KEY = "test-key"
+      mocks.query.mockResolvedValueOnce({ rows: [row("ajina", [])] }).mockResolvedValue({ rows: [row("ajina", [])] })
+      const fetchMock = vi.fn().mockResolvedValue(forebearsPage("Just a moment..."))
+      vi.stubGlobal("fetch", fetchMock)
+      const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+      const response = await POST(request({ surname: "Ajina", stage: "forebears" }), context)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(await response.json()).toMatchObject({ entry: { origins: [], forebearsUnavailable: true } })
+    })
+
+    it("does not call the API unless the web search came back unclear", async () => {
+      process.env.OPENROUTER_API_KEY = "test-key"
+      const fetchMock = vi.fn()
+      vi.stubGlobal("fetch", fetchMock)
+      const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
+      mocks.query.mockResolvedValueOnce({ rows: [] })
+      expect((await POST(request({ surname: "Ajina", stage: "forebears" }), context)).status).toBe(409)
+      mocks.query.mockResolvedValueOnce({ rows: [row("dupont", [sourcedOrigin])] })
+      expect(await (await POST(request({ surname: "Dupont", stage: "forebears" }), context)).json()).toMatchObject({ cached: true })
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+  })
+
   it("reports configuration and upstream failures without saving a result", async () => {
     const { POST } = await import("@/app/api/c/[slug]/surname-origins/route")
     expect((await POST(request({ surname: "Dupont" }), context)).status).toBe(503)
