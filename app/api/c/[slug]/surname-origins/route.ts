@@ -38,6 +38,7 @@ async function researchForebears(surname: string, key: string): Promise<SurnameO
   try { return await fetchForebears(surname, key) }
   catch (error) {
     console.error("Forebears fetch failed, retrying:", error)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     return fetchForebears(surname, key)
   }
 }

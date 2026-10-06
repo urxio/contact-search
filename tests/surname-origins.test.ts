@@ -249,6 +249,18 @@ describe("Forebears page fields", () => {
     expect(origins[0].sources[0].url).toBe("https://forebears.io/surnames/abdennasser")
   })
 
+  it("reads fields whose value is on the next line and ignores later sentences", () => {
+    const content = "Most prevalent in:\n\nUnited States\n\nHighest density in:\n\nUnited States\n\n"
+      + "Most prevalent in: Georgia, where 37 percent reside, Texas, where 19 percent reside and Florida, where 12 percent"
+    const origins = parseForebearsFetch(page(content, "https://forebears.io/surnames/almand"), "almand")
+    expect(origins.map((origin) => origin.country)).toEqual(["United States"])
+  })
+
+  it("rejects a field whose text is not a plain country name", () => {
+    const content = "Most prevalent in: Georgia, where 37 percent reside, Texas, where 19 percent reside"
+    expect(() => parseForebearsFetch(page(content, "https://forebears.io/surnames/almand"), "almand")).toThrow("no prevalence fields")
+  })
+
   it("returns one country when both fields match", () => {
     const origins = parseForebearsFetch(page("Most prevalent in: Sudan\n\nHighest density in: Sudan\n"), "abdennasser")
     expect(origins).toHaveLength(1)

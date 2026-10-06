@@ -125,9 +125,11 @@ export function parseForebearsFetch(response: { status?: unknown; output?: Array
     throw new Error(`Forebears page was not fetched (${seen || "no output"})`)
   }
   const text: string = page.content
+  // The value follows the label on the same line or, on some pages, after a blank line. Only a plain country name is
+  // accepted, so a later sentence that happens to contain the label can never become a "country".
   const field = (label: string) => {
-    const value = text.match(new RegExp(`${label}:[ \\t]*([^\\n|]{2,80})`, "i"))?.[1]?.trim()
-    return value && !/^(n\/a|unknown|none)$/i.test(value) ? value : null
+    const value = text.match(new RegExp(`${label}:\\s*([^\\n|]{2,60})`, "i"))?.[1]?.trim()
+    return value && /^[\p{L}][\p{L} .'’()-]*$/u.test(value) && !/^(n\/a|unknown|none)$/i.test(value) ? value : null
   }
   const prevalent = field("Most prevalent in")
   const density = field("Highest density in")
