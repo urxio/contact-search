@@ -105,6 +105,10 @@ describe("Origin contact UI", () => {
         country: "France", explanation: "French surname.",
         sources: [{ title: "Forebears", url: "https://forebears.io/surnames/dupont" }] }] } }))
     expect(found).toContain("fallback search on Forebears")
+    const unavailable = renderToString(React.createElement(OriginBottomBar, { ...props,
+      entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [], forebearsUnavailable: true } }))
+    expect(unavailable).toContain("could not reach Forebears")
+    expect(unavailable).not.toContain("also searched Forebears")
     const plain = renderToString(React.createElement(OriginBottomBar, { ...props,
       entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] } }))
     expect(plain).not.toContain("also searched Forebears")

@@ -14,7 +14,7 @@ function serialize(row: CacheRow) {
     reviewedAt: row.reviewed_at?.toISOString() ?? null }
 }
 
-async function researchForebears(surname: string, key: string): Promise<SurnameOrigin[]> {
+async function fetchForebears(surname: string, key: string): Promise<SurnameOrigin[]> {
   const response = await fetch("https://openrouter.ai/api/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -31,6 +31,15 @@ async function researchForebears(surname: string, key: string): Promise<SurnameO
   })
   if (!response.ok) throw new Error(`OpenRouter Forebears check returned HTTP ${response.status}`)
   return parseForebearsFetch(await response.json(), surname)
+}
+
+// The fetch is occasionally refused or empty, so try twice before reporting Forebears as unavailable.
+async function researchForebears(surname: string, key: string): Promise<SurnameOrigin[]> {
+  try { return await fetchForebears(surname, key) }
+  catch (error) {
+    console.error("Forebears fetch failed, retrying:", error)
+    return fetchForebears(surname, key)
+  }
 }
 
 async function research(surname: string, key: string): Promise<SurnameOrigin[]> {
@@ -99,6 +108,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     let origins: SurnameOrigin[]
     let forebearsFallback = false
+    let forebearsUnavailable = false
     try {
       // Temporary experiment: set SURNAME_ORIGIN_FOREBEARS_ONLY=1 to skip the general search and use Forebears alone.
       if (process.env.SURNAME_ORIGIN_FOREBEARS_ONLY === "1") {
@@ -108,7 +118,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       // Luna's general search found nothing, so have it look at Forebears itself before calling the origin unclear.
       if (!origins.length && !forebearsFallback) {
         try { origins = await researchForebears(surname, key); forebearsFallback = true }
-        catch (error) { console.error("Forebears origin check failed:", error) }
+        catch (error) { forebearsUnavailable = true; console.error("Forebears origin check failed:", error) }
       }
     }
     catch (error) {
@@ -124,6 +134,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const result = await pool.query<CacheRow>(selectEntry, [surname])
     if (result.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
     else if (!result.rows[0].reviewed_at) await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
-    return NextResponse.json({ entry: { ...serialize(result.rows[0]), forebearsFallback }, cached: false }, { headers })
+    return NextResponse.json({ entry: { ...serialize(result.rows[0]), forebearsFallback, forebearsUnavailable }, cached: false }, { headers })
   } catch (error) { return apiError(error) }
 }

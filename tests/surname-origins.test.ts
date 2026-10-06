@@ -216,9 +216,12 @@ describe("Forebears page fields", () => {
     expect(origins[0].explanation).toContain("most prevalent and has the highest density")
   })
 
-  it("returns nothing when the page was not fetched or has no fields", () => {
+  it("returns nothing when the page has no fields", () => {
     expect(parseForebearsFetch(page("The meaning is not listed."), "abdennasser")).toEqual([])
-    expect(parseForebearsFetch(page("Most prevalent in: Peru", "https://forebears.io/surnames/other"), "abdennasser")).toEqual([])
-    expect(parseForebearsFetch({ status: "completed", output: [] }, "abdennasser")).toEqual([])
+  })
+
+  it("throws when the page was not fetched so it is not reported as checked", () => {
+    expect(() => parseForebearsFetch(page("Most prevalent in: Peru", "https://forebears.io/surnames/other"), "abdennasser")).toThrow("not fetched")
+    expect(() => parseForebearsFetch({ status: "completed", output: [] }, "abdennasser")).toThrow("not fetched")
   })
 })

@@ -9,6 +9,8 @@ export type SurnameOriginEntry = {
   reviewedAt?: string | null
   // Set only on a fresh lookup: Luna's general search found nothing, so it also searched Forebears.
   forebearsFallback?: boolean
+  // Set only on a fresh lookup where the Forebears page could not be fetched, so nothing was checked.
+  forebearsUnavailable?: boolean
 }
 
 type WebOutput = {
@@ -112,13 +114,16 @@ export function parseOriginResponse(response: WebOutput): SurnameOrigin[] {
 }
 
 // Reads the "Most prevalent in" and "Highest density in" fields from a Forebears page fetched through OpenRouter's
-// web_fetch tool. The fields are read with code rather than by the model so a missing page can never produce a country.
+// web_fetch tool. The fields are read with code rather than by the model so a missing page can never produce a country. It throws when the page could not be fetched, and returns [] when the page has no such fields.
 export function parseForebearsFetch(response: { status?: unknown; output?: Array<{ type?: unknown; url?: unknown; content?: unknown }> }, surname: string): SurnameOrigin[] {
   if (response.status !== "completed" || !Array.isArray(response.output)) throw new Error("Incomplete Forebears check")
   const expected = forebearsSurnameUrl(surname)
   const page = response.output.find((item) => item.type === "openrouter:web_fetch" && typeof item.content === "string"
     && typeof item.url === "string" && item.url.replace(/\/$/, "").toLowerCase() === expected.toLowerCase())
-  if (!page || typeof page.content !== "string") return []
+  if (!page || typeof page.content !== "string") {
+    const seen = response.output.map((item) => `${String(item.type)}:${String(item.url ?? "")}`).join(", ")
+    throw new Error(`Forebears page was not fetched (${seen || "no output"})`)
+  }
   const text: string = page.content
   const field = (label: string) => {
     const value = text.match(new RegExp(`${label}:[ \\t]*([^\\n|]{2,80})`, "i"))?.[1]?.trim()
