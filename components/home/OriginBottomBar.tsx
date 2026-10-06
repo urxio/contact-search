@@ -65,7 +65,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, p
               <Loader2 className="mt-0.5 h-5 w-5 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
               <div>
                 <p className="text-sm font-medium">Luna is researching this surname…</p>
-                <p className="mt-1 text-sm text-muted-foreground">{progress ?? "Step 1 of 3: searching the web for the surname's likely origin."}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{progress ?? "Step 1 of 3: Luna is checking Forebears for the countries where this surname is most common."}</p>
               </div>
             </div>
           ) : error ? (
@@ -106,16 +106,16 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, p
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {entry.reviewedAt ? "Manually reviewed" : "Researched"} {new Date(entry.researchedAt).toLocaleDateString()}
-                {entry.forebearsFallback && " · Found by Luna's fallback search on Forebears"}
+                {entry.forebearsFallback && " · Found on Forebears"}
               </p>
             </div>
           ) : entry ? (
             <div className="origin-glass-card rounded-xl border p-4">
               <p className="font-medium">Origin unclear</p>
               <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-                <li>Step 1: Luna&apos;s web search did not find a likely country of origin.</li>
-                {entry.forebearsUnavailable && <li>Step 2: Luna could not read Forebears this time.</li>}
-                {entry.forebearsFallback && <li>Step 2: Luna checked Forebears but it listed no countries.</li>}
+                {entry.forebearsUnavailable && <li>Step 1: Luna could not read Forebears this time.</li>}
+                {entry.forebearsFallback && <li>Step 1: Luna checked Forebears but it listed no countries.</li>}
+                <li>Step 2: Luna&apos;s web search did not find a likely country of origin.</li>
                 {forebearsTab === "opened" && <li>Step 3: Luna opened Forebears in a new tab so you can check it yourself. Where a surname is common does not prove its origin.</li>}
                 {forebearsTab === "blocked" && <li>Step 3: Your browser blocked the new Forebears tab. Use the highlighted Open Forebears button below.</li>}
                 {!forebearsTab && <li>Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.</li>}

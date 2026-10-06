@@ -100,13 +100,13 @@ describe("Origin contact UI", () => {
     const render = (extra: Record<string, unknown>) => renderToString(React.createElement(OriginBottomBar, { ...props, loading: false, ...extra } as never))
     const entry = { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] }
 
-    expect(render({ loading: true, entry: null })).toContain("Step 1 of 3")
-    expect(render({ loading: true, entry: null, progress: "Step 2 of 3: the web search found nothing, so Luna is checking Forebears." }))
+    expect(render({ loading: true, entry: null })).toContain("Step 1 of 3: Luna is checking Forebears")
+    expect(render({ loading: true, entry: null, progress: "Step 2 of 3: Forebears listed no countries, so Luna is searching the web." }))
       .toContain("Step 2 of 3")
 
     const opened = render({ entry: { ...entry, forebearsFallback: true }, forebearsTab: "opened" })
-    expect(opened).toContain("web search did not find")
-    expect(opened).toContain("checked Forebears but it listed no countries")
+    expect(opened).toContain("Step 1: Luna checked Forebears but it listed no countries")
+    expect(opened).toContain("Step 2: Luna&#x27;s web search did not find")
     expect(opened).toContain("opened Forebears in a new tab")
 
     const unavailable = render({ entry: { ...entry, forebearsUnavailable: true }, forebearsTab: "blocked" })

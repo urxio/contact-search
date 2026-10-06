@@ -89,28 +89,29 @@ async function recordUnclearContact(surname: string, congregationId: number, bod
   )
 }
 
-// Second step of a lookup, run only after the web search came back unclear: read the surname's Forebears page.
-async function forebearsStage(surname: string, row: CacheRow | undefined, body: Record<string, unknown>, access: { congregation: { id: number } }) {
-  if (!row) return NextResponse.json({ error: "Search the web for this surname first." }, { status: 409, headers })
-  if (row.reviewed_at || row.origins.length) return NextResponse.json({ entry: serialize(row), cached: true }, { headers })
+// First step of a lookup: read the surname's Forebears page. A cached surname is returned as is. If Forebears names no
+// countries, nothing is saved and the client goes on to the web search.
+async function forebearsStage(surname: string, row: CacheRow | undefined, refresh: boolean, body: Record<string, unknown>, access: { congregation: { id: number } }) {
+  if (row && (!refresh || row.reviewed_at)) {
+    if (row.origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
+    return NextResponse.json({ entry: serialize(row), cached: true }, { headers })
+  }
   const key = process.env.OPENROUTER_API_KEY
   if (!key) return NextResponse.json({ error: "Origin research is not configured." }, { status: 503, headers })
   let origins: SurnameOrigin[] = []
   let forebearsUnavailable = false
   try { origins = await researchForebears(surname, key) }
   catch (error) { forebearsUnavailable = true; console.error("Forebears origin check failed:", error) }
-  if (origins.length) {
-    await pool.query(
-      `UPDATE platform_surname_origin_cache SET origins=$2::jsonb,updated_at=NOW() WHERE surname=$1 AND reviewed_at IS NULL`,
-      [surname, JSON.stringify(origins)],
-    )
-    await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
-  } else await recordUnclearContact(surname, access.congregation.id, body)
+  if (!origins.length) return NextResponse.json({ entry: null, cached: false, forebearsUnavailable }, { headers })
+  await pool.query(
+    `INSERT INTO platform_surname_origin_cache(surname,origins) VALUES($1,$2::jsonb)
+     ON CONFLICT(surname) DO UPDATE SET origins=EXCLUDED.origins,updated_at=NOW(),reviewed_at=NULL,reviewed_by_user_id=NULL
+     WHERE platform_surname_origin_cache.reviewed_at IS NULL`,
+    [surname, JSON.stringify(origins)],
+  )
+  await pool.query(`DELETE FROM platform_surname_origin_review_contacts WHERE surname=$1`, [surname])
   const result = await pool.query<CacheRow>(selectEntry, [surname])
-  return NextResponse.json({
-    entry: { ...serialize(result.rows[0]), forebearsFallback: !forebearsUnavailable, forebearsUnavailable },
-    cached: false,
-  }, { headers })
+  return NextResponse.json({ entry: { ...serialize(result.rows[0]), forebearsFallback: true }, cached: false }, { headers })
 }
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!validSurname(surname)) return NextResponse.json({ error: "A valid surname is required." }, { status: 400, headers })
     const refresh = body?.refresh === true
     const cached = await pool.query<CacheRow>(selectEntry, [surname])
-    if (body?.stage === "forebears") return forebearsStage(surname, cached.rows[0], body, access)
+    if (body?.stage === "forebears") return forebearsStage(surname, cached.rows[0], refresh, body, access)
     if (cached.rows[0] && (!refresh || cached.rows[0].reviewed_at)) {
       if (cached.rows[0].origins.length === 0) await recordUnclearContact(surname, access.congregation.id, body)
       return NextResponse.json({ entry: serialize(cached.rows[0]), cached: true }, { headers })

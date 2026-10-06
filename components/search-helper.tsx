@@ -1054,7 +1054,7 @@ export default function SearchHelper({
       }
       toast.dismiss("welcome-back")
       setOriginLookup({ surname, contactId: contact.id, contactName: contact.fullName,
-        entry: null, loading: true, error: null, progress: "Step 1 of 3: searching the web for the surname's likely origin.",
+        entry: null, loading: true, error: null, progress: "Step 1 of 3: Luna is checking Forebears for the countries where this surname is most common.",
         forebearsTab: null })
       if (!workspaceSlug) {
         setOriginLookup((current) => current && current.contactId === contact.id
@@ -1069,19 +1069,24 @@ export default function SearchHelper({
         })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || "Origin research failed")
-        return data as { entry: SurnameOriginEntry; cached: boolean }
+        return data as { entry: SurnameOriginEntry | null; cached: boolean; forebearsUnavailable?: boolean }
       }
       const update = (patch: Partial<NonNullable<typeof originLookup>>) =>
         setOriginLookup((current) => current?.contactId === contact.id && current.surname === surname
           ? { ...current, ...patch } : current)
       void (async () => {
-        let { entry, cached } = await post("web")
+        // Step 1: Forebears. A cached surname is answered here without searching again.
+        const forebears = await post("forebears")
         if (!isCurrent()) return
-        // Step 2: the web search found nothing, so read the surname's Forebears page (fresh lookups only).
-        if (!entry.origins.length && !cached) {
-          update({ progress: "Step 2 of 3: the web search found nothing, so Luna is checking Forebears for the countries where this surname is most common." })
-          ;({ entry } = await post("forebears"))
+        let entry = forebears.entry
+        if (!entry) {
+          // Step 2: Forebears named no countries, so search the web for the surname's origin.
+          update({ progress: `Step 2 of 3: ${forebears.forebearsUnavailable ? "Luna could not read Forebears" : "Forebears listed no countries"}, so Luna is searching the web for this surname's origin.` })
+          const web = await post("web")
           if (!isCurrent()) return
+          // The flags only describe an unclear result; an origin found here came from the web, not Forebears.
+          entry = web.entry!.origins.length ? web.entry! : { ...web.entry!, forebearsFallback: !forebears.forebearsUnavailable,
+            forebearsUnavailable: forebears.forebearsUnavailable === true }
         }
         setContacts((current) => current.map((item) => item.id === contact.id ? { ...item, checkedOnOrigin: true } : item))
         if (entry.origins.length) {
