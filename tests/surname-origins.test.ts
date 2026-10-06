@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
-import { parseOriginResponse } from "@/lib/surname-origins"
+import { parseForebearsFetch, parseOriginResponse } from "@/lib/surname-origins"
 
 const mocks = vi.hoisted(() => ({ query: vi.fn(), member: vi.fn(), origin: vi.fn() }))
 vi.mock("@/lib/db", () => ({ pool: { query: mocks.query } }))
@@ -197,5 +197,28 @@ describe("platform surname origin cache", () => {
     const failed = await POST(request({ surname: "Dupont" }), context)
     expect(failed.status).toBe(502)
     expect(mocks.query.mock.calls.every(([sql]) => !String(sql).includes("INSERT"))).toBe(true)
+  })
+})
+
+describe("Forebears page fields", () => {
+  const page = (content: string, url = "https://forebears.io/surnames/abdennasser") =>
+    ({ status: "completed", output: [{ type: "openrouter:web_fetch", url, content }] })
+
+  it("returns the most prevalent and highest density countries", () => {
+    const origins = parseForebearsFetch(page("Most prevalent in: Morocco\n\nHighest density in: Tunisia\n"), "Abdennasser")
+    expect(origins.map((origin) => origin.country)).toEqual(["Morocco", "Tunisia"])
+    expect(origins[0].sources[0].url).toBe("https://forebears.io/surnames/abdennasser")
+  })
+
+  it("returns one country when both fields match", () => {
+    const origins = parseForebearsFetch(page("Most prevalent in: Sudan\n\nHighest density in: Sudan\n"), "abdennasser")
+    expect(origins).toHaveLength(1)
+    expect(origins[0].explanation).toContain("most prevalent and has the highest density")
+  })
+
+  it("returns nothing when the page was not fetched or has no fields", () => {
+    expect(parseForebearsFetch(page("The meaning is not listed."), "abdennasser")).toEqual([])
+    expect(parseForebearsFetch(page("Most prevalent in: Peru", "https://forebears.io/surnames/other"), "abdennasser")).toEqual([])
+    expect(parseForebearsFetch({ status: "completed", output: [] }, "abdennasser")).toEqual([])
   })
 })

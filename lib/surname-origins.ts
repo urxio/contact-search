@@ -1,4 +1,4 @@
-import { normalizeSurname, validSurname } from "@/lib/surname-countries"
+import { forebearsSurnameUrl, normalizeSurname, validSurname } from "@/lib/surname-countries"
 
 export type OriginSource = { title: string; url: string }
 export type SurnameOrigin = { country: string; explanation: string; sources: OriginSource[] }
@@ -109,6 +109,37 @@ export function parseOriginResponse(response: WebOutput): SurnameOrigin[] {
     if (origins.length === 2) break
   }
   return origins
+}
+
+// Reads the "Most prevalent in" and "Highest density in" fields from a Forebears page fetched through OpenRouter's
+// web_fetch tool. The fields are read with code rather than by the model so a missing page can never produce a country.
+export function parseForebearsFetch(response: { status?: unknown; output?: Array<{ type?: unknown; url?: unknown; content?: unknown }> }, surname: string): SurnameOrigin[] {
+  if (response.status !== "completed" || !Array.isArray(response.output)) throw new Error("Incomplete Forebears check")
+  const expected = forebearsSurnameUrl(surname)
+  const page = response.output.find((item) => item.type === "openrouter:web_fetch" && typeof item.content === "string"
+    && typeof item.url === "string" && item.url.replace(/\/$/, "").toLowerCase() === expected.toLowerCase())
+  if (!page || typeof page.content !== "string") return []
+  const text: string = page.content
+  const field = (label: string) => {
+    const value = text.match(new RegExp(`${label}:[ \\t]*([^\\n|]{2,80})`, "i"))?.[1]?.trim()
+    return value && !/^(n\/a|unknown|none)$/i.test(value) ? value : null
+  }
+  const prevalent = field("Most prevalent in")
+  const density = field("Highest density in")
+  const countries = new Map<string, { prevalent: boolean; density: boolean }>()
+  for (const [country, key] of [[prevalent, "prevalent"], [density, "density"]] as const) {
+    if (!country) continue
+    const entry = countries.get(country.toLocaleLowerCase("en")) ?? { prevalent: false, density: false }
+    entry[key] = true
+    countries.set(country.toLocaleLowerCase("en"), entry)
+  }
+  const names = new Map([prevalent, density].filter((c): c is string => Boolean(c)).map((c) => [c.toLocaleLowerCase("en"), c]))
+  return Array.from(countries, ([key, flags]) => ({
+    country: names.get(key)!,
+    explanation: `Forebears lists ${names.get(key)} as where this surname is ${flags.prevalent && flags.density
+      ? "most prevalent and has the highest density" : flags.prevalent ? "most prevalent" : "at its highest density"}. This shows where the surname is common, not proven origin.`,
+    sources: [{ title: "Forebears surname page", url: expected }],
+  }))
 }
 
 export { normalizeSurname, validSurname }
