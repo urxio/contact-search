@@ -114,7 +114,7 @@ export function parseOriginResponse(response: WebOutput): SurnameOrigin[] {
 }
 
 // Reads the "Most prevalent in" and "Highest density in" fields from a Forebears page fetched through OpenRouter's
-// web_fetch tool. The fields are read with code rather than by the model so a missing page can never produce a country. It throws when the page could not be fetched, and returns [] when the page has no such fields.
+// web_fetch tool. The fields are read with code rather than by the model so a missing page can never produce a country. It throws when the page could not be fetched or has no such fields.
 export function parseForebearsFetch(response: { status?: unknown; output?: Array<{ type?: unknown; url?: unknown; content?: unknown }> }, surname: string): SurnameOrigin[] {
   if (response.status !== "completed" || !Array.isArray(response.output)) throw new Error("Incomplete Forebears check")
   const expected = forebearsSurnameUrl(surname)
@@ -131,6 +131,8 @@ export function parseForebearsFetch(response: { status?: unknown; output?: Array
   }
   const prevalent = field("Most prevalent in")
   const density = field("Highest density in")
+  // Forebears always lists these fields, so a page without them was blocked or only partly fetched.
+  if (!prevalent && !density) throw new Error(`Forebears page had no prevalence fields: ${JSON.stringify(text.slice(0, 300))}`)
   const countries = new Map<string, { prevalent: boolean; density: boolean }>()
   for (const [country, key] of [[prevalent, "prevalent"], [density, "density"]] as const) {
     if (!country) continue

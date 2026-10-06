@@ -107,7 +107,7 @@ describe("Origin contact UI", () => {
     expect(found).toContain("fallback search on Forebears")
     const unavailable = renderToString(React.createElement(OriginBottomBar, { ...props,
       entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [], forebearsUnavailable: true } }))
-    expect(unavailable).toContain("could not reach Forebears")
+    expect(unavailable).toContain("could not read Forebears")
     expect(unavailable).not.toContain("also searched Forebears")
     const plain = renderToString(React.createElement(OriginBottomBar, { ...props,
       entry: { surname: "dupont", researchedAt: "2026-09-26T12:00:00Z", origins: [] } }))

@@ -110,7 +110,7 @@ export function OriginBottomBar({ contactName, surname, entry, loading, error, o
               <p className="font-medium">Origin unclear</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {entry.forebearsFallback && "Luna's general search found nothing, so it also searched Forebears. "}
-                {entry.forebearsUnavailable && "Luna's general search found nothing, and it could not reach Forebears this time. "}The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
+                {entry.forebearsUnavailable && "Luna's general search found nothing, and it could not read Forebears this time. "}The web sources did not support a likely country of origin for this surname. Try searching Forebears using the highlighted button below for more clues; where a surname is common does not prove its origin.
               </p>
             </div>
           ) : null}

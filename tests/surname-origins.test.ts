@@ -216,8 +216,8 @@ describe("Forebears page fields", () => {
     expect(origins[0].explanation).toContain("most prevalent and has the highest density")
   })
 
-  it("returns nothing when the page has no fields", () => {
-    expect(parseForebearsFetch(page("The meaning is not listed."), "abdennasser")).toEqual([])
+  it("throws when the page has no fields, such as a blocked page", () => {
+    expect(() => parseForebearsFetch(page("Just a moment..."), "abdennasser")).toThrow("no prevalence fields")
   })
 
   it("throws when the page was not fetched so it is not reported as checked", () => {
