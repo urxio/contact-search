@@ -234,7 +234,7 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   const [mode, setMode] = useState<"unassigned" | "new">(canPickUnassigned ? "unassigned" : "new")
   const [unassigned, setUnassigned] = useState<UnassignedZip[] | null>(canPickUnassigned ? null : [])
   const [unassignedQuery, setUnassignedQuery] = useState("")
-  const [selectedZip, setSelectedZip] = useState<UnassignedZip | null>(null)
+  const [selectedZips, setSelectedZips] = useState<string[]>([])
 
   useEffect(() => {
     if (!canPickUnassigned) return
@@ -257,11 +257,34 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
     return unassigned.filter(row => row.zipcode.includes(query) || row.city.toLocaleLowerCase().includes(query))
   }, [unassigned, unassignedQuery])
 
-  const pickUnassigned = (row: UnassignedZip) => {
-    setSelectedZip(row)
-    setCity(row.city)
-    setTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
+  const selectedRows = useMemo(() => (unassigned ?? []).filter(row => selectedZips.includes(row.zipcode)), [unassigned, selectedZips])
+  const singleSelected = selectedRows.length === 1 ? selectedRows[0] : null
+  const needsSharedCity = selectedRows.length > 1 && selectedRows.some(row => !row.city.trim())
+  const allShownSelected = filteredUnassigned.length > 0 && filteredUnassigned.every(row => selectedZips.includes(row.zipcode))
+
+  const applySelection = (next: string[]) => {
+    setSelectedZips(next)
     setError("")
+    const rows = (unassigned ?? []).filter(row => next.includes(row.zipcode))
+    // One ZIP: prefill its own details. Several: city only fills ZIPs that have none.
+    if (rows.length === 1) {
+      setCity(rows[0].city)
+      setTotalPages(rows[0].totalPages && rows[0].totalPages > 0 ? String(rows[0].totalPages) : "")
+    } else {
+      setCity("")
+      setTotalPages("")
+    }
+  }
+
+  const toggleUnassigned = (row: UnassignedZip) => applySelection(selectedZips.includes(row.zipcode)
+    ? selectedZips.filter(zip => zip !== row.zipcode)
+    : [...selectedZips, row.zipcode])
+
+  const toggleAllShown = () => {
+    const shown = filteredUnassigned.map(row => row.zipcode)
+    applySelection(allShownSelected
+      ? selectedZips.filter(zip => !shown.includes(zip))
+      : Array.from(new Set([...selectedZips, ...shown])))
   }
 
   const submit = async () => {
@@ -276,14 +299,22 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
       return
     }
     if (mode === "unassigned") {
-      const pages = totalPages.trim() ? Number.parseInt(totalPages, 10) : null
-      if (!selectedZip) { setError("Pick an unassigned ZIP code."); return }
-      if (!territoryName.trim() || !city.trim()) { setError("An area and city are required."); return }
+      const pages = singleSelected && totalPages.trim() ? Number.parseInt(totalPages, 10) : null
+      if (selectedRows.length === 0) { setError("Pick at least one unassigned ZIP code."); return }
+      if (!territoryName.trim()) { setError("An area name is required."); return }
+      if ((singleSelected || needsSharedCity) && !city.trim()) { setError(singleSelected ? "A city is required." : "Enter a city for the ZIP codes that don't have one."); return }
       if (pages !== null && (!Number.isSafeInteger(pages) || pages < 1)) { setError("Total pages must be a positive number."); return }
+      const rows = selectedRows.map(row => ({
+        zipcode: row.zipcode,
+        city: singleSelected ? city.trim() : row.city.trim() || city.trim(),
+        area: territoryName.trim(),
+        totalPages: singleSelected ? pages : null,
+        decision: row.inTeamProgress ? "replace" : "create",
+      }))
       setSaving(true)
-      const res = await fetch(mappingsUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "manual", rows: [{ zipcode: selectedZip.zipcode, city: city.trim(), area: territoryName.trim(), totalPages: pages, decision: selectedZip.inTeamProgress ? "replace" : "create" }] }) })
+      const res = await fetch(mappingsUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "manual", rows }) })
       setSaving(false)
-      if (res.ok) { onAdded(territoryName.trim()); onClose() } else { const d = await res.json().catch(() => null); setError(d?.error ?? "Failed to add zipcode.") }
+      if (res.ok) { onAdded(territoryName.trim()); onClose() } else { const d = await res.json().catch(() => null); setError(d?.error ?? "Failed to add ZIP codes.") }
       return
     }
     const pages = parseInt(totalPages)
@@ -297,7 +328,7 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   const switchMode = (next: "unassigned" | "new") => {
     setMode(next)
     setError("")
-    setSelectedZip(null)
+    setSelectedZips([])
     setCity("")
     setZipcode("")
     setTotalPages("")
@@ -331,19 +362,25 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
           ) : null}
           {!nameOnlyArea && mode === "unassigned" ? (
             <div>
-              <label htmlFor="unassigned-search" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Unassigned ZIP codes</label>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label htmlFor="unassigned-search" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Unassigned ZIP codes{selectedZips.length ? ` · ${selectedZips.length} selected` : ""}</label>
+                {filteredUnassigned.length > 0 ? <button type="button" onClick={toggleAllShown} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">{allShownSelected ? "Clear shown" : "Select all shown"}</button> : null}
+              </div>
               <input id="unassigned-search" value={unassignedQuery} onChange={e => setUnassignedQuery(e.target.value)} placeholder="Search ZIP or city" className={inputClass} />
-              <div role="listbox" aria-label="Unassigned ZIP codes" className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+              <div role="listbox" aria-multiselectable="true" aria-label="Unassigned ZIP codes" className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
                 {unassigned === null ? (
                   <p className="px-3 py-3 text-sm text-gray-400">Loading…</p>
                 ) : filteredUnassigned.length === 0 ? (
                   <p className="px-3 py-3 text-sm text-gray-400">{unassigned.length === 0 ? "No unassigned ZIP codes. Add them under Settings → Territory." : "No matches."}</p>
                 ) : filteredUnassigned.map(row => {
-                  const selected = selectedZip?.zipcode === row.zipcode
+                  const selected = selectedZips.includes(row.zipcode)
                   return (
-                    <button key={row.zipcode} type="button" role="option" aria-selected={selected} onClick={() => pickUnassigned(row)}
+                    <button key={row.zipcode} type="button" role="option" aria-selected={selected} onClick={() => toggleUnassigned(row)}
                       className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${selected ? "bg-indigo-50 dark:bg-indigo-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
-                      <span className={`font-semibold ${selected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-200"}`}>{row.zipcode}</span>
+                      <span className="flex items-center gap-2.5">
+                        <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] leading-none ${selected ? "border-indigo-600 bg-indigo-600 text-white" : "border-gray-300 dark:border-gray-600"}`}>{selected ? "✓" : null}</span>
+                        <span className={`font-semibold ${selected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-200"}`}>{row.zipcode}</span>
+                      </span>
                       <span className="truncate text-xs text-gray-400">{row.city || "No city yet"}</span>
                     </button>
                   )
@@ -351,7 +388,16 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
               </div>
             </div>
           ) : null}
-          {!nameOnlyArea && mode === "unassigned" && selectedZip ? <>
+          {!nameOnlyArea && mode === "unassigned" && needsSharedCity ? (
+            <div>
+              <label htmlFor="unassigned-shared-city" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">City for ZIPs without one</label>
+              <input id="unassigned-shared-city" value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Alexandria" className={inputClass} />
+            </div>
+          ) : null}
+          {!nameOnlyArea && mode === "unassigned" && selectedRows.length > 1 ? (
+            <p className="text-xs text-muted-foreground">Page totals can be set per ZIP afterwards; ZIPs without one show as Setup.</p>
+          ) : null}
+          {!nameOnlyArea && mode === "unassigned" && singleSelected ? <>
             <div>
               <label htmlFor="unassigned-city" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">City</label>
               <input id="unassigned-city" value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Alexandria" className={inputClass} />
@@ -376,7 +422,7 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
           {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 min-h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-            <button type="button" onClick={submit} disabled={saving || (!nameOnlyArea && mode === "unassigned" && !selectedZip)} className="admin-primary-button min-h-11 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : territory ? "Add ZIP code" : "Create area"}</button>
+            <button type="button" onClick={submit} disabled={saving || (!nameOnlyArea && mode === "unassigned" && selectedRows.length === 0)} className="admin-primary-button min-h-11 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : !territory ? "Create area" : mode === "unassigned" && selectedRows.length > 1 ? `Add ${selectedRows.length} ZIP codes` : "Add ZIP code"}</button>
           </div>
         </div>
       </div>
