@@ -8,6 +8,7 @@ import { AlertTriangle, BarChart3, ClipboardList, LayoutDashboard, MapPin, Penci
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { UNASSIGNED_TEAM_AREA } from "@/lib/team-areas"
 
 type ZipcodeRow = {
   id: number
@@ -218,6 +219,8 @@ function NamePickerModal({ knownUsers, onSelect }: { knownUsers: string[]; onSel
 }
 
 // ── Add Zipcode Modal ─────────────────────────────────────────────────────────
+type UnassignedZip = { zipcode: string; city: string; totalPages: number | null; inTeamProgress: boolean }
+
 function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territories" }: { onClose: () => void; onAdded: (territory: string) => void; territory: string; apiBase?: string }) {
   const [territoryName, setTerritoryName] = useState(territory)
   const [city, setCity] = useState("")
@@ -226,6 +229,40 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const nameOnlyArea = !territory && apiBase.startsWith("/api/c/")
+  const canPickUnassigned = Boolean(territory) && apiBase.startsWith("/api/c/")
+  const mappingsUrl = apiBase.replace(/\/team$/, "/settings/territory-zipcodes")
+  const [mode, setMode] = useState<"unassigned" | "new">(canPickUnassigned ? "unassigned" : "new")
+  const [unassigned, setUnassigned] = useState<UnassignedZip[] | null>(canPickUnassigned ? null : [])
+  const [unassignedQuery, setUnassignedQuery] = useState("")
+  const [selectedZip, setSelectedZip] = useState<UnassignedZip | null>(null)
+
+  useEffect(() => {
+    if (!canPickUnassigned) return
+    fetch(mappingsUrl, { cache: "no-store" })
+      .then(r => r.ok ? r.json() : { rows: [] })
+      .then(data => {
+        const rows: UnassignedZip[] = (Array.isArray(data?.rows) ? data.rows : [])
+          .filter((row: { area?: string }) => { const area = String(row.area ?? "").trim(); return !area || area.toLocaleLowerCase() === UNASSIGNED_TEAM_AREA.toLocaleLowerCase() })
+          .map((row: { zipcode: string; city?: string; totalPages?: number | null; inTeamProgress?: boolean }) => ({ zipcode: String(row.zipcode), city: String(row.city ?? ""), totalPages: row.totalPages ?? null, inTeamProgress: Boolean(row.inTeamProgress) }))
+          .sort((a: UnassignedZip, b: UnassignedZip) => a.zipcode.localeCompare(b.zipcode, undefined, { numeric: true }))
+        setUnassigned(rows)
+        if (rows.length === 0) setMode("new")
+      })
+      .catch(() => { setUnassigned([]); setMode("new") })
+  }, [canPickUnassigned, mappingsUrl])
+
+  const filteredUnassigned = useMemo(() => {
+    const query = unassignedQuery.trim().toLocaleLowerCase()
+    if (!unassigned || !query) return unassigned ?? []
+    return unassigned.filter(row => row.zipcode.includes(query) || row.city.toLocaleLowerCase().includes(query))
+  }, [unassigned, unassignedQuery])
+
+  const pickUnassigned = (row: UnassignedZip) => {
+    setSelectedZip(row)
+    setCity(row.city)
+    setTotalPages(row.totalPages && row.totalPages > 0 ? String(row.totalPages) : "")
+    setError("")
+  }
 
   const submit = async () => {
     setError("")
@@ -238,6 +275,17 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
       if (res.ok) { onAdded(name); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to create area.") }
       return
     }
+    if (mode === "unassigned") {
+      const pages = totalPages.trim() ? Number.parseInt(totalPages, 10) : null
+      if (!selectedZip) { setError("Pick an unassigned ZIP code."); return }
+      if (!territoryName.trim() || !city.trim()) { setError("An area and city are required."); return }
+      if (pages !== null && (!Number.isSafeInteger(pages) || pages < 1)) { setError("Total pages must be a positive number."); return }
+      setSaving(true)
+      const res = await fetch(mappingsUrl, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "manual", rows: [{ zipcode: selectedZip.zipcode, city: city.trim(), area: territoryName.trim(), totalPages: pages, decision: selectedZip.inTeamProgress ? "replace" : "create" }] }) })
+      setSaving(false)
+      if (res.ok) { onAdded(territoryName.trim()); onClose() } else { const d = await res.json().catch(() => null); setError(d?.error ?? "Failed to add zipcode.") }
+      return
+    }
     const pages = parseInt(totalPages)
     if (!territoryName.trim() || !city.trim() || !zipcode.trim() || !pages || pages < 1) { setError("All fields are required."); return }
     setSaving(true)
@@ -246,9 +294,20 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
     if (res.ok) { onAdded(territoryName.trim()); onClose() } else { const d = await res.json(); setError(d.error ?? "Failed to add zipcode.") }
   }
 
+  const switchMode = (next: "unassigned" | "new") => {
+    setMode(next)
+    setError("")
+    setSelectedZip(null)
+    setCity("")
+    setZipcode("")
+    setTotalPages("")
+  }
+
+  const inputClass = "w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="zipcode-dialog-title" className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-labelledby="zipcode-dialog-title" className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Progress</p><h2 id="zipcode-dialog-title" className="mt-1 text-base font-semibold text-gray-900 dark:text-white">{territory ? "Add ZIP code" : "Create area"}</h2></div>
           <button type="button" onClick={onClose} aria-label="Close add zipcode dialog" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">×</button>
@@ -260,22 +319,64 @@ function AddZipcodeModal({ onClose, onAdded, territory, apiBase = "/api/territor
               className="admin-field h-11 w-full rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
             <p className="mt-2 text-xs font-normal text-muted-foreground">This becomes a tab containing its cities and ZIP codes.</p>
           </div>
-          {!nameOnlyArea ? [["City", city, setCity, "e.g. Alexandria"], ["Zipcode", zipcode, setZipcode, "e.g. 22314"]].map(([label, val, setter, ph]) => (
+          {canPickUnassigned ? (
+            <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+              {(["unassigned", "new"] as const).map(m => (
+                <button key={m} type="button" onClick={() => switchMode(m)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${mode === m ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
+                  {m === "unassigned" ? `From unassigned${unassigned ? ` (${unassigned.length})` : ""}` : "New ZIP"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {!nameOnlyArea && mode === "unassigned" ? (
+            <div>
+              <label htmlFor="unassigned-search" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Unassigned ZIP codes</label>
+              <input id="unassigned-search" value={unassignedQuery} onChange={e => setUnassignedQuery(e.target.value)} placeholder="Search ZIP or city" className={inputClass} />
+              <div role="listbox" aria-label="Unassigned ZIP codes" className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+                {unassigned === null ? (
+                  <p className="px-3 py-3 text-sm text-gray-400">Loading…</p>
+                ) : filteredUnassigned.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-gray-400">{unassigned.length === 0 ? "No unassigned ZIP codes. Add them under Settings → Territory." : "No matches."}</p>
+                ) : filteredUnassigned.map(row => {
+                  const selected = selectedZip?.zipcode === row.zipcode
+                  return (
+                    <button key={row.zipcode} type="button" role="option" aria-selected={selected} onClick={() => pickUnassigned(row)}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${selected ? "bg-indigo-50 dark:bg-indigo-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-800/50"}`}>
+                      <span className={`font-semibold ${selected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-200"}`}>{row.zipcode}</span>
+                      <span className="truncate text-xs text-gray-400">{row.city || "No city yet"}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+          {!nameOnlyArea && mode === "unassigned" && selectedZip ? <>
+            <div>
+              <label htmlFor="unassigned-city" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">City</label>
+              <input id="unassigned-city" value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Alexandria" className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="unassigned-pages" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Total pages in A-Z <span className="font-normal">(optional)</span></label>
+              <input id="unassigned-pages" type="number" value={totalPages} onChange={e => setTotalPages(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Leave blank to set up later" min={1} className={inputClass} />
+            </div>
+          </> : null}
+          {!nameOnlyArea && mode === "new" ? [["City", city, setCity, "e.g. Alexandria"], ["Zipcode", zipcode, setZipcode, "e.g. 22314"]].map(([label, val, setter, ph]) => (
             <div key={label as string}>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">{label as string}</label>
               <input value={val as string} onChange={e => (setter as (v: string) => void)(e.target.value)} placeholder={ph as string}
-                className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                className={inputClass} />
             </div>
           )) : null}
-          {!nameOnlyArea ? <div>
+          {!nameOnlyArea && mode === "new" ? <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Total pages in A-Z</label>
             <input type="number" value={totalPages} onChange={e => setTotalPages(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="e.g. 800" min={1}
-              className="w-full h-10 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              className={inputClass} />
           </div> : null}
           {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="flex-1 min-h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-            <button type="button" onClick={submit} disabled={saving} className="admin-primary-button min-h-11 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : territory ? "Add ZIP code" : "Create area"}</button>
+            <button type="button" onClick={submit} disabled={saving || (!nameOnlyArea && mode === "unassigned" && !selectedZip)} className="admin-primary-button min-h-11 flex-1 rounded-xl text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : territory ? "Add ZIP code" : "Create area"}</button>
           </div>
         </div>
       </div>
