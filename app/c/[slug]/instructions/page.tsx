@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageFrame } from "@/components/workspace/page-frame"
 import { CustomInstructions } from "@/components/instructions/custom-instructions"
 import { InstructionsTabs } from "@/components/instructions/instructions-tabs"
+import { OnboardingVideo } from "@/components/instructions/onboarding-video"
 
 const presentationUrl =
   "https://docs.google.com/presentation/d/1ycSduWrylr_MVjJFY58KAG2TLTpiN7vR_4G7Jdrugww/edit?usp=sharing"
@@ -45,7 +46,9 @@ export default async function InstructionsPage({ params }: { params: { slug: str
       className="max-w-6xl"
     >
       <InstructionsTabs customInstructions={<CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={access.user.isPlatformAdmin || access.membership?.role === "admin"} />}>
-      <Card className="max-w-3xl">
+      <OnboardingVideo className="max-w-3xl" />
+
+      <Card className="mt-6 max-w-3xl">
         <CardHeader>
           <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Presentation className="h-5 w-5" aria-hidden="true" />

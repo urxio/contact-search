@@ -4,6 +4,7 @@ import { ExternalLink, Presentation, Search } from "lucide-react"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { OnboardingVideo } from "@/components/instructions/onboarding-video"
 
 const presentationUrl =
   "https://docs.google.com/presentation/d/1ycSduWrylr_MVjJFY58KAG2TLTpiN7vR_4G7Jdrugww/edit?usp=sharing"
@@ -34,11 +35,13 @@ export default function InstructionsPage() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-primary">Getting started</p>
           <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl">Instructions</h1>
           <p className="mt-5 text-lg leading-8 text-muted-foreground">
-            Use the training presentation below for a guided walkthrough of Name Search.
+            Watch the walkthrough video, or use the training presentation for a step-by-step guide to Name Search.
           </p>
         </div>
 
-        <Card className="mt-10 max-w-2xl border-primary/15 shadow-sm">
+        <OnboardingVideo className="mt-10 max-w-2xl border-primary/15 shadow-sm" />
+
+        <Card className="mt-6 max-w-2xl border-primary/15 shadow-sm">
           <CardHeader>
             <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Presentation className="h-5 w-5" aria-hidden="true" />
