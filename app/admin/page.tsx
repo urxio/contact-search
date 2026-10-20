@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef, Fragment } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, memo, Fragment } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -245,29 +245,45 @@ export default function AdminDashboard() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  const visible = submissions.filter(s => showArchived ? s.archived : !s.archived)
-  const availableUsers = Array.from(new Set(submissions.map((submission) => submission.user_id))).sort((a, b) => a.localeCompare(b))
-  const normalizedSearch = submissionSearch.trim().toLowerCase()
-  const filteredVisible = visible.filter((submission) => {
+  // Formatting dates through Intl is slow, so do it once per submission rather
+  // than on every keystroke and every row render.
+  const submittedLabels = useMemo(
+    () => new Map(submissions.map((submission) => [submission.id, new Date(submission.submitted_at).toLocaleString()])),
+    [submissions],
+  )
+  const visible = useMemo(
+    () => submissions.filter(s => showArchived ? s.archived : !s.archived),
+    [submissions, showArchived],
+  )
+  const availableUsers = useMemo(
+    () => Array.from(new Set(submissions.map((submission) => submission.user_id))).sort((a, b) => a.localeCompare(b)),
+    [submissions],
+  )
+  // Keep the search box responsive; the table catches up a frame later.
+  const deferredSubmissionSearch = useDeferredValue(submissionSearch)
+  const normalizedSearch = deferredSubmissionSearch.trim().toLowerCase()
+  const filteredVisible = useMemo(() => visible.filter((submission) => {
     const reviewStatus = submission.review_status ?? "pending"
     const checkedCount = submission.potentially_french + submission.not_french + submission.duplicate
-    const searchableText = [
-      submission.user_id,
-      submission.top_zipcode,
-      submission.territory_zipcode,
-      submission.territory_page_range,
-      new Date(submission.submitted_at).toLocaleString(),
-    ].filter(Boolean).join(" ").toLowerCase()
 
-    if (normalizedSearch && !searchableText.includes(normalizedSearch)) return false
+    if (normalizedSearch) {
+      const searchableText = [
+        submission.user_id,
+        submission.top_zipcode,
+        submission.territory_zipcode,
+        submission.territory_page_range,
+        submittedLabels.get(submission.id),
+      ].filter(Boolean).join(" ").toLowerCase()
+      if (!searchableText.includes(normalizedSearch)) return false
+    }
     if (submissionUser !== "all" && submission.user_id !== submissionUser) return false
     if (submissionStatus !== "all" && reviewStatus !== submissionStatus) return false
     if (submissionProgress === "complete" && checkedCount < submission.contact_count) return false
     if (submissionProgress === "incomplete" && checkedCount >= submission.contact_count) return false
     if (submissionProgress === "unchecked" && submission.not_checked === 0) return false
     return true
-  })
-  const sortedFilteredVisible = [...filteredVisible].sort((a, b) => {
+  }), [visible, normalizedSearch, submittedLabels, submissionUser, submissionStatus, submissionProgress])
+  const sortedFilteredVisible = useMemo(() => [...filteredVisible].sort((a, b) => {
     const newestFirst = new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
 
     switch (submissionSort) {
@@ -286,7 +302,7 @@ export default function AdminDashboard() {
       default:
         return newestFirst
     }
-  })
+  }), [filteredVisible, submissionSort])
   const activeFilterCount = [
     submissionUser !== "all",
     submissionStatus !== "all",
@@ -301,14 +317,17 @@ export default function AdminDashboard() {
     setSubmissionProgress("all")
   }
 
-  const latestSubmissionIds = new Set<number>()
-  const seenUsers = new Set<string>()
-  visible.forEach((submission) => {
-    if (!seenUsers.has(submission.user_id)) {
-      seenUsers.add(submission.user_id)
-      latestSubmissionIds.add(submission.id)
-    }
-  })
+  const latestSubmissionIds = useMemo(() => {
+    const ids = new Set<number>()
+    const seenUsers = new Set<string>()
+    visible.forEach((submission) => {
+      if (!seenUsers.has(submission.user_id)) {
+        seenUsers.add(submission.user_id)
+        ids.add(submission.id)
+      }
+    })
+    return ids
+  }, [visible])
 
   const totalContacts  = visible.reduce((s, r) => s + r.contact_count, 0)
   const totalPending   = visible.filter(s => s.review_status === "pending").length
@@ -450,20 +469,20 @@ export default function AdminDashboard() {
 
         {/* Keep tools mounted after their first visit so switching does not refetch. */}
         {visitedTabs.has("otm") && (
-          <div className={activeTab === "otm" ? "" : "hidden"}><OtmPanel /></div>
+          <div className={activeTab === "otm" ? "" : "hidden"}><MemoOtmPanel /></div>
         )}
 
         {visitedTabs.has("names") && (
-          <div className={activeTab === "names" ? "" : "hidden"}><DictionaryFeedbackPanel /></div>
+          <div className={activeTab === "names" ? "" : "hidden"}><MemoDictionaryFeedbackPanel /></div>
         )}
 
         {visitedTabs.has("potentiallyFrench") && (
-          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><PotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} /></div>
+          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><MemoPotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} /></div>
         )}
 
         {visitedTabs.has("dictionaryScan") && (
           <div className={activeTab === "dictionaryScan" ? "" : "hidden"}>
-            <DictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />
+            <MemoDictionaryScanPanel onSubmissionsChanged={fetchSubmissions} />
           </div>
         )}
 
@@ -729,81 +748,19 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     )}
-                    {sortedFilteredVisible.map((sub) => {
-                      const isBusy = !!busy[sub.id]
-                      const zip = sub.top_zipcode || sub.territory_zipcode
-
-                      return (
-                        <tr key={sub.id} className="group border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-semibold uppercase ${userIconClass(sub.user_id)}`} aria-hidden="true">
-                                {sub.user_id.slice(0, 1)}
-                              </span>
-                              <span className="max-w-[180px] truncate font-medium">{sub.user_id}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <span>{new Date(sub.submitted_at).toLocaleString()}</span>
-                              {latestSubmissionIds.has(sub.id) && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">Latest</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-muted-foreground">
-                            {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
-                          </td>
-                          <td className="px-3 py-3 text-right font-medium tabular-nums">{sub.contact_count}</td>
-                          <td className="px-3 py-3">
-                            <select
-                              value={sub.review_status ?? "pending"}
-                              disabled={isBusy}
-                              onChange={(event) => setStatus(sub.id, event.target.value as ReviewStatus)}
-                              aria-label={`Review status for submission ${sub.id}`}
-                              className={`rounded-md border px-2 py-1 text-xs font-semibold outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${STATUS_CLASSES[sub.review_status ?? "pending"]}`}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="in_review">In review</option>
-                              <option value="reviewed">Reviewed</option>
-                            </select>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <Link
-                                href={`${adminPeopleBase}/${encodeURIComponent(sub.user_id)}?submissionId=${sub.id}`}
-                                className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              >
-                                Open
-                              </Link>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button
-                                    disabled={isBusy}
-                                    aria-label={`More actions for submission ${sub.id}`}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground opacity-60 transition-all duration-150 ease-out hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 disabled:opacity-50"
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="admin-material rounded-xl p-2">
-                                  <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
-                                    {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
-                                    {sub.archived ? "Restore" : "Archive"}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onSelect={() => deleteSubmission(sub.id)}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 aria-hidden="true" />
-                                    Delete permanently
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {sortedFilteredVisible.map((sub) => (
+                      <SubmissionRow
+                        key={sub.id}
+                        sub={sub}
+                        submittedLabel={submittedLabels.get(sub.id) ?? ""}
+                        isLatest={latestSubmissionIds.has(sub.id)}
+                        isBusy={!!busy[sub.id]}
+                        adminPeopleBase={adminPeopleBase}
+                        onStatusChange={setStatus}
+                        onToggleArchive={toggleArchive}
+                        onDelete={deleteSubmission}
+                      />
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -816,6 +773,101 @@ export default function AdminDashboard() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+// Memoized so typing in the search box or toggling one submission's status
+// does not re-render every other row.
+const SubmissionRow = memo(function SubmissionRow({
+  sub,
+  submittedLabel,
+  isLatest,
+  isBusy,
+  adminPeopleBase,
+  onStatusChange: setStatus,
+  onToggleArchive: toggleArchive,
+  onDelete: deleteSubmission,
+}: {
+  sub: Submission
+  submittedLabel: string
+  isLatest: boolean
+  isBusy: boolean
+  adminPeopleBase: string
+  onStatusChange: (id: number, status: ReviewStatus) => void
+  onToggleArchive: (id: number, archived: boolean) => void
+  onDelete: (id: number) => void
+}) {
+  const zip = sub.top_zipcode || sub.territory_zipcode
+
+  return (
+    <tr className="group border-b transition-colors duration-150 ease-out last:border-0 hover:bg-muted/30">
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-2">
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-semibold uppercase ${userIconClass(sub.user_id)}`} aria-hidden="true">
+            {sub.user_id.slice(0, 1)}
+          </span>
+          <span className="max-w-[180px] truncate font-medium">{sub.user_id}</span>
+        </div>
+      </td>
+      <td className="px-3 py-3 text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span>{submittedLabel}</span>
+          {isLatest && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">Latest</span>}
+        </div>
+      </td>
+      <td className="px-3 py-3 text-muted-foreground">
+        {zip ? `${zip}${sub.territory_page_range ? ` · pages ${sub.territory_page_range}` : ""}` : "—"}
+      </td>
+      <td className="px-3 py-3 text-right font-medium tabular-nums">{sub.contact_count}</td>
+      <td className="px-3 py-3">
+        <select
+          value={sub.review_status ?? "pending"}
+          disabled={isBusy}
+          onChange={(event) => setStatus(sub.id, event.target.value as ReviewStatus)}
+          aria-label={`Review status for submission ${sub.id}`}
+          className={`rounded-md border px-2 py-1 text-xs font-semibold outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${STATUS_CLASSES[sub.review_status ?? "pending"]}`}
+        >
+          <option value="pending">Pending</option>
+          <option value="in_review">In review</option>
+          <option value="reviewed">Reviewed</option>
+        </select>
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex items-center justify-end gap-2">
+          <Link
+            href={`${adminPeopleBase}/${encodeURIComponent(sub.user_id)}?submissionId=${sub.id}`}
+            className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Open
+          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                disabled={isBusy}
+                aria-label={`More actions for submission ${sub.id}`}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground opacity-60 transition-all duration-150 ease-out hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 disabled:opacity-50"
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="admin-material rounded-xl p-2">
+              <DropdownMenuItem onSelect={() => toggleArchive(sub.id, !sub.archived)}>
+                {sub.archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
+                {sub.archived ? "Restore" : "Archive"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => deleteSubmission(sub.id)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 aria-hidden="true" />
+                Delete permanently
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </td>
+    </tr>
+  )
+})
 
 function QueueMetric({ icon: Icon, label, value }: { icon: typeof Inbox; label: string; value: number }) {
   return (
@@ -3008,3 +3060,10 @@ function DictionaryScanPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: 
     </div>
   )
 }
+
+// Visited tool tabs stay mounted while hidden; memoizing them keeps typing or
+// clicking elsewhere on the dashboard from re-rendering their (often long) lists.
+const MemoOtmPanel = memo(OtmPanel)
+const MemoDictionaryFeedbackPanel = memo(DictionaryFeedbackPanel)
+const MemoPotentiallyFrenchPanel = memo(PotentiallyFrenchPanel)
+const MemoDictionaryScanPanel = memo(DictionaryScanPanel)

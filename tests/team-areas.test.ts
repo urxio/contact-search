@@ -56,13 +56,17 @@ describe("Team Progress area ordering", () => {
   })
 
   it("applies the saved area order to Team Progress ZIP results", async () => {
+    mocks.requireMembership.mockResolvedValue({
+      user: { id: 12 },
+      congregation: { id: 34, slug: "central", settings: { teamProgressAreaOrder: ["South", "North", "Unassigned"] } },
+      membership: { role: "member" },
+    })
     mocks.poolQuery
       .mockResolvedValueOnce({ rows: [
         { zipcode: "22301", city: "Alexandria", territory: "North" },
         { zipcode: "22191", city: "Woodbridge", territory: "South" },
         { zipcode: "20101", city: "Dulles", territory: "Unassigned" },
       ] })
-      .mockResolvedValueOnce({ rows: [{ settings: { teamProgressAreaOrder: ["South", "North", "Unassigned"] } }] })
     const { GET } = await import("@/app/api/c/[slug]/team/zipcodes/route")
     const response = await GET(new NextRequest("https://search.example/api/c/central/team/zipcodes"), { params: { slug: "central" } })
 

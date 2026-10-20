@@ -8,7 +8,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
-    const [result, congregation] = await Promise.all([pool.query(
+    const result = await pool.query(
       `SELECT z.id, z.city, z.zipcode, z.total_pages, z.territory,
         COUNT(s.id)::int AS segment_count,
         COALESCE(COUNT(s.id) FILTER (WHERE s.status = 'Completed'), 0)::int AS completed,
@@ -29,8 +29,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
        GROUP BY z.id
        ORDER BY z.city, z.zipcode`,
       [auth.congregation.id],
-    ), pool.query(`SELECT settings FROM congregations WHERE id = $1`, [auth.congregation.id])])
-    const settings = congregation.rows[0]?.settings ?? {}
+    )
+    // requireMembership already loaded the congregation's settings.
+    const settings = (auth.congregation.settings ?? {}) as { teamProgressAreaOrder?: unknown }
     const areas = orderedTeamAreas(result.rows.map((row) => String(row.territory)), settings.teamProgressAreaOrder)
     const areaIndex = new Map(areas.map((area, index) => [area.toLocaleLowerCase(), index]))
     result.rows.sort((a, b) => {
