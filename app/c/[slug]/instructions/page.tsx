@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 
 import { AuthError, requireMembership } from "@/lib/auth"
 import { pool } from "@/lib/db"
-import { canSeeAdminInstructions, serializeInstruction } from "@/lib/congregation-instructions"
+import { serializeInstruction } from "@/lib/congregation-instructions"
 import { PageFrame } from "@/components/workspace/page-frame"
 import { CustomInstructions } from "@/components/instructions/custom-instructions"
 import { InstructionsTabs } from "@/components/instructions/instructions-tabs"
@@ -18,10 +18,13 @@ export default async function InstructionsPage({ params }: { params: { slug: str
     }
     notFound()
   }
-  const canManage = canSeeAdminInstructions(access)
-  // Members never receive admin-only instructions, not even hidden in the page payload.
-  const result = await pool.query(`SELECT id,title,body,position,revision,audience,created_at,updated_at FROM congregation_instructions
-    WHERE congregation_id=$1 AND ($2::boolean OR audience='everyone') ORDER BY position,id`, [access.congregation.id, canManage])
+  const isPlatformAdmin = Boolean(access.user.isPlatformAdmin)
+  const canManage = isPlatformAdmin || access.membership?.role === "admin"
+  // Admin instructions are only queried for admins, so members never receive them.
+  const [result, adminResult] = await Promise.all([
+    pool.query(`SELECT id,title,body,position,revision,created_at,updated_at FROM congregation_instructions WHERE congregation_id=$1 ORDER BY position,id`, [access.congregation.id]),
+    canManage ? pool.query(`SELECT id,title,body,position,revision,created_at,updated_at FROM platform_admin_instructions ORDER BY position,id`) : null,
+  ])
 
   return (
     <PageFrame
@@ -30,7 +33,10 @@ export default async function InstructionsPage({ params }: { params: { slug: str
       description="Everything a congregation member needs to use Name Search, from opening an Excel to tracking progress."
       className="max-w-6xl"
     >
-      <InstructionsTabs customInstructions={<CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={canManage} />}>
+      <InstructionsTabs
+        customInstructions={<CustomInstructions slug={params.slug} initialInstructions={result.rows.map(serializeInstruction)} canManage={canManage} />}
+        adminInstructions={adminResult ? <CustomInstructions slug={params.slug} variant="admin" initialInstructions={adminResult.rows.map(serializeInstruction)} canManage={isPlatformAdmin} /> : undefined}
+      >
         <GeneralInstructions />
       </InstructionsTabs>
     </PageFrame>

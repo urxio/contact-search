@@ -1,9 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ArrowDown, ArrowUp, Bold, Heading2, ImagePlus, Italic, Link, List, Pencil, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react"
+import { ArrowDown, ArrowUp, Bold, Heading2, ImagePlus, Italic, Link, List, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import type { CongregationInstruction, InstructionAudience } from "@/lib/congregation-instructions"
+import type { CongregationInstruction } from "@/lib/congregation-instructions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,7 +11,30 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { InstructionContent } from "@/components/instructions/instruction-content"
 
-type Props = { slug: string; initialInstructions: CongregationInstruction[]; canManage: boolean }
+type Props = {
+  slug: string
+  initialInstructions: CongregationInstruction[]
+  canManage: boolean
+  /** Shows the platform-written admin instructions instead of this congregation's. */
+  variant?: "congregation" | "admin"
+}
+
+const copy = {
+  congregation: {
+    heading: "Congregation instructions",
+    description: "Additional guidance from your congregation administrators.",
+    emptyManage: "Add congregation-specific instructions for members here.",
+    emptyRead: "There are no additional congregation instructions right now.",
+    notify: "Members will be notified when this is published or updated.",
+  },
+  admin: {
+    heading: "Admin instructions",
+    description: "Guidance for congregation admins from the Name Search team. Members cannot see this section.",
+    emptyManage: "Add instructions for congregation admins here. Only admins will see them.",
+    emptyRead: "There are no admin instructions right now.",
+    notify: "Every congregation admin will see this. Members will not.",
+  },
+} as const
 
 const dataImage = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i
 const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
@@ -41,26 +64,28 @@ function editorToMarkdown(editor: HTMLElement) {
   return Array.from(editor.childNodes).map(read).join("").replace(/\n{3,}/g, "\n\n").trim()
 }
 
-export function CustomInstructions({ slug, initialInstructions, canManage }: Props) {
+export function CustomInstructions({ slug, initialInstructions, canManage, variant = "congregation" }: Props) {
+  const text = copy[variant]
+  const anchorPrefix = variant === "admin" ? "admin-instruction" : "instruction"
   const [instructions, setInstructions] = useState(initialInstructions)
   const [editing, setEditing] = useState<CongregationInstruction | null>(null)
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
-  const [audience, setAudience] = useState<InstructionAudience>("everyone")
   const [busy, setBusy] = useState(false)
   const editorRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
-  const endpoint = `/api/c/${encodeURIComponent(slug)}/instructions`
+  const endpoint = variant === "admin" ? "/api/platform/admin-instructions" : `/api/c/${encodeURIComponent(slug)}/instructions`
   useEffect(() => {
+    if (variant === "admin") return
     const params = new URLSearchParams(window.location.search)
     const instructionId = Number(params.get("instruction"))
     const revision = Number(params.get("revision"))
     if (!Number.isSafeInteger(instructionId) || instructionId < 1 || !Number.isSafeInteger(revision) || revision < 1) return
     void fetch(`${endpoint}/views`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId, revision }) })
-  }, [endpoint])
-  function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0, audience: "everyone" }); setTitle(""); setBody(""); setAudience("everyone") }
-  function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body); setAudience(instruction.audience) }
+  }, [endpoint, variant])
+  function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0 }); setTitle(""); setBody("") }
+  function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body) }
 
   const setEditor = useCallback((element: HTMLDivElement | null) => {
     editorRef.current = element
@@ -118,7 +143,7 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
     setBody(instructionBody)
     setBusy(true)
     try {
-      const response = await fetch(endpoint, { method: editing.id ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editing.id ? { id: editing.id, title, body: instructionBody, audience } : { title, body: instructionBody, audience }) })
+      const response = await fetch(endpoint, { method: editing.id ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editing.id ? { id: editing.id, title, body: instructionBody } : { title, body: instructionBody }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || "Unable to save instruction")
       setInstructions((current) => editing.id ? current.map((item) => item.id === editing.id ? result.instruction : item) : [result.instruction, ...current])
@@ -148,13 +173,13 @@ export function CustomInstructions({ slug, initialInstructions, canManage }: Pro
   }
 
   return (
-    <section className="max-w-4xl" aria-labelledby="congregation-instructions-heading">
+    <section className="max-w-4xl" aria-labelledby={`${anchorPrefix}s-heading`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 id="congregation-instructions-heading" className="text-xl font-semibold">Congregation instructions</h2><p className="mt-1 text-sm text-muted-foreground">{canManage ? "Additional guidance from your congregation administrators. Instructions marked Admins only are hidden from members." : "Additional guidance from your congregation administrators."}</p></div>
+        <div><h2 id={`${anchorPrefix}s-heading`} className="text-xl font-semibold">{text.heading}</h2><p className="mt-1 text-sm text-muted-foreground">{text.description}</p></div>
         {canManage ? <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" />Add instruction</Button> : null}
       </div>
-      {instructions.length ? <div className="mt-5 space-y-4">{instructions.map((instruction, index) => <Card key={instruction.id} id={`instruction-${instruction.id}`} className={index === 0 ? "ring-1 ring-blue-400/50 shadow-[0_0_24px_rgba(59,130,246,0.16)]" : undefined}><CardHeader className="gap-2"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-wrap items-center gap-2"><CardTitle className="text-base">{instruction.title}</CardTitle>{instruction.audience === "admins" ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />Admins only</span> : null}</div>{canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Move ${instruction.title} up`} variant="ghost" size="icon" disabled={index === 0 || busy} onClick={() => void reorder([...instructions.slice(0, index - 1), instruction, instructions[index - 1], ...instructions.slice(index + 1)])}><ArrowUp className="h-4 w-4" /></Button><Button aria-label={`Move ${instruction.title} down`} variant="ghost" size="icon" disabled={index === instructions.length - 1 || busy} onClick={() => void reorder([...instructions.slice(0, index), instructions[index + 1], instruction, ...instructions.slice(index + 2)])}><ArrowDown className="h-4 w-4" /></Button><Button aria-label={`Edit ${instruction.title}`} variant="ghost" size="icon" disabled={busy} onClick={() => openEdit(instruction)}><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${instruction.title}`} variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={busy} onClick={() => void remove(instruction)}><Trash2 className="h-4 w-4" /></Button></div> : null}</div><InstructionContent content={instruction.body} className="text-sm leading-6 text-muted-foreground" /></CardHeader></Card>)}</div> : <Card className="mt-5"><CardContent className="py-6 text-sm text-muted-foreground">{canManage ? "Add congregation-specific instructions for members here." : "There are no additional congregation instructions right now."}</CardContent></Card>}
-      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Format text, paste an image, or upload one from your device. {audience === "admins" ? "Only admins will see this and be notified when it is published or updated." : "Members will be notified when this is published or updated."}</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><fieldset className="space-y-2"><legend className="text-sm font-medium">Who can see this</legend><div role="radiogroup" aria-label="Who can see this" className="grid gap-2 sm:grid-cols-2">{([["everyone", UsersRound, "Everyone", "All members of the congregation"], ["admins", ShieldCheck, "Admins only", "Hidden from members"]] as const).map(([value, Icon, label, hint]) => <button key={value} type="button" role="radio" aria-checked={audience === value} onClick={() => setAudience(value)} className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${audience === value ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}><Icon className={`mt-0.5 h-4 w-4 shrink-0 ${audience === value ? "text-primary" : "text-muted-foreground"}`} aria-hidden="true" /><span><span className="block text-sm font-medium">{label}</span><span className="block text-xs text-muted-foreground">{hint}</span></span></button>)}</div></fieldset><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><div className="flex flex-wrap gap-1 rounded-t-md border border-b-0 bg-muted/40 p-1"><Button type="button" variant="ghost" size="sm" aria-label="Bold" onClick={() => format("bold")}><Bold className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Italic" onClick={() => format("italic")}><Italic className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Heading" onClick={() => format("formatBlock", "h2")}><Heading2 className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Bulleted list" onClick={() => format("insertUnorderedList")}><List className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Link" onClick={() => { const url = window.prompt("Paste an HTTPS URL")?.trim(); if (url?.startsWith("https://")) format("createLink", url) }}><Link className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Upload image from device" onClick={() => imageInputRef.current?.click()}><ImagePlus className="h-4 w-4" /><span className="ml-1">Upload</span></Button><Input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadImage} /></div><div ref={setEditor} id="instruction-body" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" className="min-h-48 max-h-72 overflow-y-auto rounded-b-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring [&_img]:my-2 [&_img]:max-h-56 [&_img]:max-w-full [&_img]:rounded-md [&_img]:object-contain" onInput={(event) => setBody(editorToMarkdown(event.currentTarget))} onPaste={pasteImage} /><p className="text-xs text-muted-foreground">Paste a PNG, JPEG, or WebP image directly into the editor.</p><div className="rounded-md border bg-muted/20 p-3"><p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>{body.trim() ? <InstructionContent content={body} className="text-sm leading-6" /> : <p className="text-sm text-muted-foreground">Your formatted instruction will appear here.</p>}</div></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim() || body.length > 750000} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
+      {instructions.length ? <div className="mt-5 space-y-4">{instructions.map((instruction, index) => <Card key={instruction.id} id={`${anchorPrefix}-${instruction.id}`} className={index === 0 ? "ring-1 ring-blue-400/50 shadow-[0_0_24px_rgba(59,130,246,0.16)]" : undefined}><CardHeader className="gap-2"><div className="flex items-start justify-between gap-3"><CardTitle className="text-base">{instruction.title}</CardTitle>{canManage ? <div className="flex shrink-0 gap-1"><Button aria-label={`Move ${instruction.title} up`} variant="ghost" size="icon" disabled={index === 0 || busy} onClick={() => void reorder([...instructions.slice(0, index - 1), instruction, instructions[index - 1], ...instructions.slice(index + 1)])}><ArrowUp className="h-4 w-4" /></Button><Button aria-label={`Move ${instruction.title} down`} variant="ghost" size="icon" disabled={index === instructions.length - 1 || busy} onClick={() => void reorder([...instructions.slice(0, index), instructions[index + 1], instruction, ...instructions.slice(index + 2)])}><ArrowDown className="h-4 w-4" /></Button><Button aria-label={`Edit ${instruction.title}`} variant="ghost" size="icon" disabled={busy} onClick={() => openEdit(instruction)}><Pencil className="h-4 w-4" /></Button><Button aria-label={`Delete ${instruction.title}`} variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={busy} onClick={() => void remove(instruction)}><Trash2 className="h-4 w-4" /></Button></div> : null}</div><InstructionContent content={instruction.body} className="text-sm leading-6 text-muted-foreground" /></CardHeader></Card>)}</div> : <Card className="mt-5"><CardContent className="py-6 text-sm text-muted-foreground">{canManage ? text.emptyManage : text.emptyRead}</CardContent></Card>}
+      <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !busy) setEditing(null) }}><DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{editing?.id ? "Edit instruction" : "Add instruction"}</DialogTitle><DialogDescription>Format text, paste an image, or upload one from your device. {text.notify}</DialogDescription></DialogHeader><div className="space-y-4"><div className="space-y-2"><Label htmlFor="instruction-title">Title</Label><Input id="instruction-title" value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></div><div className="space-y-2"><Label htmlFor="instruction-body">Instructions</Label><div className="flex flex-wrap gap-1 rounded-t-md border border-b-0 bg-muted/40 p-1"><Button type="button" variant="ghost" size="sm" aria-label="Bold" onClick={() => format("bold")}><Bold className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Italic" onClick={() => format("italic")}><Italic className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Heading" onClick={() => format("formatBlock", "h2")}><Heading2 className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Bulleted list" onClick={() => format("insertUnorderedList")}><List className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Link" onClick={() => { const url = window.prompt("Paste an HTTPS URL")?.trim(); if (url?.startsWith("https://")) format("createLink", url) }}><Link className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="sm" aria-label="Upload image from device" onClick={() => imageInputRef.current?.click()}><ImagePlus className="h-4 w-4" /><span className="ml-1">Upload</span></Button><Input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadImage} /></div><div ref={setEditor} id="instruction-body" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" className="min-h-48 max-h-72 overflow-y-auto rounded-b-md border bg-background px-3 py-2 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring [&_img]:my-2 [&_img]:max-h-56 [&_img]:max-w-full [&_img]:rounded-md [&_img]:object-contain" onInput={(event) => setBody(editorToMarkdown(event.currentTarget))} onPaste={pasteImage} /><p className="text-xs text-muted-foreground">Paste a PNG, JPEG, or WebP image directly into the editor.</p><div className="rounded-md border bg-muted/20 p-3"><p className="mb-2 text-xs font-medium text-muted-foreground">Preview</p>{body.trim() ? <InstructionContent content={body} className="text-sm leading-6" /> : <p className="text-sm text-muted-foreground">Your formatted instruction will appear here.</p>}</div></div></div><DialogFooter><Button disabled={busy || !title.trim() || !body.trim() || body.length > 750000} onClick={() => void save()}>{busy ? "Saving…" : "Save instruction"}</Button></DialogFooter></DialogContent></Dialog>
     </section>
   )
 }

@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-type Props = { children: React.ReactNode; customInstructions: React.ReactNode }
+type Props = { children: React.ReactNode; customInstructions: React.ReactNode; adminInstructions?: React.ReactNode }
 
-export function InstructionsTabs({ children, customInstructions }: Props) {
+export function InstructionsTabs({ children, customInstructions, adminInstructions }: Props) {
   const [tab, setTab] = useState("general")
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("tab") === "custom") setTab("custom")
-  }, [])
+    if (params.get("tab") === "admin" && adminInstructions) setTab("admin")
+  }, [adminInstructions])
 
   useEffect(() => {
     if (tab !== "custom") return
@@ -25,9 +26,11 @@ export function InstructionsTabs({ children, customInstructions }: Props) {
       <TabsList aria-label="Instruction categories">
         <TabsTrigger value="general">General instructions</TabsTrigger>
         <TabsTrigger value="custom">Congregation instructions</TabsTrigger>
+        {adminInstructions ? <TabsTrigger value="admin">Admin instructions</TabsTrigger> : null}
       </TabsList>
       <TabsContent value="general" className="mt-6">{children}</TabsContent>
       <TabsContent value="custom" className="mt-6">{customInstructions}</TabsContent>
+      {adminInstructions ? <TabsContent value="admin" className="mt-6">{adminInstructions}</TabsContent> : null}
     </Tabs>
   )
 }

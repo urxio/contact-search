@@ -283,6 +283,22 @@ const migrations: Migration[] = [{
     await client.query(`ALTER TABLE congregation_instructions
       ADD COLUMN audience TEXT NOT NULL DEFAULT 'everyone' CHECK(audience IN ('everyone','admins'))`)
   }
+},{
+  version:21,name:"platform instructions for congregation admins",async run(client){
+    // Admin guidance moved to a single platform-written list; congregation
+    // instructions are for everyone again.
+    await client.query(`ALTER TABLE congregation_instructions DROP COLUMN IF EXISTS audience`)
+    await client.query(`CREATE TABLE platform_admin_instructions (
+      id BIGSERIAL PRIMARY KEY,
+      title TEXT NOT NULL CHECK(length(trim(title)) BETWEEN 1 AND 120),
+      body TEXT NOT NULL CHECK(length(trim(body)) BETWEEN 1 AND 750000),
+      position INT NOT NULL UNIQUE CHECK(position >= 0),
+      revision INT NOT NULL DEFAULT 1 CHECK(revision > 0),
+      created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
