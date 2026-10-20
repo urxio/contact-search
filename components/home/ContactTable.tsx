@@ -60,6 +60,7 @@ export function ContactTable({
   areaByZipcode = new Map(),
   areaOrder = [],
 }: ContactTableProps) {
+  const selectedSet = React.useMemo(() => new Set(selectedContacts), [selectedContacts])
   return (
     <div className="overflow-x-auto rounded-md border">
       <Table className="min-w-[1100px]">
@@ -82,275 +83,29 @@ export function ContactTable({
         </TableHeader>
         <TableBody>
           {contacts.map((contact) => {
-            const statusColorClass =
-              contact.status === "Potentially French"
-                ? "bg-green-50 dark:bg-green-900/20"
-                : contact.status === "Duplicate"
-                  ? "bg-amber-50 dark:bg-amber-900/20"
-                  : contact.status === "Detected"
-                    ? "bg-purple-50 dark:bg-purple-900/20"
-                    : contact.status === "Not French"
-                      ? "bg-red-50 dark:bg-red-900/20"
-                      : ""
             const area = areaByZipcode.get(contact.zipcode.trim())
-            const rowColorClass = colorByArea ? areaColorClass(area, areaOrder) : statusColorClass
-            const hasSurname = Boolean(contact.lastName?.trim())
-
             return (
-              <React.Fragment key={contact.id}>
-                <TableRow
-                  id={`contact-row-${contact.id}`}
-                  className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${
-                    contact.id === activeOriginContactId ? "ring-2 ring-inset ring-indigo-500" : ""
-                  } ${
-                    contact.id === lastVerifiedId ? "border-l-4 border-l-green-500 dark:border-l-green-400" : ""
-                  }`}
-                  onClick={() => onToggleExpanded(contact.id)}
-                >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedContacts.includes(contact.id)}
-                      onCheckedChange={() => onToggleSelection(contact.id)}
-                    />
-                  </TableCell>
-
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {contact.fullName}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button" variant="ghost" size="icon"
-                            disabled={!contact.lastName?.trim()}
-                            onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
-                            aria-label={`Copy surname ${contact.lastName?.trim() || ""}`.trim()}
-                            className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
-                      </Tooltip>
-                      {colorByArea && area && (
-                        <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          {area}
-                        </span>
-                      )}
-                      {contact.id === lastVerifiedId && (
-                        <Tooltip>
-                          <TooltipTrigger><Clock className="h-4 w-4 text-green-500" /></TooltipTrigger>
-                          <TooltipContent>Last verified contact</TooltipContent>
-                        </Tooltip>
-                      )}
-                      {contact.notes && contact.notes.trim() !== "" && (
-                        <Tooltip>
-                          <TooltipTrigger><StickyNote className="h-4 w-4 text-blue-500" /></TooltipTrigger>
-                          <TooltipContent>Has notes</TooltipContent>
-                        </Tooltip>
-                      )}
-                      {contact.needAddressUpdate && (
-                        <Tooltip>
-                          <TooltipTrigger><AlertCircleIcon className="h-4 w-4 text-amber-500" /></TooltipTrigger>
-                          <TooltipContent>Address needs update</TooltipContent>
-                        </Tooltip>
-                      )}
-                      {contact.needPhoneUpdate && (
-                        <Tooltip>
-                          <TooltipTrigger><Phone className="h-4 w-4 text-amber-500" /></TooltipTrigger>
-                          <TooltipContent>Phone needs update</TooltipContent>
-                        </Tooltip>
-                      )}
-                      {contact.territoryStatus && (
-                        <Tooltip>
-                          <TooltipTrigger><MapPin className="h-4 w-4 text-red-500" /></TooltipTrigger>
-                          <TooltipContent>Different territory</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5 sm:hidden">
-                      <Button
-                        variant="outline" size="sm" disabled={!hasSurname}
-                        onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
-                        aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
-                        className={`gap-1.5 ${contact.checkedOnForebears
-                          ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
-                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
-                      >
-                        <Globe className="h-4 w-4" /> Forebears
-                      </Button>
-                      <Button
-                        variant="outline" size="sm" disabled={!hasSurname}
-                        onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
-                        aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
-                        className={`gap-1.5 ${contact.checkedOnOrigin
-                          ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
-                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
-                      >
-                        <Sparkles className="h-4 w-4" /> Luna
-                      </Button>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>{contact.address}</TableCell>
-                  <TableCell>{contact.city}</TableCell>
-                  <TableCell>{contact.zipcode}</TableCell>
-                  <TableCell>{contact.phone}</TableCell>
-
-                  <TableCell>
-                    <Select
-                      value={contact.status}
-                      onValueChange={(value) => onStatusChange(contact.id, value as EnhancedContact["status"])}
-                    >
-                      <SelectTrigger
-                        className={`w-[140px] rounded-full ${
-                          contact.status === "Potentially French"
-                            ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
-                            : contact.status === "Not French"
-                              ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
-                              : contact.status === "Detected"
-                                ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
-                                : contact.status === "Duplicate"
-                                  ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
-                                  : "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
-                        }`}
-                      >
-                        <SelectValue placeholder={contact.status} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Not checked">Not checked</SelectItem>
-                        <SelectItem value="Potentially French">Potentially French</SelectItem>
-                        <SelectItem value="Detected">Detected</SelectItem>
-                        <SelectItem value="Duplicate">Duplicate</SelectItem>
-                        <SelectItem value="Not French">Not French</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={(e) => { e.stopPropagation(); onToggleExpanded(contact.id) }}
-                            className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            {contact.isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline" size="icon"
-                            disabled={!hasSurname}
-                            onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
-                            aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
-                            className={`hidden sm:inline-flex ${contact.checkedOnForebears
-                              ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
-                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
-                          >
-                            <Globe className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{hasSurname ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline" size="icon"
-                            disabled={!hasSurname}
-                            onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
-                            aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
-                            className={`hidden sm:inline-flex ${contact.checkedOnOrigin
-                              ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
-                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{hasSurname ? "Research surname origin with Luna" : "A last name is required"}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Button
-                            variant={contact.checkedOnTPS ? "secondary" : "outline"} size="icon"
-                            onClick={(e) => { e.stopPropagation(); onSearchTPS(contact) }}
-                            className={contact.checkedOnTPS
-                              ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
-                          >
-                            <Search className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Search on TruePeopleSearch</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
-                </TableRow>
-
-                {contact.isExpanded && (
-                  <TableRow className={`${rowColorClass} border-t-0`}>
-                    <TableCell colSpan={8} className="p-0">
-                      <div className="p-4 bg-background/50 rounded-b-lg shadow-inner">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h3 className="text-sm font-medium mb-2">Contact Details</h3>
-                            <div className="space-y-3 text-sm">
-                              {(["firstName", "lastName", "address", "city", "zipcode", "phone"] as (keyof BaseContact)[]).map((field) => (
-                                <div key={field} className="grid grid-cols-3 items-center gap-2">
-                                  <span className="font-medium capitalize">{field === "firstName" ? "First Name" : field === "lastName" ? "Last Name" : field.charAt(0).toUpperCase() + field.slice(1)}:</span>
-                                  <Input
-                                    value={contact[field] as string}
-                                    onChange={(e) => onFieldChange(contact.id, field, e.target.value)}
-                                    className="col-span-2 h-8"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
-                            <Textarea
-                              placeholder="Add notes about this contact..."
-                              value={contact.notes}
-                              onChange={(e) => onNotesChange(contact.id, e.target.value)}
-                              className="mb-2 min-h-[80px]"
-                            />
-                            <div className="flex items-center space-x-4">
-                              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <Checkbox
-                                  id={`address-update-${contact.id}`}
-                                  checked={contact.needAddressUpdate}
-                                  onCheckedChange={(checked) => onAddressUpdateChange(contact.id, !!checked)}
-                                />
-                                Address updated
-                              </label>
-                              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <Checkbox
-                                  id={`phone-update-${contact.id}`}
-                                  checked={contact.needPhoneUpdate}
-                                  onCheckedChange={(checked) => onPhoneUpdateChange(contact.id, !!checked)}
-                                />
-                                Phone updated
-                              </label>
-                              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <Checkbox
-                                  id={`territory-status-${contact.id}`}
-                                  checked={contact.territoryStatus}
-                                  onCheckedChange={(checked) => onTerritoryStatusChange(contact.id, !!checked)}
-                                />
-                                Different territory
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </React.Fragment>
+              <ContactTableRow
+                key={contact.id}
+                contact={contact}
+                isSelected={selectedSet.has(contact.id)}
+                isLastVerified={contact.id === lastVerifiedId}
+                isActiveOrigin={contact.id === activeOriginContactId}
+                area={colorByArea ? area : undefined}
+                areaClass={colorByArea ? areaColorClass(area, areaOrder) : null}
+                onToggleSelection={onToggleSelection}
+                onToggleExpanded={onToggleExpanded}
+                onStatusChange={onStatusChange}
+                onNotesChange={onNotesChange}
+                onFieldChange={onFieldChange}
+                onAddressUpdateChange={onAddressUpdateChange}
+                onPhoneUpdateChange={onPhoneUpdateChange}
+                onTerritoryStatusChange={onTerritoryStatusChange}
+                onSearchForebears={onSearchForebears}
+                onCopyForebearsSurname={onCopyForebearsSurname}
+                onSearchOrigin={onSearchOrigin}
+                onSearchTPS={onSearchTPS}
+              />
             )
           })}
         </TableBody>
@@ -358,3 +113,310 @@ export function ContactTable({
     </div>
   )
 }
+
+type ContactTableRowProps = Pick<ContactTableProps,
+  | "onToggleSelection" | "onToggleExpanded" | "onStatusChange" | "onNotesChange" | "onFieldChange"
+  | "onAddressUpdateChange" | "onPhoneUpdateChange" | "onTerritoryStatusChange" | "onSearchForebears"
+  | "onCopyForebearsSurname" | "onSearchOrigin" | "onSearchTPS"
+> & {
+  contact: EnhancedContact
+  isSelected: boolean
+  isLastVerified: boolean
+  isActiveOrigin: boolean
+  area?: string
+  areaClass: string | null
+}
+
+// Memoized so editing one contact (typing notes, changing status) only
+// re-renders that row instead of every row in a large territory.
+const ContactTableRow = React.memo(function ContactTableRow({
+  contact,
+  isSelected,
+  isLastVerified,
+  isActiveOrigin,
+  area,
+  areaClass,
+  onToggleSelection,
+  onToggleExpanded,
+  onStatusChange,
+  onNotesChange,
+  onFieldChange,
+  onAddressUpdateChange,
+  onPhoneUpdateChange,
+  onTerritoryStatusChange,
+  onSearchForebears,
+  onCopyForebearsSurname,
+  onSearchOrigin,
+  onSearchTPS,
+}: ContactTableRowProps) {
+  const statusColorClass =
+    contact.status === "Potentially French"
+      ? "bg-green-50 dark:bg-green-900/20"
+      : contact.status === "Duplicate"
+        ? "bg-amber-50 dark:bg-amber-900/20"
+        : contact.status === "Detected"
+          ? "bg-purple-50 dark:bg-purple-900/20"
+          : contact.status === "Not French"
+            ? "bg-red-50 dark:bg-red-900/20"
+            : ""
+  const rowColorClass = areaClass ?? statusColorClass
+  const colorByArea = areaClass != null
+  const hasSurname = Boolean(contact.lastName?.trim())
+
+  return (
+    <>
+      <TableRow
+        id={`contact-row-${contact.id}`}
+        className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${
+          isActiveOrigin ? "ring-2 ring-inset ring-indigo-500" : ""
+        } ${
+          isLastVerified ? "border-l-4 border-l-green-500 dark:border-l-green-400" : ""
+        }`}
+        onClick={() => onToggleExpanded(contact.id)}
+      >
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelection(contact.id)}
+          />
+        </TableCell>
+
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            {contact.fullName}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  disabled={!contact.lastName?.trim()}
+                  onClick={(e) => { e.stopPropagation(); onCopyForebearsSurname(contact) }}
+                  aria-label={`Copy surname ${contact.lastName?.trim() || ""}`.trim()}
+                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
+            </Tooltip>
+            {colorByArea && area && (
+              <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {area}
+              </span>
+            )}
+            {isLastVerified && (
+              <Tooltip>
+                <TooltipTrigger><Clock className="h-4 w-4 text-green-500" /></TooltipTrigger>
+                <TooltipContent>Last verified contact</TooltipContent>
+              </Tooltip>
+            )}
+            {contact.notes && contact.notes.trim() !== "" && (
+              <Tooltip>
+                <TooltipTrigger><StickyNote className="h-4 w-4 text-blue-500" /></TooltipTrigger>
+                <TooltipContent>Has notes</TooltipContent>
+              </Tooltip>
+            )}
+            {contact.needAddressUpdate && (
+              <Tooltip>
+                <TooltipTrigger><AlertCircleIcon className="h-4 w-4 text-amber-500" /></TooltipTrigger>
+                <TooltipContent>Address needs update</TooltipContent>
+              </Tooltip>
+            )}
+            {contact.needPhoneUpdate && (
+              <Tooltip>
+                <TooltipTrigger><Phone className="h-4 w-4 text-amber-500" /></TooltipTrigger>
+                <TooltipContent>Phone needs update</TooltipContent>
+              </Tooltip>
+            )}
+            {contact.territoryStatus && (
+              <Tooltip>
+                <TooltipTrigger><MapPin className="h-4 w-4 text-red-500" /></TooltipTrigger>
+                <TooltipContent>Different territory</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 sm:hidden">
+            <Button
+              variant="outline" size="sm" disabled={!hasSurname}
+              onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
+              aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
+              className={`gap-1.5 ${contact.checkedOnForebears
+                ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+            >
+              <Globe className="h-4 w-4" /> Forebears
+            </Button>
+            <Button
+              variant="outline" size="sm" disabled={!hasSurname}
+              onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+              aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
+              className={`gap-1.5 ${contact.checkedOnOrigin
+                ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+            >
+              <Sparkles className="h-4 w-4" /> Luna
+            </Button>
+          </div>
+        </TableCell>
+
+        <TableCell>{contact.address}</TableCell>
+        <TableCell>{contact.city}</TableCell>
+        <TableCell>{contact.zipcode}</TableCell>
+        <TableCell>{contact.phone}</TableCell>
+
+        <TableCell>
+          <Select
+            value={contact.status}
+            onValueChange={(value) => onStatusChange(contact.id, value as EnhancedContact["status"])}
+          >
+            <SelectTrigger
+              className={`w-[140px] rounded-full ${
+                contact.status === "Potentially French"
+                  ? "bg-green-100 dark:bg-green-900/40 border-green-200 dark:border-green-800"
+                  : contact.status === "Not French"
+                    ? "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800"
+                    : contact.status === "Detected"
+                      ? "bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800"
+                      : contact.status === "Duplicate"
+                        ? "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800"
+                        : "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800"
+              }`}
+            >
+              <SelectValue placeholder={contact.status} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Not checked">Not checked</SelectItem>
+              <SelectItem value="Potentially French">Potentially French</SelectItem>
+              <SelectItem value="Detected">Detected</SelectItem>
+              <SelectItem value="Duplicate">Duplicate</SelectItem>
+              <SelectItem value="Not French">Not French</SelectItem>
+            </SelectContent>
+          </Select>
+        </TableCell>
+
+        <TableCell className="text-right">
+          <div className="flex justify-end space-x-2">
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant="ghost" size="icon"
+                  onClick={(e) => { e.stopPropagation(); onToggleExpanded(contact.id) }}
+                  className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  {contact.isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{contact.isExpanded ? "Collapse" : "Expand"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline" size="icon"
+                  disabled={!hasSurname}
+                  onClick={(e) => { e.stopPropagation(); onSearchForebears(contact) }}
+                  aria-label={`Search ${contact.lastName?.trim() || "surname"} on Forebears`}
+                  className={`hidden sm:inline-flex ${contact.checkedOnForebears
+                    ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                    : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                >
+                  <Globe className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{hasSurname ? "Search surname on Forebears" : "A last name is required"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline" size="icon"
+                  disabled={!hasSurname}
+                  onClick={(e) => { e.stopPropagation(); onSearchOrigin(contact) }}
+                  aria-label={`Research ${contact.lastName?.trim() || "surname"} with Luna`}
+                  className={`hidden sm:inline-flex ${contact.checkedOnOrigin
+                    ? "border-green-300 bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60"
+                    : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}`}
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{hasSurname ? "Research surname origin with Luna" : "A last name is required"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  variant={contact.checkedOnTPS ? "secondary" : "outline"} size="icon"
+                  onClick={(e) => { e.stopPropagation(); onSearchTPS(contact) }}
+                  className={contact.checkedOnTPS
+                    ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20"}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Search on TruePeopleSearch</TooltipContent>
+            </Tooltip>
+          </div>
+        </TableCell>
+      </TableRow>
+
+      {contact.isExpanded && (
+        <TableRow className={`${rowColorClass} border-t-0`}>
+          <TableCell colSpan={8} className="p-0">
+            <div className="p-4 bg-background/50 rounded-b-lg shadow-inner">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Contact Details</h3>
+                  <div className="space-y-3 text-sm">
+                    {(["firstName", "lastName", "address", "city", "zipcode", "phone"] as (keyof BaseContact)[]).map((field) => (
+                      <div key={field} className="grid grid-cols-3 items-center gap-2">
+                        <span className="font-medium capitalize">{field === "firstName" ? "First Name" : field === "lastName" ? "Last Name" : field.charAt(0).toUpperCase() + field.slice(1)}:</span>
+                        <Input
+                          value={contact[field] as string}
+                          onChange={(e) => onFieldChange(contact.id, field, e.target.value)}
+                          className="col-span-2 h-8"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Notes & Status</h3>
+                  <Textarea
+                    placeholder="Add notes about this contact..."
+                    value={contact.notes}
+                    onChange={(e) => onNotesChange(contact.id, e.target.value)}
+                    className="mb-2 min-h-[80px]"
+                  />
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        id={`address-update-${contact.id}`}
+                        checked={contact.needAddressUpdate}
+                        onCheckedChange={(checked) => onAddressUpdateChange(contact.id, !!checked)}
+                      />
+                      Address updated
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        id={`phone-update-${contact.id}`}
+                        checked={contact.needPhoneUpdate}
+                        onCheckedChange={(checked) => onPhoneUpdateChange(contact.id, !!checked)}
+                      />
+                      Phone updated
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        id={`territory-status-${contact.id}`}
+                        checked={contact.territoryStatus}
+                        onCheckedChange={(checked) => onTerritoryStatusChange(contact.id, !!checked)}
+                      />
+                      Different territory
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  )
+})

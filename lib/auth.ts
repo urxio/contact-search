@@ -2,9 +2,13 @@ import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from "util"
 import { cookies, headers } from "next/headers"
 import { getIronSession } from "iron-session"
+import * as React from "react"
 import { ensureSchema, pool } from "@/lib/db"
 
 const scrypt = promisify(scryptCallback)
+// React.cache exists in Next's server runtime; plain React 18 (tests, scripts)
+// lacks it, so fall back to calling the function directly.
+const cache: <T extends (...args: any[]) => any>(fn: T) => T = (React as any).cache ?? ((fn) => fn)
 export const AUTH_COOKIE_NAME = "search_helper_session"
 const SESSION_DAYS = 14
 const MAX_FAILED_LOGINS = 5
@@ -70,7 +74,9 @@ export async function destroyAuthSession(sessionId?: string) {
   session.destroy()
 }
 
-export async function getCurrentSession() {
+// cache() dedupes the lookup within one server render, so a layout and page
+// that both check auth share a single round of database queries.
+export const getCurrentSession = cache(async function getCurrentSession() {
   if (!isMultiTenantEnabled()) return null
   await ensureSchema()
   const session = await getIronSession<AuthCookie>(await cookies(), sessionOptions())
@@ -91,7 +97,7 @@ export async function getCurrentSession() {
       preferences: row.preferences ?? {},
     } as AuthUser,
   }
-}
+})
 
 export async function requireUser() {
   const current = await getCurrentSession()
@@ -99,7 +105,7 @@ export async function requireUser() {
   return current.user
 }
 
-export async function requireMembership(slug: string): Promise<CongregationAccess> {
+export const requireMembership = cache(async function requireMembership(slug: string): Promise<CongregationAccess> {
   const user = await requireUser()
   const result = await pool.query(`SELECT c.id congregation_id,c.name,c.slug,c.settings,m.id membership_id,m.role,m.display_name
     FROM congregations c LEFT JOIN congregation_memberships m ON m.congregation_id=c.id AND m.user_id=$2 AND m.status='active'
@@ -109,7 +115,7 @@ export async function requireMembership(slug: string): Promise<CongregationAcces
   if (!row.membership_id && !user.isPlatformAdmin) throw new AuthError(404, "Workspace not found")
   if (user.isPlatformAdmin && !row.membership_id) await auditEvent({ actorUserId: user.id, congregationId: Number(row.congregation_id), action: "platform.support_access", targetType: "congregation", targetId: String(row.congregation_id) })
   return { user, congregation: { id: Number(row.congregation_id), name: row.name, slug: row.slug, settings: row.settings ?? {} }, membership: row.membership_id ? { id: Number(row.membership_id), role: row.role, displayName: row.display_name } : null }
-}
+})
 
 export async function requireCongregationAdmin(slug: string) {
   const access = await requireMembership(slug)

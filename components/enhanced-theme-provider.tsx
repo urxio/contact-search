@@ -2,16 +2,9 @@
 
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import type { ThemeProviderProps } from "next-themes"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 
 export function EnhancedThemeProvider({ children, ...props }: ThemeProviderProps) {
-  const [mounted, setMounted] = useState(false)
-
-  // Prevent flash of unstyled content
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   // Add a class to the body when dark mode is active
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
@@ -32,9 +25,7 @@ export function EnhancedThemeProvider({ children, ...props }: ThemeProviderProps
     return () => observer.disconnect()
   }, [])
 
-  if (!mounted) {
-    return <>{children}</>
-  }
-
+  // Always render the provider: swapping it in after mount changed the tree
+  // shape and remounted the whole app (re-running every effect and fetch).
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>
 }
