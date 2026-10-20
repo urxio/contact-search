@@ -299,6 +299,16 @@ const migrations: Migration[] = [{
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`)
   }
+},{
+  version:22,name:"admin instruction view acknowledgements",async run(client){
+    await client.query(`CREATE TABLE platform_admin_instruction_views (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      instruction_id BIGINT NOT NULL REFERENCES platform_admin_instructions(id) ON DELETE CASCADE,
+      instruction_revision INT NOT NULL CHECK(instruction_revision > 0),
+      viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(user_id,instruction_id,instruction_revision)
+    )`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

@@ -28,6 +28,8 @@ describe("platform admin instructions API", () => {
     await expect(response.json()).resolves.toEqual({ instruction: { id: 5, title: "Reviewing", body: "Archive weekly.", position: 0, revision: 1 } })
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO platform_admin_instructions"), ["Reviewing", "Archive weekly.", 1])
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "platform_admin_instruction.created", targetId: "5" }))
+    // The author is not notified about their own instruction.
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO platform_admin_instruction_views"), [1, 5, 1])
   })
 
   it("refuses congregation admins and members", async () => {
@@ -51,6 +53,7 @@ describe("platform admin instructions API", () => {
     const response = await PATCH(request("PATCH", { id: 5, title: "Updated", body: "New steps" }))
     expect(response.status).toBe(200)
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("revision=revision+1"), ["Updated", "New steps", 5])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO platform_admin_instruction_views"), [1, 5, 2])
   })
 
   it("persists a new ordering of the same instructions", async () => {

@@ -160,6 +160,7 @@ export default function SearchHelper({
   const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; state: "assigned" | "in_progress"; isMine: boolean }>>([])
   const [dismissedPackageNotifications, setDismissedPackageNotifications] = useState<Set<number>>(new Set())
   const [instructionNotifications, setInstructionNotifications] = useState<Array<{ id: number; revision: number; title: string }>>([])
+  const [adminInstructionNotifications, setAdminInstructionNotifications] = useState<Array<{ id: number; revision: number; title: string }>>([])
   const [dismissedInstructionNotifications, setDismissedInstructionNotifications] = useState<Set<string>>(new Set())
   const [packageAssignmentLocked, setPackageAssignmentLocked] = useState(false)
   const [globalNotes, setGlobalNotes] = useState("")
@@ -291,10 +292,11 @@ export default function SearchHelper({
     })
   }, [packageNotificationStorageKey])
 
-  const dismissInstructionNotifications = useCallback((items: Array<{ id: number; revision: number }>) => {
+  // Admin instruction ids are a separate sequence, so their keys carry an "admin:" prefix.
+  const dismissInstructionNotifications = useCallback((items: Array<{ id: number; revision: number }>, prefix = "") => {
     setDismissedInstructionNotifications((current) => {
       const next = new Set(current)
-      items.forEach((item) => next.add(`${item.id}:${item.revision}`))
+      items.forEach((item) => next.add(`${prefix}${item.id}:${item.revision}`))
       if (instructionNotificationStorageKey) sessionStorage.setItem(instructionNotificationStorageKey, JSON.stringify([...next]))
       return next
     })
@@ -319,6 +321,14 @@ export default function SearchHelper({
       .then((result) => setInstructionNotifications(Array.isArray(result.instructions) ? result.instructions : []))
       .catch(() => setInstructionNotifications([]))
   }, [workspaceSlug])
+  const isWorkspaceAdmin = workspace?.canManagePackages === true
+  useEffect(() => {
+    if (!workspaceSlug || !isWorkspaceAdmin) { setAdminInstructionNotifications([]); return }
+    fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/admin-instructions`, { cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() : { instructions: [] })
+      .then((result) => setAdminInstructionNotifications(Array.isArray(result.instructions) ? result.instructions : []))
+      .catch(() => setAdminInstructionNotifications([]))
+  }, [isWorkspaceAdmin, workspaceSlug])
   const storagePrefix = workspaceSlug
     ? `search-helper:${workspaceSlug}:${authenticatedUserId ?? authenticatedDisplayName ?? "member"}`
     : "search-helper:legacy"
@@ -2582,6 +2592,24 @@ export default function SearchHelper({
             dismissInstructionNotifications([instruction])
             if (!workspaceSlug) return
             void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/instructions/views`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: instruction.id, revision: instruction.revision }),
+            })
+          }}
+          adminInstructionNotifications={adminInstructionNotifications.filter((item) => !dismissedInstructionNotifications.has(`admin:${item.id}:${item.revision}`))}
+          onOpenAdminInstruction={async (instruction) => {
+            if (!workspaceSlug) return
+            try {
+              const response = await fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/admin-instructions/views`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: instruction.id, revision: instruction.revision }),
+              })
+              if (response.ok) dismissInstructionNotifications([instruction], "admin:")
+            } catch { /* The destination also records the view after it opens. */ }
+            window.location.assign(`/c/${encodeURIComponent(workspaceSlug)}/instructions?tab=admin&instruction=${instruction.id}&revision=${instruction.revision}`)
+          }}
+          onDismissAdminInstruction={(instruction) => {
+            dismissInstructionNotifications([instruction], "admin:")
+            if (!workspaceSlug) return
+            void fetch(`/api/c/${encodeURIComponent(workspaceSlug)}/admin-instructions/views`, {
               method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: instruction.id, revision: instruction.revision }),
             })
           }}

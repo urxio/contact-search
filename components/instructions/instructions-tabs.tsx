@@ -7,18 +7,20 @@ type Props = { children: React.ReactNode; customInstructions: React.ReactNode; a
 
 export function InstructionsTabs({ children, customInstructions, adminInstructions }: Props) {
   const [tab, setTab] = useState("general")
+  const hasAdminTab = Boolean(adminInstructions)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("tab") === "custom") setTab("custom")
-    if (params.get("tab") === "admin" && adminInstructions) setTab("admin")
-  }, [adminInstructions])
+    if (params.get("tab") === "admin" && hasAdminTab) setTab("admin")
+  }, [hasAdminTab])
 
   useEffect(() => {
-    if (tab !== "custom") return
+    if (tab !== "custom" && tab !== "admin") return
     const instructionId = new URLSearchParams(window.location.search).get("instruction")
     if (!instructionId) return
-    requestAnimationFrame(() => document.getElementById(`instruction-${instructionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }))
+    const anchor = tab === "admin" ? `admin-instruction-${instructionId}` : `instruction-${instructionId}`
+    requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" }))
   }, [tab])
 
   return (

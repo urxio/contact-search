@@ -9,6 +9,12 @@ import { apiError, assertMultiTenantEnabled, integer } from "../../c/_shared"
 const COLUMNS = `id,title,body,position,revision,created_at,updated_at`
 const SELECT = `SELECT ${COLUMNS} FROM platform_admin_instructions ORDER BY position ASC,id ASC`
 
+// Publishing or editing notifies every congregation admin, but not the author.
+function markViewed(client: { query: typeof pool.query }, userId: number, instruction: { id: number; revision: number }) {
+  return client.query(`INSERT INTO platform_admin_instruction_views(user_id,instruction_id,instruction_revision)
+    VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, [userId, instruction.id, instruction.revision])
+}
+
 export async function POST(req: NextRequest) {
   const client = await pool.connect()
   try {
@@ -25,6 +31,7 @@ export async function POST(req: NextRequest) {
     const result = await client.query(`INSERT INTO platform_admin_instructions(title,body,position,created_by_user_id)
       VALUES($1,$2,0,$3) RETURNING ${COLUMNS}`, [title, instructionBody, user.id])
     const instruction = serializeInstruction(result.rows[0])
+    await markViewed(client, user.id, instruction)
     await client.query("COMMIT")
     await auditEvent({ actorUserId: user.id, action: "platform_admin_instruction.created", targetType: "platform_admin_instruction", targetId: String(instruction.id) })
     return NextResponse.json({ instruction }, { status: 201 })
@@ -63,6 +70,7 @@ export async function PATCH(req: NextRequest) {
       WHERE id=$3 RETURNING ${COLUMNS}`, [title, instructionBody, id])
     if (!result.rowCount) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Instruction not found." }, { status: 404 }) }
     const instruction = serializeInstruction(result.rows[0])
+    await markViewed(client, user.id, instruction)
     await auditEvent({ actorUserId: user.id, action: "platform_admin_instruction.updated", targetType: "platform_admin_instruction", targetId: String(id) })
     await client.query("COMMIT")
     return NextResponse.json({ instruction })

@@ -76,14 +76,15 @@ export function CustomInstructions({ slug, initialInstructions, canManage, varia
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   const endpoint = variant === "admin" ? "/api/platform/admin-instructions" : `/api/c/${encodeURIComponent(slug)}/instructions`
+  const viewsEndpoint = variant === "admin" ? `/api/c/${encodeURIComponent(slug)}/admin-instructions/views` : `${endpoint}/views`
   useEffect(() => {
-    if (variant === "admin") return
     const params = new URLSearchParams(window.location.search)
+    if ((params.get("tab") === "admin") !== (variant === "admin")) return
     const instructionId = Number(params.get("instruction"))
     const revision = Number(params.get("revision"))
     if (!Number.isSafeInteger(instructionId) || instructionId < 1 || !Number.isSafeInteger(revision) || revision < 1) return
-    void fetch(`${endpoint}/views`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId, revision }) })
-  }, [endpoint, variant])
+    void fetch(viewsEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instructionId, revision }) })
+  }, [variant, viewsEndpoint])
   function openCreate() { setEditing({ id: 0, title: "", body: "", position: instructions.length, revision: 0 }); setTitle(""); setBody("") }
   function openEdit(instruction: CongregationInstruction) { setEditing(instruction); setTitle(instruction.title); setBody(instruction.body) }
 

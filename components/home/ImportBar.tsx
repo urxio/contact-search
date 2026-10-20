@@ -3,7 +3,7 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send, PackageOpen, X } from "lucide-react"
+import { Upload, Check, RefreshCw, AlertCircleIcon, Loader2, Send, PackageOpen, ShieldCheck, X } from "lucide-react"
 
 interface ImportBarProps {
   isLoading: boolean
@@ -26,6 +26,9 @@ interface ImportBarProps {
   instructionNotifications?: Array<{ id: number; revision: number; title: string }>
   onOpenInstructions?: (instructionId: number) => void
   onDismissInstruction?: (instruction: { id: number; revision: number; title: string }) => void
+  adminInstructionNotifications?: Array<{ id: number; revision: number; title: string }>
+  onOpenAdminInstruction?: (instruction: { id: number; revision: number; title: string }) => void
+  onDismissAdminInstruction?: (instruction: { id: number; revision: number; title: string }) => void
   onDismissError?: () => void
 }
 
@@ -50,6 +53,9 @@ export function ImportBar({
   instructionNotifications = [],
   onOpenInstructions,
   onDismissInstruction,
+  adminInstructionNotifications = [],
+  onOpenAdminInstruction,
+  onDismissAdminInstruction,
   onDismissError,
 }: ImportBarProps) {
   const currentActivePackage = ownActivePackages.find((item) => item.id === currentPackageId)
@@ -164,6 +170,17 @@ export function ImportBar({
             <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Review the latest guidance before continuing your work.</p>
           </div>
           <div className="flex flex-wrap gap-2">{instructionNotifications.map((instruction) => <div key={`${instruction.id}:${instruction.revision}`} className="flex items-center gap-1"><Button type="button" size="sm" variant="outline" className="border-amber-200 bg-background text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-background/10 dark:text-amber-200" onClick={() => onOpenInstructions?.(instruction.id)}>Review {instruction.title}</Button><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-amber-700 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-200" aria-label={`Dismiss ${instruction.title} notification`} onClick={() => onDismissInstruction?.(instruction)}><X className="h-4 w-4" aria-hidden="true" /></Button></div>)}</div>
+        </div>
+      ) : null}
+
+      {adminInstructionNotifications.length > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-blue-100 bg-blue-50/70 px-5 py-3 text-blue-950 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-100 sm:flex-row sm:items-center">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-300 sm:mt-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{adminInstructionNotifications.length === 1 ? "New admin instruction" : `${adminInstructionNotifications.length} new or updated admin instructions`}</p>
+            <p className="mt-0.5 text-xs text-blue-800/80 dark:text-blue-200/80">Guidance for congregation admins from the Name Search team. Members don&apos;t see this.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">{adminInstructionNotifications.map((instruction) => <div key={`${instruction.id}:${instruction.revision}`} className="flex items-center gap-1"><Button type="button" size="sm" variant="outline" className="border-blue-200 bg-background text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-background/10 dark:text-blue-200" onClick={() => onOpenAdminInstruction?.(instruction)}>Review {instruction.title}</Button><Button type="button" size="icon" variant="ghost" className="h-8 w-8 text-blue-700 hover:bg-blue-100 hover:text-blue-900 dark:text-blue-200" aria-label={`Dismiss ${instruction.title} notification`} onClick={() => onDismissAdminInstruction?.(instruction)}><X className="h-4 w-4" aria-hidden="true" /></Button></div>)}</div>
         </div>
       ) : null}
 
