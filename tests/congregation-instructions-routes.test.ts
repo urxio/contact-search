@@ -26,8 +26,23 @@ describe("congregation instructions API", () => {
     const { GET } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await GET(request("GET"), { params: { slug: "central" } })
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ instructions: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 2 }] })
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE congregation_id=$1"), [34])
+    await expect(response.json()).resolves.toEqual({ instructions: [{ id: 8, title: "Call first", body: "Use the directory.", position: 0, revision: 2, audience: "everyone" }] })
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE congregation_id=$1"), [34, true])
+  })
+
+  it("hides admin-only instructions from members", async () => {
+    mocks.member.mockResolvedValueOnce({ ...access, user: { id: 12, isPlatformAdmin: false }, membership: { role: "member" } })
+    const { GET } = await import("@/app/api/c/[slug]/instructions/route")
+    const response = await GET(request("GET"), { params: { slug: "central" } })
+    expect(response.status).toBe(200)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("audience='everyone'"), [34, false])
+  })
+
+  it("hides admin-only instructions from a member's notifications", async () => {
+    mocks.member.mockResolvedValueOnce({ ...access, membership: { role: "member" } })
+    const { GET } = await import("@/app/api/c/[slug]/instructions/route")
+    await GET(request("GET", undefined, "?notifications=unviewed"), { params: { slug: "central" } })
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("audience='everyone'"), [34, 12, false])
   })
 
   it("returns only instruction revisions the member has not viewed when requested for notifications", async () => {
@@ -35,7 +50,7 @@ describe("congregation instructions API", () => {
     const { GET } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await GET(request("GET", undefined, "?notifications=unviewed"), { params: { slug: "central" } })
     expect(response.status).toBe(200)
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("congregation_instruction_views"), [34, 12])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("congregation_instruction_views"), [34, 12, true])
   })
 
   it("creates a validated instruction and records its audit event", async () => {
@@ -43,9 +58,25 @@ describe("congregation instructions API", () => {
     const { POST } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await POST(request("POST", { title: " Call first ", body: " Use the directory. " }), { params: { slug: "central" } })
     expect(response.status).toBe(201)
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instructions"), [34, "Call first", "Use the directory.", 12])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instructions"), [34, "Call first", "Use the directory.", 12, "everyone"])
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("position=position+1000000"), [34])
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "congregation_instruction.created", targetId: "8" }))
+  })
+
+  it("creates an admin-only instruction", async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 9, title: "Review", body: "Archive weekly.", position: 0, revision: 1, audience: "admins" }] }).mockResolvedValueOnce({ rows: [] })
+    const { POST } = await import("@/app/api/c/[slug]/instructions/route")
+    const response = await POST(request("POST", { title: "Review", body: "Archive weekly.", audience: "admins" }), { params: { slug: "central" } })
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({ instruction: { id: 9, audience: "admins" } })
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instructions"), [34, "Review", "Archive weekly.", 12, "admins"])
+  })
+
+  it("rejects an unknown audience before writing", async () => {
+    const { POST } = await import("@/app/api/c/[slug]/instructions/route")
+    const response = await POST(request("POST", { title: "Review", body: "Archive weekly.", audience: "elders" }), { params: { slug: "central" } })
+    expect(response.status).toBe(400)
+    expect(mocks.query).not.toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instructions"), expect.anything())
   })
 
   it("rejects empty instructions before writing", async () => {
@@ -59,7 +90,7 @@ describe("congregation instructions API", () => {
     const { PATCH } = await import("@/app/api/c/[slug]/instructions/route")
     const response = await PATCH(request("PATCH", { id: 8, title: "Updated", body: "New direction" }), { params: { slug: "central" } })
     expect(response.status).toBe(200)
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("revision=revision+1"), ["Updated", "New direction", 8, 34])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("revision=revision+1"), ["Updated", "New direction", 8, 34, "everyone"])
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "congregation_instruction.updated" }))
   })
 
@@ -94,5 +125,16 @@ describe("congregation instructions API", () => {
     }), { params: { slug: "central" } })
     expect(response.status).toBe(200)
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO congregation_instruction_views"), [12, 34, 8, 2])
+  })
+
+  it("does not let a member acknowledge an admin-only instruction", async () => {
+    mocks.member.mockResolvedValueOnce({ ...access, membership: { role: "member" } })
+    mocks.query.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    const { POST } = await import("@/app/api/c/[slug]/instructions/views/route")
+    const response = await POST(new NextRequest("https://search.example/api/c/central/instructions/views", {
+      method: "POST", headers: { origin: "https://search.example", host: "search.example", "Content-Type": "application/json" }, body: JSON.stringify({ instructionId: 9, revision: 1 }),
+    }), { params: { slug: "central" } })
+    expect(response.status).toBe(404)
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("audience='everyone'"), [9, 34, 1, false])
   })
 })

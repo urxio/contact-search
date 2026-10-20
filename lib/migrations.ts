@@ -278,6 +278,11 @@ const migrations: Migration[] = [{
       PRIMARY KEY(surname,congregation_id,contact_id)
     )`)
   }
+},{
+  version:20,name:"admin-only congregation instructions",async run(client){
+    await client.query(`ALTER TABLE congregation_instructions
+      ADD COLUMN audience TEXT NOT NULL DEFAULT 'everyone' CHECK(audience IN ('everyone','admins'))`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

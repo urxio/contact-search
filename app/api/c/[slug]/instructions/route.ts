@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, requireMembership, validateMutationOrigin } from "@/lib/auth"
-import { serializeInstruction, validateInstructionText } from "@/lib/congregation-instructions"
+import { canSeeAdminInstructions, serializeInstruction, validateInstructionAudience, validateInstructionText } from "@/lib/congregation-instructions"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../_shared"
 
-const SELECT = `SELECT id,title,body,position,revision,created_at,updated_at
+const COLUMNS = `id,title,body,position,revision,audience,created_at,updated_at`
+const SELECT = `SELECT ${COLUMNS}
   FROM congregation_instructions WHERE congregation_id=$1 ORDER BY position ASC,id ASC`
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
@@ -12,16 +13,18 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     assertMultiTenantEnabled()
     const auth = await requireMembership(params.slug)
     const notificationsOnly = _req.nextUrl.searchParams.get("notifications") === "unviewed"
+    const includeAdminOnly = canSeeAdminInstructions(auth)
     const result = await pool.query(notificationsOnly
-      ? `SELECT ci.id,ci.title,ci.body,ci.position,ci.revision,ci.created_at,ci.updated_at
+      ? `SELECT ci.id,ci.title,ci.body,ci.position,ci.revision,ci.audience,ci.created_at,ci.updated_at
           FROM congregation_instructions ci
-          WHERE ci.congregation_id=$1 AND NOT EXISTS (
+          WHERE ci.congregation_id=$1 AND ($3::boolean OR ci.audience='everyone') AND NOT EXISTS (
             SELECT 1 FROM congregation_instruction_views civ
             WHERE civ.congregation_id=ci.congregation_id AND civ.user_id=$2
               AND civ.instruction_id=ci.id AND civ.instruction_revision=ci.revision
           ) ORDER BY ci.position ASC,ci.id ASC`
-      : SELECT,
-    notificationsOnly ? [auth.congregation.id, auth.user.id] : [auth.congregation.id])
+      : `SELECT ${COLUMNS} FROM congregation_instructions
+          WHERE congregation_id=$1 AND ($2::boolean OR audience='everyone') ORDER BY position ASC,id ASC`,
+    notificationsOnly ? [auth.congregation.id, auth.user.id, includeAdminOnly] : [auth.congregation.id, includeAdminOnly])
     return NextResponse.json({ instructions: result.rows.map(serializeInstruction) })
   } catch (error) { return apiError(error) }
 }
@@ -34,14 +37,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const body = await req.json()
     const title = validateInstructionText(body?.title, 120)
     const instructionBody = validateInstructionText(body?.body, 750000)
+    const audience = validateInstructionAudience(body?.audience)
     if (!title || !instructionBody) return NextResponse.json({ error: "Title and instructions are required (120 and 750,000 characters maximum)." }, { status: 400 })
+    if (!audience) return NextResponse.json({ error: "Choose who can see this instruction." }, { status: 400 })
     await client.query("BEGIN")
     // Reserve the first position for the new instruction without a transient unique-position collision.
     await client.query(`UPDATE congregation_instructions SET position=position+1000000 WHERE congregation_id=$1`, [auth.congregation.id])
     await client.query(`UPDATE congregation_instructions SET position=position-999999 WHERE congregation_id=$1`, [auth.congregation.id])
-    const result = await client.query(`INSERT INTO congregation_instructions(congregation_id,title,body,position,created_by_user_id)
-      VALUES($1,$2,$3,0,$4)
-      RETURNING id,title,body,position,revision,created_at,updated_at`, [auth.congregation.id, title, instructionBody, auth.user.id])
+    const result = await client.query(`INSERT INTO congregation_instructions(congregation_id,title,body,position,created_by_user_id,audience)
+      VALUES($1,$2,$3,0,$4,$5)
+      RETURNING ${COLUMNS}`, [auth.congregation.id, title, instructionBody, auth.user.id, audience])
     const instruction = serializeInstruction(result.rows[0])
     await client.query("COMMIT")
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id, action: "congregation_instruction.created", targetType: "congregation_instruction", targetId: String(instruction.id) })
@@ -76,9 +81,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const id = integer(body?.id)
     const title = validateInstructionText(body?.title, 120)
     const instructionBody = validateInstructionText(body?.body, 750000)
+    const audience = validateInstructionAudience(body?.audience)
     if (!id || !title || !instructionBody) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Instruction ID, title, and instructions are required." }, { status: 400 }) }
-    const result = await client.query(`UPDATE congregation_instructions SET title=$1,body=$2,revision=revision+1,updated_at=NOW()
-      WHERE id=$3 AND congregation_id=$4 RETURNING id,title,body,position,revision,created_at,updated_at`, [title, instructionBody, id, auth.congregation.id])
+    if (!audience) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Choose who can see this instruction." }, { status: 400 }) }
+    const result = await client.query(`UPDATE congregation_instructions SET title=$1,body=$2,audience=$5,revision=revision+1,updated_at=NOW()
+      WHERE id=$3 AND congregation_id=$4 RETURNING ${COLUMNS}`, [title, instructionBody, id, auth.congregation.id, audience])
     if (!result.rowCount) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Instruction not found." }, { status: 404 }) }
     const instruction = serializeInstruction(result.rows[0])
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id, action: "congregation_instruction.updated", targetType: "congregation_instruction", targetId: String(id) })
