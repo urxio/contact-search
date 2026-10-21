@@ -73,7 +73,7 @@ function MemberEditDialog({ slug, member, onClose, onSaved }: { slug: string; me
 
   useEffect(() => {
     if (!member) return
-    const [first = "", ...rest] = member.displayName.trim().split(/\s+/)
+    const [first = "", ...rest] = (member.congregationDisplayName || member.displayName).trim().split(/\s+/)
     setFirstName(first)
     setLastName(rest.join(" "))
   }, [member])
@@ -768,6 +768,12 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             )}
           </CardContent>
         </Card>
+        <MemberEditDialog
+          slug={slug}
+          member={editingMember}
+          onClose={() => setEditingMember(null)}
+          onSaved={() => { setEditingMember(null); loadMembers() }}
+        />
       </TabsContent>
 
       <TabsContent value="invitations">
@@ -777,12 +783,6 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <CardDescription>Create a secure link to copy and share manually.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <MemberEditDialog
-              slug={slug}
-              member={editingMember}
-              onClose={() => setEditingMember(null)}
-              onSaved={() => { setEditingMember(null); loadMembers() }}
-            />
             <Dialog open={Boolean(refreshedInviteUrl)} onOpenChange={(open) => { if (!open) setRefreshedInviteUrl("") }}>
               <DialogContent className="rounded-2xl sm:max-w-md">
                 <DialogHeader>
