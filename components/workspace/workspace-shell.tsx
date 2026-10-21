@@ -37,12 +37,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { CongregationMark } from "./congregation-mark"
@@ -59,11 +54,13 @@ const defaultAccount: WorkspaceAccount = {
   displayName: "Workspace member",
 }
 
-function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boolean }) {
+function WorkspaceNav({ slug, canAdmin = false, compact = false }: { slug: string; canAdmin?: boolean; compact?: boolean }) {
   const pathname = usePathname()
   const searchHref = `/c/${slug}`
   const teamHref = `/c/${slug}/team`
+  const adminHref = `/c/${slug}/admin`
   const isTeam = pathname === teamHref || pathname.startsWith(`${teamHref}/`)
+  const isAdmin = pathname === adminHref || pathname.startsWith(`${adminHref}/`)
   const isSearch = pathname === searchHref
 
   return (
@@ -98,6 +95,20 @@ function WorkspaceNav({ slug, compact = false }: { slug: string; compact?: boole
         <UsersRound className="h-4 w-4" aria-hidden="true" />
         Team Progress
       </Link>
+      {canAdmin ? (
+        <Link
+          href={adminHref}
+          aria-current={isAdmin ? "page" : undefined}
+          className={cn(
+            "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            compact && "w-full justify-start",
+            isAdmin && "bg-background text-foreground shadow-sm ring-2 ring-blue-500 ring-offset-1",
+          )}
+        >
+          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          Admin
+        </Link>
+      ) : null}
     </nav>
   )
 }
@@ -175,22 +186,10 @@ export function WorkspaceShell({
             </DropdownMenu>
 
             <div className="mx-auto hidden lg:block">
-              <WorkspaceNav slug={activeWorkspace.slug} />
+              <WorkspaceNav slug={activeWorkspace.slug} canAdmin={canAdmin} />
             </div>
 
             <div className="ml-auto flex items-center gap-1">
-              {canAdmin ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button asChild variant="ghost" size="icon" className="hidden h-11 w-11 rounded-xl sm:inline-flex">
-                      <Link href={`/c/${activeWorkspace.slug}/admin`} aria-label="Open submissions review">
-                        <ShieldCheck aria-hidden="true" />
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Submissions review</TooltipContent>
-                </Tooltip>
-              ) : null}
               <ThemeSwitcher className="h-11 w-11 rounded-xl shadow-none hover:translate-y-0 hover:bg-muted" />
 
               <DropdownMenu>
@@ -278,18 +277,10 @@ export function WorkspaceShell({
                   <div className="mt-8 space-y-6">
                     <SheetClose asChild>
                       <div>
-                        <WorkspaceNav slug={activeWorkspace.slug} compact />
+                        <WorkspaceNav slug={activeWorkspace.slug} canAdmin={canAdmin} compact />
                       </div>
                     </SheetClose>
                     <div className="border-t pt-4">
-                      {canAdmin ? (
-                        <SheetClose asChild>
-                          <Link href={`/c/${activeWorkspace.slug}/admin`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                            Submissions review
-                          </Link>
-                        </SheetClose>
-                      ) : null}
                       <SheetClose asChild>
                         <Link href={`/c/${activeWorkspace.slug}/settings`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <Settings className="h-4 w-4" aria-hidden="true" />
