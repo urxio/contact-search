@@ -155,7 +155,7 @@ export function ZipCoverage({ slug }: { slug: string }) {
                   </div>
                   {zip.totalPages < 1 ? (
                     <p className="text-sm text-muted-foreground">
-                      Set this ZIP code&apos;s page total in <Link href={`/c/${slug}/admin/settings`} className="text-primary underline underline-offset-2">Settings</Link> before uploading Excels.
+                      Set this ZIP code&apos;s page total in <Link href={`/c/${slug}/admin/settings`} className="text-primary underline underline-offset-2">Congregation settings</Link> before uploading Excels.
                     </p>
                   ) : (
                     <>

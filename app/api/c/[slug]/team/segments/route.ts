@@ -91,6 +91,9 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         [auth.congregation.id, zip.id, pageStart, pageEnd, owner, auth.user.id],
       )
       await client.query("COMMIT")
+      // Feeds Admin > Statistics > Activity.
+      await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id, action: "team.segment.created",
+        targetType: "segment", targetId: String(result.rows[0].id), metadata: { zipcode, pageStart, pageEnd: pageEnd ?? Number(zip.total_pages) } })
       return NextResponse.json(result.rows[0], { status: 201 })
     } catch (error) {
       await client.query("ROLLBACK")
@@ -128,7 +131,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     try {
       await client.query("BEGIN")
       const current = await client.query(
-        `SELECT s.id, s.zipcode_id, z.total_pages, z.zipcode
+        `SELECT s.id, s.zipcode_id, s.status, z.total_pages, z.zipcode
          FROM zt_segments s JOIN zt_zipcodes z
            ON z.id=s.zipcode_id AND z.congregation_id=s.congregation_id
          WHERE s.id=$1 AND s.congregation_id=$2
@@ -157,6 +160,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
          body.notes === undefined ? null : String(body.notes)],
       )
       await client.query("COMMIT")
+      if (segment.status !== status) {
+        await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id, action: "team.segment.status_changed",
+          targetType: "segment", targetId: String(id),
+          metadata: { zipcode: segment.zipcode, pageStart, pageEnd: pageEnd ?? Number(segment.total_pages), status, previousStatus: segment.status } })
+      }
       return NextResponse.json(result.rows[0])
     } catch (error) {
       await client.query("ROLLBACK")
