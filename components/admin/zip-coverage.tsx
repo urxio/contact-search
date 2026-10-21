@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { CheckCircle2, ChevronRight, FileSpreadsheet, FileUp, Minus, Plus, RefreshCw, Search, Share2, UserRound } from "lucide-react"
+import { CheckCircle2, ChevronRight, FileSpreadsheet, FileUp, Minus, Pencil, Plus, RefreshCw, Search, Share2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -310,9 +309,7 @@ export function ZipCoverage({ slug }: { slug: string }) {
                         </span>
                       </button>
                       {zip.totalPages < 1 ? (
-                        <p className="text-sm text-muted-foreground">
-                          Set the page total in <Link href={`/c/${slug}/admin/settings`} className="text-primary underline underline-offset-2">Settings</Link>
-                        </p>
+                        <PageTotalEditor slug={slug} zip={zip} onSaved={load} />
                       ) : next ? (
                         <Button variant="outline" size="sm" disabled={reading} onClick={() => startUpload(zip, next)}
                           className="h-9 shrink-0 rounded-lg border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60">
@@ -339,6 +336,7 @@ export function ZipCoverage({ slug }: { slug: string }) {
                             </Tooltip>
                           ))}
                         </div>
+                        <PageTotalEditor slug={slug} zip={zip} onSaved={load} />
                         <p className="text-xs text-muted-foreground">
                           Each square is {batchPages} {batchPages === 1 ? "page" : "pages"}. Click an amber square to upload its Excel.
                           {batches.length ? ` ${number.format(batches.length)} ${batches.length === 1 ? "batch" : "batches"} left.` : ""}
@@ -354,6 +352,63 @@ export function ZipCoverage({ slug }: { slug: string }) {
       </div>
       <UploadDialog slug={slug} upload={pendingUpload} onClose={() => setPendingUpload(null)} onUploaded={() => { setPendingUpload(null); void load() }} />
     </TooltipProvider>
+  )
+}
+
+/** Sets a ZIP code's page total; shown open when the ZIP has none yet, otherwise behind an edit button. */
+function PageTotalEditor({ slug, zip, onSaved }: { slug: string; zip: ZipRow; onSaved: () => Promise<void> }) {
+  const [editing, setEditing] = useState(zip.totalPages < 1)
+  const [value, setValue] = useState(zip.totalPages > 0 ? String(zip.totalPages) : "")
+  const [saving, setSaving] = useState(false)
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const totalPages = Number(value)
+    if (!Number.isSafeInteger(totalPages) || totalPages < 1) {
+      toast.error("Enter a page total of 1 or more.")
+      return
+    }
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/c/${encodeURIComponent(slug)}/settings/territory-zipcodes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "manual", rows: [{ zipcode: zip.zipcode, city: zip.city, area: zip.area, totalPages, decision: "replace" }] }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "The page total could not be saved")
+      toast.success(`${zip.zipcode} now has ${number.format(totalPages)} pages.`)
+      await onSaved()
+      if (zip.totalPages > 0) setEditing(false)
+    } catch (saveError) {
+      toast.error(saveError instanceof Error ? saveError.message : "The page total could not be saved")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        {number.format(zip.totalPages)} pages total
+        <Button variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-xs" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />Edit
+        </Button>
+      </p>
+    )
+  }
+
+  return (
+    <form onSubmit={save} className="flex items-center gap-2">
+      <Label htmlFor={`page-total-${zip.zipcode}`} className="whitespace-nowrap text-sm font-normal text-muted-foreground">Total pages</Label>
+      <Input id={`page-total-${zip.zipcode}`} type="number" inputMode="numeric" min={1} value={value} autoFocus={zip.totalPages > 0}
+        onChange={(event) => setValue(event.target.value)} className="h-9 w-24 rounded-lg" />
+      <Button type="submit" size="sm" className="h-9 rounded-lg" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      {zip.totalPages > 0 ? (
+        <Button type="button" variant="ghost" size="sm" className="h-9 rounded-lg" disabled={saving}
+          onClick={() => { setEditing(false); setValue(String(zip.totalPages)) }}>Cancel</Button>
+      ) : null}
+    </form>
   )
 }
 
