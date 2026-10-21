@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Copy, Search, Sparkles,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, Bookmark,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { areaColorClass } from "@/lib/area-colors"
@@ -21,6 +21,7 @@ interface ContactTableProps {
   lastVerifiedId: string | null
   onToggleSelectAll: () => void
   onToggleSelection: (id: string) => void
+  onToggleBookmark: (id: string) => void
   onToggleExpanded: (id: string) => void
   onStatusChange: (id: string, status: EnhancedContact["status"]) => void
   onNotesChange: (id: string, notes: string) => void
@@ -44,6 +45,7 @@ export function ContactTable({
   lastVerifiedId,
   onToggleSelectAll,
   onToggleSelection,
+  onToggleBookmark,
   onToggleExpanded,
   onStatusChange,
   onNotesChange,
@@ -94,6 +96,7 @@ export function ContactTable({
                 area={colorByArea ? area : undefined}
                 areaClass={colorByArea ? areaColorClass(area, areaOrder) : null}
                 onToggleSelection={onToggleSelection}
+                onToggleBookmark={onToggleBookmark}
                 onToggleExpanded={onToggleExpanded}
                 onStatusChange={onStatusChange}
                 onNotesChange={onNotesChange}
@@ -115,7 +118,7 @@ export function ContactTable({
 }
 
 type ContactTableRowProps = Pick<ContactTableProps,
-  | "onToggleSelection" | "onToggleExpanded" | "onStatusChange" | "onNotesChange" | "onFieldChange"
+  | "onToggleSelection" | "onToggleBookmark" | "onToggleExpanded" | "onStatusChange" | "onNotesChange" | "onFieldChange"
   | "onAddressUpdateChange" | "onPhoneUpdateChange" | "onTerritoryStatusChange" | "onSearchForebears"
   | "onCopyForebearsSurname" | "onSearchOrigin" | "onSearchTPS"
 > & {
@@ -137,6 +140,7 @@ const ContactTableRow = React.memo(function ContactTableRow({
   area,
   areaClass,
   onToggleSelection,
+  onToggleBookmark,
   onToggleExpanded,
   onStatusChange,
   onNotesChange,
@@ -171,6 +175,8 @@ const ContactTableRow = React.memo(function ContactTableRow({
           isActiveOrigin ? "ring-2 ring-inset ring-indigo-500" : ""
         } ${
           isLastVerified ? "border-l-4 border-l-green-500 dark:border-l-green-400" : ""
+        } ${
+          contact.bookmarked ? "border-t-2 border-t-amber-500" : ""
         }`}
         onClick={() => onToggleExpanded(contact.id)}
       >
@@ -184,6 +190,11 @@ const ContactTableRow = React.memo(function ContactTableRow({
         <TableCell className="font-medium">
           <div className="flex items-center gap-2">
             {contact.fullName}
+            {contact.bookmarked && (
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                You stopped here
+              </span>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -197,6 +208,20 @@ const ContactTableRow = React.memo(function ContactTableRow({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  onClick={(e) => { e.stopPropagation(); onToggleBookmark(contact.id) }}
+                  aria-label={contact.bookmarked ? "Remove bookmark" : "Bookmark where I stopped"}
+                  aria-pressed={Boolean(contact.bookmarked)}
+                  className={`h-5 w-5 shrink-0 ${contact.bookmarked ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Bookmark className={`h-3 w-3 ${contact.bookmarked ? "fill-current" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{contact.bookmarked ? "Remove bookmark" : "Bookmark where I stopped"}</TooltipContent>
             </Tooltip>
             {colorByArea && area && (
               <span className="rounded-full border border-current/10 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">

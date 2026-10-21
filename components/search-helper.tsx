@@ -1386,38 +1386,86 @@ export default function SearchHelper({
     }
   }, [])
 
+  // One bookmark per list: setting it elsewhere moves it. Stored on the contact so it syncs with the draft.
+  const toggleBookmark = useCallback((id: string) => {
+    setContacts((prev) => {
+      const alreadyBookmarked = prev.some((c) => c.id === id && c.bookmarked)
+      return prev.map((c) => {
+        if (c.id === id) return { ...c, bookmarked: !alreadyBookmarked }
+        return c.bookmarked ? { ...c, bookmarked: false } : c
+      })
+    })
+  }, [])
+
+  // Remember the first visible row when the user leaves, as a fallback when nothing is bookmarked.
+  const saveScrollAnchor = useCallback(() => {
+    const rows = document.querySelectorAll<HTMLElement>('[id^="contact-row-"]')
+    for (const row of rows) {
+      const rect = row.getBoundingClientRect()
+      if (rect.bottom > 80) {
+        if (rect.top < window.innerHeight) {
+          try { localStorage.setItem(storageKey("scrollAnchorId"), row.id.replace("contact-row-", "")) } catch {}
+        }
+        return
+      }
+    }
+  }, [storageKey])
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === "hidden") saveScrollAnchor() }
+    document.addEventListener("visibilitychange", onHide)
+    window.addEventListener("pagehide", saveScrollAnchor)
+    return () => {
+      document.removeEventListener("visibilitychange", onHide)
+      window.removeEventListener("pagehide", saveScrollAnchor)
+    }
+  }, [saveScrollAnchor])
+
+  const jumpToContact = useCallback((id: string) => {
+    const element = document.getElementById(`contact-row-${id}`)
+    if (!element) return
+    element.scrollIntoView({ behavior: "smooth", block: "center" })
+    element.classList.add("bg-green-200", "dark:bg-green-800")
+    setTimeout(() => element.classList.remove("bg-green-200", "dark:bg-green-800"), 2000)
+  }, [])
+
   // Offer resume only for the draft restored at startup, never for a new contact interaction.
   const resumeToastChecked = useRef(false)
   useEffect(() => {
     if (resumeToastChecked.current || !draftReadyRef.current || draftSessionLoading) return
     resumeToastChecked.current = true
-    if (draftEditBlocked || originLookup || !lastVerifiedId || contacts.length === 0) return
+    if (draftEditBlocked || originLookup || contacts.length === 0) return
 
-    const lastContact = contacts.find((c) => c.id === lastVerifiedId)
-    if (!lastContact) return
+    const lastContact = lastVerifiedId ? contacts.find((c) => c.id === lastVerifiedId) : undefined
+    const bookmarked = contacts.find((c) => c.bookmarked)
+    let scrollAnchor: typeof bookmarked
+    try {
+      const anchorId = localStorage.getItem(storageKey("scrollAnchorId"))
+      scrollAnchor = anchorId ? contacts.find((c) => c.id === anchorId) : undefined
+    } catch {}
+    // A manual bookmark wins over the automatic scroll position.
+    const stopped = bookmarked ?? (scrollAnchor && scrollAnchor.id !== lastContact?.id ? scrollAnchor : undefined)
+    if (!lastContact && !stopped) return
 
     // Small delay so the page has rendered the contact rows first
     const timer = setTimeout(() => {
       toast("Welcome back!", {
         id: "welcome-back",
-        description: `Pick up where you left off — last verified: ${lastContact.fullName}`,
-        duration: 8000,
+        description: lastContact
+          ? `Pick up where you left off — last verified: ${lastContact.fullName}`
+          : `Pick up where you stopped: ${stopped!.fullName}`,
+        duration: 10000,
         action: {
-          label: "Resume",
-          onClick: () => {
-            const element = document.getElementById(`contact-row-${lastVerifiedId}`)
-            if (element) {
-              element.scrollIntoView({ behavior: "smooth", block: "center" })
-              element.classList.add("bg-green-200", "dark:bg-green-800")
-              setTimeout(() => element.classList.remove("bg-green-200", "dark:bg-green-800"), 2000)
-            }
-          },
+          label: lastContact ? "Resume" : bookmarked ? "Go to bookmark" : "Go to where I stopped",
+          onClick: () => jumpToContact((lastContact ?? stopped!).id),
         },
+        cancel: lastContact && stopped
+          ? { label: bookmarked ? "Go to bookmark" : "Where I stopped", onClick: () => jumpToContact(stopped.id) }
+          : undefined,
       })
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [contacts, draftEditBlocked, draftSessionLoading, lastVerifiedId, originLookup])
+  }, [contacts, draftEditBlocked, draftSessionLoading, jumpToContact, lastVerifiedId, originLookup, storageKey])
 
   // Add keyboard shortcuts for batch operations
   // Add this to the useEffect for keyboard shortcuts
@@ -1886,6 +1934,7 @@ export default function SearchHelper({
     localStorage.removeItem(storageKey("territoryZipcode"))
     localStorage.removeItem(storageKey("territoryPageRange"))
     localStorage.removeItem(storageKey("lastVerifiedId"))
+    localStorage.removeItem(storageKey("scrollAnchorId"))
     if (workspaceSlug) {
       if (draftAutosaveTimerRef.current != null) {
         window.clearTimeout(draftAutosaveTimerRef.current)
@@ -2748,6 +2797,7 @@ export default function SearchHelper({
                       lastVerifiedId={lastVerifiedId}
                       onToggleSelectAll={toggleSelectAll}
                       onToggleSelection={toggleContactSelection}
+                      onToggleBookmark={toggleBookmark}
                       onToggleExpanded={toggleContactExpanded}
                       onStatusChange={handleStatusChange}
                       onNotesChange={handleNotesChange}
@@ -2772,6 +2822,7 @@ export default function SearchHelper({
                       selectedContacts={selectedContacts}
                       lastVerifiedId={lastVerifiedId}
                       onToggleSelection={toggleContactSelection}
+                      onToggleBookmark={toggleBookmark}
                       onToggleExpanded={toggleContactExpanded}
                       onStatusChange={handleStatusChange}
                       onNotesChange={handleNotesChange}

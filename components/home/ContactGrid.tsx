@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Clock, StickyNote, AlertCircleIcon, Phone, MapPin, Globe, Copy, Search, Sparkles,
-  CheckCircle2, XCircle, RefreshCw, CircleSlash,
+  CheckCircle2, XCircle, RefreshCw, CircleSlash, Bookmark,
 } from "lucide-react"
 import type { EnhancedContact, BaseContact } from "@/types/contact"
 import { areaColorClass } from "@/lib/area-colors"
@@ -21,6 +21,7 @@ interface ContactGridProps {
   selectedContacts: string[]
   lastVerifiedId: string | null
   onToggleSelection: (id: string) => void
+  onToggleBookmark: (id: string) => void
   onToggleExpanded: (id: string) => void
   onStatusChange: (id: string, status: EnhancedContact["status"]) => void
   onNotesChange: (id: string, notes: string) => void
@@ -62,6 +63,7 @@ export function ContactGrid({
   selectedContacts,
   lastVerifiedId,
   onToggleSelection,
+  onToggleBookmark,
   onToggleExpanded,
   onStatusChange,
   onNotesChange,
@@ -93,6 +95,7 @@ export function ContactGrid({
             area={colorByArea ? area : undefined}
             areaClass={colorByArea ? areaColorClass(area, areaOrder) : null}
             onToggleSelection={onToggleSelection}
+            onToggleBookmark={onToggleBookmark}
             onToggleExpanded={onToggleExpanded}
             onStatusChange={onStatusChange}
             onNotesChange={onNotesChange}
@@ -112,7 +115,7 @@ export function ContactGrid({
 }
 
 type ContactGridCardProps = Pick<ContactGridProps,
-  | "onToggleSelection" | "onToggleExpanded" | "onStatusChange" | "onNotesChange" | "onFieldChange"
+  | "onToggleSelection" | "onToggleBookmark" | "onToggleExpanded" | "onStatusChange" | "onNotesChange" | "onFieldChange"
   | "onAddressUpdateChange" | "onPhoneUpdateChange" | "onTerritoryStatusChange" | "onSearchForebears"
   | "onCopyForebearsSurname" | "onSearchOrigin" | "onSearchTPS"
 > & {
@@ -133,6 +136,7 @@ const ContactGridCard = React.memo(function ContactGridCard({
   area,
   areaClass,
   onToggleSelection,
+  onToggleBookmark,
   onToggleExpanded,
   onStatusChange,
   onNotesChange,
@@ -149,7 +153,7 @@ const ContactGridCard = React.memo(function ContactGridCard({
     <Card
       key={contact.id}
       id={`contact-row-${contact.id}`}
-      className={`overflow-hidden cursor-pointer ${areaClass ?? ""} ${isLastVerified ? "border-l-4 border-l-green-500" : ""} ${isActiveOrigin ? "ring-2 ring-indigo-500" : ""}`}
+      className={`overflow-hidden cursor-pointer ${areaClass ?? ""} ${isLastVerified ? "border-l-4 border-l-green-500" : ""} ${contact.bookmarked ? "border-t-2 border-t-amber-500" : ""} ${isActiveOrigin ? "ring-2 ring-indigo-500" : ""}`}
       onClick={() => onToggleExpanded(contact.id)}
     >
       <CardHeader className="pb-2">
@@ -162,6 +166,11 @@ const ContactGridCard = React.memo(function ContactGridCard({
                 onClick={(e) => e.stopPropagation()}
               />
               <CardTitle className="text-base">{contact.fullName}</CardTitle>
+              {contact.bookmarked && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                  You stopped here
+                </span>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -175,6 +184,20 @@ const ContactGridCard = React.memo(function ContactGridCard({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{contact.lastName?.trim() ? "Copy surname" : "A last name is required"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button" variant="ghost" size="icon"
+                    onClick={(e) => { e.stopPropagation(); onToggleBookmark(contact.id) }}
+                    aria-label={contact.bookmarked ? "Remove bookmark" : "Bookmark where I stopped"}
+                    aria-pressed={Boolean(contact.bookmarked)}
+                    className={`h-5 w-5 shrink-0 ${contact.bookmarked ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Bookmark className={`h-3 w-3 ${contact.bookmarked ? "fill-current" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{contact.bookmarked ? "Remove bookmark" : "Bookmark where I stopped"}</TooltipContent>
               </Tooltip>
             </div>
             {area && (

@@ -23,4 +23,5 @@ export interface EnhancedContact extends BaseContact {
   territoryStatus: boolean
   frenchNameMatched?: boolean
   nameFeedback?: "french" | "not-french"
+  bookmarked?: boolean
 }

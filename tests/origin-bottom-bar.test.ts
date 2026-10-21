@@ -18,7 +18,7 @@ const contact: EnhancedContact = {
 
 const handlers = {
   contacts: [contact], selectedContacts: [], lastVerifiedId: null,
-  onToggleSelection: vi.fn(), onToggleExpanded: vi.fn(), onStatusChange: vi.fn(),
+  onToggleSelection: vi.fn(), onToggleBookmark: vi.fn(), onToggleExpanded: vi.fn(), onStatusChange: vi.fn(),
   onNotesChange: vi.fn(), onFieldChange: vi.fn(), onAddressUpdateChange: vi.fn(),
   onPhoneUpdateChange: vi.fn(), onTerritoryStatusChange: vi.fn(),
   onSearchForebears: vi.fn(), onSearchOrigin: vi.fn(), onSearchTPS: vi.fn(),
