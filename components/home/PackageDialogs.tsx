@@ -112,6 +112,12 @@ function isClaimableByViewer(row: PackageRow) {
 
 const PAGE_SIZE = 25
 
+const PILL = "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+const PILL_SUCCESS = "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+const PILL_WARNING = "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+const PILL_ACCENT = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+const PILL_NEUTRAL = "border bg-muted/40 text-muted-foreground"
+
 type ExcelFilter = { id: string; label: string; test: (row: PackageRow) => boolean }
 
 const SORT_LABELS = { recent: "Most recent", name: "Name A–Z", zip: "ZIP code" } as const
@@ -269,13 +275,15 @@ export function PackageDialogs({
 
   const selectedZip = useMemo(() => zipcodes.find((item) => item.zipcode === zipcode), [zipcode, zipcodes])
   const visibleZipcodes = useMemo(() => zipcodes.filter((item) => showAllZipcodes || item.zipcode.includes(zipcode)), [showAllZipcodes, zipcode, zipcodes])
-  const myExcels = useMemo(() => packages.filter((row) => row.state !== "completed"), [packages])
+  const isOwnExcel = (row: PackageRow) => Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer") ||
+    (value<boolean>(row, "isMine", "is_mine") && (row.visibility === "private" || row.state !== "available")))
+  const ownExcels = useMemo(() => packages.filter((row) => row.state !== "completed" && isOwnExcel(row)), [packages])
+  const otherExcels = useMemo(() => packages.filter((row) => row.state !== "completed" && !isOwnExcel(row)), [packages])
   const myFilters = useMemo<ExcelFilter[]>(() => [
     { id: "all", label: "All", test: () => true },
-    { id: "mine", label: "Mine", test: (row) => Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer") || (value<boolean>(row, "isMine", "is_mine") && row.state !== "available") || (row.visibility === "private" && value<boolean>(row, "isMine", "is_mine"))) },
     { id: "available", label: "Available", test: (row) => row.state === "available" },
     { id: "in_progress", label: "In progress", test: (row) => row.state === "in_progress" },
-    { id: "private", label: "Private", test: (row) => row.visibility === "private" },
+    { id: "assigned", label: "Assigned", test: (row) => row.state === "assigned" },
   ], [])
   const libraryFilters = useMemo<ExcelFilter[]>(() => [
     { id: "all", label: "All", test: () => true },
@@ -568,7 +576,7 @@ export function PackageDialogs({
           <p className="mt-0.5 text-xs font-normal text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · ${updatedLabel}` : ""}</p>
           <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5"><span className={`${PILL} ${PILL_NEUTRAL}`}>{row.visibility === "private" ? "Private" : "Shared"}</span>{isAssignedToViewer ? <span className={`${PILL} ${PILL_ACCENT}`}>Assigned to you</span> : null}<span className={`${PILL} capitalize ${row.state === "available" ? PILL_SUCCESS : row.state === "in_progress" ? PILL_WARNING : row.state === "assigned" ? PILL_ACCENT : PILL_NEUTRAL}`}>{packageStatus}</span></div>
         <div className="flex shrink-0 items-center justify-end gap-1.5">
           {!assignedToAnotherMember ? <Button className="h-9 rounded-lg px-4" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
           {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
@@ -677,7 +685,7 @@ export function PackageDialogs({
               >
                 <UserRound className="shrink-0 text-primary" aria-hidden="true" />
                 <span>
-                  <span className="block text-sm font-semibold">{uploadAction === "save" ? "Saving…" : "Save in My Excels"}</span>
+                  <span className="block text-sm font-semibold">{uploadAction === "save" ? "Saving…" : "Save in Your Excels"}</span>
                   <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Keep it private for later</span>
                 </span>
               </Button>
@@ -708,9 +716,16 @@ export function PackageDialogs({
             <p className="py-10 text-center text-sm font-normal leading-relaxed text-muted-foreground">Loading Excels…</p>
           ) : (
             <Tabs defaultValue="mine" className="py-2">
-              <TabsList className="w-full sm:w-auto"><TabsTrigger value="mine" className="flex-1 sm:flex-none">My Excels</TabsTrigger>{canManagePackages ? <TabsTrigger value="library" className="flex-1 sm:flex-none">Congregation Library</TabsTrigger> : null}</TabsList>
-              <TabsContent value="mine" className="pt-4">
-                <ExcelBrowser rows={myExcels} filters={myFilters} renderRow={(row) => renderPackageCard(row)} searchLabel="Search your Excels" />
+              <TabsList className="w-full sm:w-auto"><TabsTrigger value="mine" className="flex-1 sm:flex-none">Excels</TabsTrigger>{canManagePackages ? <TabsTrigger value="library" className="flex-1 sm:flex-none">Congregation Library</TabsTrigger> : null}</TabsList>
+              <TabsContent value="mine" className="space-y-6 pt-4">
+                <section aria-labelledby="own-excels-title" className="space-y-2 rounded-xl border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900/60 dark:bg-blue-950/20">
+                  <div className="flex items-center gap-2"><UserRound className="h-4 w-4 text-blue-700 dark:text-blue-300" aria-hidden="true" /><h3 id="own-excels-title" className="text-sm font-semibold">Your Excels</h3><span className={`${PILL} ${PILL_ACCENT}`}>{ownExcels.length}</span></div>
+                  {ownExcels.length ? <div className="divide-y rounded-lg border bg-background">{ownExcels.map((row) => renderPackageCard(row))}</div> : <p className="rounded-lg border border-dashed bg-background/60 px-4 py-5 text-center text-sm text-muted-foreground">Excels you upload privately or claim will appear here.</p>}
+                </section>
+                <section aria-labelledby="all-excels-title" className="space-y-2">
+                  <div className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" /><h3 id="all-excels-title" className="text-sm font-semibold">Congregation Excels</h3></div>
+                  <ExcelBrowser rows={otherExcels} filters={myFilters} renderRow={(row) => renderPackageCard(row)} searchLabel="Search congregation Excels" />
+                </section>
               </TabsContent>
               {canManagePackages ? <TabsContent value="library" className="pt-4">
                 <ExcelBrowser rows={libraryPackages} filters={libraryFilters} renderRow={(row) => renderPackageCard(row, true)} searchLabel="Search congregation Excel library" />
