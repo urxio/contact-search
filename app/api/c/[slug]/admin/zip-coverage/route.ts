@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireCongregationAdmin } from "@/lib/auth"
 import { pool } from "@/lib/db"
 import { orderedTeamAreas } from "@/lib/team-areas"
-import { coverageRanges, pagesIn } from "@/lib/zip-coverage"
+import { coverageRanges, pagesIn, uploadBatchPages } from "@/lib/zip-coverage"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../../_shared"
 
 // Page-by-page coverage for every ZIP code, so admins can see which ranges still need an Excel.
@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     ])
     const byZip = new Map<number, typeof segments.rows>()
     for (const row of segments.rows) byZip.set(Number(row.zipcode_id), [...(byZip.get(Number(row.zipcode_id)) ?? []), row])
-    const settings = (auth.congregation.settings ?? {}) as { teamProgressAreaOrder?: unknown }
+    const settings = (auth.congregation.settings ?? {}) as { teamProgressAreaOrder?: unknown; uploadBatchPages?: unknown }
     const areas = orderedTeamAreas(zipcodes.rows.map((row) => String(row.territory)), settings.teamProgressAreaOrder)
     const rows = zipcodes.rows.map((zip) => {
       const totalPages = Number(zip.total_pages)
@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
         claimedPages: pagesIn(ranges, "claimed"), completedPages: pagesIn(ranges, "completed"),
       }
     })
-    return NextResponse.json({ rows, areas })
+    return NextResponse.json({ rows, areas, batchPages: uploadBatchPages(settings.uploadBatchPages) })
   } catch (error) {
     return apiError(error)
   }

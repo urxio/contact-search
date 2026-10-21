@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, requireMembership, validateMutationOrigin } from "@/lib/auth"
+import { MAX_UPLOAD_BATCH_PAGES, MIN_UPLOAD_BATCH_PAGES } from "@/lib/zip-coverage"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../_shared"
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
@@ -42,6 +43,13 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         return NextResponse.json({ error: "Team territories must be a list." }, { status: 400 })
       }
       settingsPatch.teamTerritories = body.teamTerritories
+    }
+    if (body.uploadBatchPages !== undefined) {
+      const pages = Number(body.uploadBatchPages)
+      if (!Number.isInteger(pages) || pages < MIN_UPLOAD_BATCH_PAGES || pages > MAX_UPLOAD_BATCH_PAGES) {
+        return NextResponse.json({ error: `Pages per upload must be between ${MIN_UPLOAD_BATCH_PAGES} and ${MAX_UPLOAD_BATCH_PAGES}.` }, { status: 400 })
+      }
+      settingsPatch.uploadBatchPages = pages
     }
     try {
       const result = await pool.query(

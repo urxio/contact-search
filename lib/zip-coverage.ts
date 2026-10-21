@@ -46,3 +46,27 @@ export function coverageRanges(totalPages: number, segments: CoverageSegment[]):
 export function pagesIn(ranges: CoverageRange[], state: CoverageState) {
   return ranges.filter((range) => range.state === state).reduce((total, range) => total + range.pageEnd - range.pageStart + 1, 0)
 }
+
+export const DEFAULT_UPLOAD_BATCH_PAGES = 10
+export const MIN_UPLOAD_BATCH_PAGES = 1
+export const MAX_UPLOAD_BATCH_PAGES = 100
+
+/** The congregation's pages-per-upload setting, falling back to the default when unset or invalid. */
+export function uploadBatchPages(value: unknown) {
+  const pages = Number(value)
+  return Number.isInteger(pages) && pages >= MIN_UPLOAD_BATCH_PAGES && pages <= MAX_UPLOAD_BATCH_PAGES ? pages : DEFAULT_UPLOAD_BATCH_PAGES
+}
+
+/** Splits open ranges into suggested uploads whose boundaries land on multiples of batchPages (e.g. 26–30, 31–40). */
+export function uploadBatches(ranges: CoverageRange[], batchPages: number) {
+  const batches: { pageStart: number; pageEnd: number }[] = []
+  for (const range of ranges) {
+    if (range.state !== "open") continue
+    for (let start = range.pageStart; start <= range.pageEnd;) {
+      const end = Math.min(range.pageEnd, Math.ceil(start / batchPages) * batchPages)
+      batches.push({ pageStart: start, pageEnd: end })
+      start = end + 1
+    }
+  }
+  return batches
+}

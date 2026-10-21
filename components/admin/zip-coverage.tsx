@@ -1,15 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { CheckCircle2, FileUp, RefreshCw, Search } from "lucide-react"
+import { CheckCircle2, FileUp, Minus, Plus, RefreshCw, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { CoverageRange, CoverageState } from "@/lib/zip-coverage"
+import {
+  DEFAULT_UPLOAD_BATCH_PAGES, MAX_UPLOAD_BATCH_PAGES, MIN_UPLOAD_BATCH_PAGES, uploadBatches,
+  type CoverageRange, type CoverageState,
+} from "@/lib/zip-coverage"
 import { cn } from "@/lib/utils"
 
 type ZipRow = {
@@ -41,6 +44,9 @@ export function ZipCoverage({ slug }: { slug: string }) {
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [view, setView] = useState<"open" | "all">("open")
+  const [batchPages, setBatchPages] = useState(DEFAULT_UPLOAD_BATCH_PAGES)
+  const [batchSave, setBatchSave] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const load = useCallback(async () => {
     setError(null)
@@ -50,12 +56,35 @@ export function ZipCoverage({ slug }: { slug: string }) {
       if (!response.ok) throw new Error(result.error || "Unable to load ZIP coverage")
       setRows(result.rows)
       setAreas(result.areas)
+      setBatchPages(result.batchPages)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load ZIP coverage")
     }
   }, [slug])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => () => clearTimeout(saveTimer.current), [])
+
+  // Steps apply instantly; the congregation setting is saved once clicking pauses.
+  const changeBatchPages = (delta: number) => {
+    const next = Math.min(MAX_UPLOAD_BATCH_PAGES, Math.max(MIN_UPLOAD_BATCH_PAGES, batchPages + delta))
+    if (next === batchPages) return
+    setBatchPages(next)
+    setBatchSave("saving")
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/c/${encodeURIComponent(slug)}/settings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadBatchPages: next }),
+        })
+        setBatchSave(response.ok ? "saved" : "error")
+      } catch {
+        setBatchSave("error")
+      }
+    }, 600)
+  }
 
   const groups = useMemo(() => {
     if (!rows) return []
@@ -130,10 +159,25 @@ export function ZipCoverage({ slug }: { slug: string }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legend">
-          {(Object.keys(STATES) as CoverageState[]).map((state) => (
-            <span key={state} className="inline-flex items-center gap-1.5"><span className={cn("h-2.5 w-2.5 rounded-sm", STATES[state].dot)} aria-hidden="true" />{STATES[state].label}</span>
-          ))}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legend">
+            {(Object.keys(STATES) as CoverageState[]).map((state) => (
+              <span key={state} className="inline-flex items-center gap-1.5"><span className={cn("h-2.5 w-2.5 rounded-sm", STATES[state].dot)} aria-hidden="true" />{STATES[state].label}</span>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Pages per upload</span>
+            <div className="inline-flex items-center rounded-xl border bg-card">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-l-xl rounded-r-none" aria-label="Fewer pages per upload"
+                onClick={() => changeBatchPages(-1)} disabled={batchPages <= MIN_UPLOAD_BATCH_PAGES}><Minus aria-hidden="true" /></Button>
+              <span className="min-w-8 text-center font-semibold tabular-nums" aria-live="polite">{batchPages}</span>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-l-none rounded-r-xl" aria-label="More pages per upload"
+                onClick={() => changeBatchPages(1)} disabled={batchPages >= MAX_UPLOAD_BATCH_PAGES}><Plus aria-hidden="true" /></Button>
+            </div>
+            <span className={cn("w-16 text-xs text-muted-foreground", batchSave === "error" && "text-destructive")} aria-live="polite">
+              {batchSave === "saving" ? "Saving…" : batchSave === "saved" ? "Saved" : batchSave === "error" ? "Not saved" : ""}
+            </span>
+          </div>
         </div>
 
         {groups.length === 0 ? (
@@ -173,11 +217,13 @@ export function ZipCoverage({ slug }: { slug: string }) {
                       </div>
                       {zip.openPages ? (
                         <div className="flex flex-wrap gap-2">
-                          {zip.ranges.filter((range) => range.state === "open").map((range) => (
-                            <Button key={range.pageStart} asChild variant="outline" size="sm" className="h-9 rounded-lg border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950/40">
+                          {uploadBatches(zip.ranges, batchPages).map((range, index) => (
+                            <Button key={range.pageStart} asChild variant="outline" size="sm"
+                              className={cn("h-9 rounded-lg border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950/40",
+                                index === 0 && "bg-amber-50 dark:bg-amber-950/40")}>
                               <Link href={`/c/${slug}?uploadZip=${encodeURIComponent(zip.zipcode)}&uploadPages=${range.pageStart}-${range.pageEnd}`}>
                                 <FileUp aria-hidden="true" />
-                                Upload {pages(range).toLocaleLowerCase()}
+                                {pages(range)}
                               </Link>
                             </Button>
                           ))}
