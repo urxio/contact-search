@@ -68,6 +68,25 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     if (userId === auth.user.id && (role === "member" || status === "inactive")) {
       return NextResponse.json({ error: "You cannot remove your own admin access." }, { status: 400 })
     }
+    if (body.displayName !== undefined) {
+      const accountName = String(body.displayName).trim().replace(/\s+/g, " ")
+      if (!accountName) return NextResponse.json({ error: "Name cannot be empty." }, { status: 400 })
+      const updated = await pool.query(
+        `UPDATE users SET display_name = $3
+         WHERE id = $2 AND EXISTS (SELECT 1 FROM congregation_memberships WHERE congregation_id = $1 AND user_id = $2)
+         RETURNING id`,
+        [auth.congregation.id, userId, accountName],
+      )
+      if (!updated.rows[0]) return NextResponse.json({ error: "Member not found." }, { status: 404 })
+      // Keep an existing congregation-specific name in step with the renamed account.
+      await pool.query(
+        `UPDATE congregation_memberships SET display_name = $3, updated_at = NOW()
+         WHERE congregation_id = $1 AND user_id = $2 AND display_name IS NOT NULL`,
+        [auth.congregation.id, userId, accountName],
+      )
+      await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
+        action: "member.profile_updated", targetType: "user", targetId: String(userId) })
+    }
     const displayName = body.congregationDisplayName === undefined ? null : String(body.congregationDisplayName).trim()
     const result = await pool.query(
       `UPDATE congregation_memberships SET
