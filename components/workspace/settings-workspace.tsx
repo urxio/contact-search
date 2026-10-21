@@ -117,6 +117,9 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
   const [members, setMembers] = useState<Member[]>([])
   const [legacyIdentities, setLegacyIdentities] = useState<LegacyIdentity[]>([])
   const [membersLoading, setMembersLoading] = useState(true)
+  const [editingMember, setEditingMember] = useState<Member | null>(null)
+  const [memberNameDraft, setMemberNameDraft] = useState("")
+  const [memberSaving, setMemberSaving] = useState(false)
   const [territoryRows, setTerritoryRows] = useState<TerritoryZipRow[]>([])
   const [territoryAreas, setTerritoryAreas] = useState<string[]>([])
   const [territoryRowsLoading, setTerritoryRowsLoading] = useState(true)
@@ -551,6 +554,25 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
     return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value))
   }
 
+  async function saveMemberProfile(event: FormEvent) {
+    event.preventDefault()
+    if (!editingMember) return
+    setMemberSaving(true)
+    const response = await fetch(`/api/c/${slug}/members`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: editingMember.userId, congregationDisplayName: memberNameDraft.trim() }),
+    })
+    setMemberSaving(false)
+    if (!response.ok) {
+      toast.error("Member profile could not be updated")
+      return
+    }
+    toast.success("Member profile updated")
+    setEditingMember(null)
+    loadMembers()
+  }
+
   async function updateMember(member: Member, changes: Partial<Pick<Member, "role" | "status">>) {
     const response = await fetch(`/api/c/${slug}/members`, {
       method: "PATCH",
@@ -667,6 +689,10 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
                       <Button type="button" variant="outline" onClick={() => updateMember(member, { status: member.status === "active" ? "inactive" : "active" })} className="min-h-11 rounded-xl">
                         {member.status === "active" ? "Deactivate" : "Reactivate"}
                       </Button>
+                      <Button type="button" variant="outline" onClick={() => { setEditingMember(member); setMemberNameDraft(member.congregationDisplayName || member.displayName) }} className="min-h-11 rounded-xl">
+                        <Pencil aria-hidden="true" />
+                        Edit
+                      </Button>
                       <Button type="button" variant="ghost" onClick={() => copyPasswordReset(member)} className="min-h-11 rounded-xl">
                         <Copy aria-hidden="true" />
                         Reset link
@@ -712,6 +738,28 @@ export function SettingsWorkspace({ slug, initialName }: SettingsWorkspaceProps)
             <CardDescription>Create a secure link to copy and share manually.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <Dialog open={Boolean(editingMember)} onOpenChange={(open) => { if (!open) setEditingMember(null) }}>
+              <DialogContent className="rounded-2xl sm:max-w-md">
+                <form onSubmit={saveMemberProfile} className="grid gap-4">
+                  <DialogHeader>
+                    <DialogTitle className="text-base font-semibold">Edit member profile</DialogTitle>
+                    <DialogDescription>Change how this member appears in this congregation. Leave blank to use their account name.</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-2">
+                    <Label htmlFor="member-profile-name">Display name</Label>
+                    <Input id="member-profile-name" value={memberNameDraft} onChange={(event) => setMemberNameDraft(event.target.value)} placeholder={editingMember?.displayName} className="min-h-11 rounded-xl" />
+                    <p className="text-xs font-normal text-muted-foreground">{editingMember?.email}</p>
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditingMember(null)} className="min-h-11 rounded-xl">Cancel</Button>
+                    <Button type="submit" disabled={memberSaving} className="min-h-11 rounded-xl">
+                      {memberSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                      Save
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
             <Dialog open={Boolean(refreshedInviteUrl)} onOpenChange={(open) => { if (!open) setRefreshedInviteUrl("") }}>
               <DialogContent className="rounded-2xl sm:max-w-md">
                 <DialogHeader>
