@@ -13,7 +13,7 @@ export function AdminSubnav({ slug }: { slug: string }) {
   const tabs = [
     { href: `${base}/stats`, label: "Statistics", icon: BarChart3 },
     { href: base, label: "Submissions", icon: Inbox },
-    { href: `${base}/zip-coverage`, label: "ZIP coverage", icon: MapPinned },
+    { href: `${base}/zip-codes`, label: "ZIP codes", icon: MapPinned },
     { href: `${base}/settings`, label: "Congregation settings", icon: Settings },
   ]
   const sections = tabs.map((tab) => tab.href).filter((href) => href !== base)

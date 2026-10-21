@@ -87,7 +87,7 @@ export function AdminStats({ slug }: { slug: string }) {
         </div>
 
         {data.pages.open > 0 ? (
-          <Link href={`/c/${slug}/admin/zip-coverage`} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60">
+          <Link href={`/c/${slug}/admin/zip-codes/coverage`} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60">
             <MapPinned className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="flex-1">{number.format(data.pages.open)} pages have no Excel yet, so members can&apos;t claim them.</span>
             <span className="inline-flex items-center gap-1 font-medium">See ZIP coverage<ArrowRight className="h-4 w-4" aria-hidden="true" /></span>
