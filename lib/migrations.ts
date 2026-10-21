@@ -309,6 +309,15 @@ const migrations: Migration[] = [{
       PRIMARY KEY(user_id,instruction_id,instruction_revision)
     )`)
   }
+},{
+  version:23,name:"current segment owner names",async run(client){
+    // Owner names were copied as text when a segment was taken; bring renamed members up to date.
+    await client.query(`UPDATE zt_segments s
+      SET owner=COALESCE((SELECT NULLIF(TRIM(m.display_name),'') FROM congregation_memberships m
+        WHERE m.user_id=s.owner_user_id AND m.congregation_id=s.congregation_id),u.display_name)
+      FROM users u
+      WHERE s.owner_user_id=u.id`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version
