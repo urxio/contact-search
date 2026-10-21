@@ -36,6 +36,7 @@ import { loadDictionaryIfNeeded, isPotentiallyFrench } from "@/utils/french-name
 // Home sub-components
 import { ImportBar } from "@/components/home/ImportBar"
 import { PackageDialogs, type PendingPackageUpload } from "@/components/home/PackageDialogs"
+import { ExcelColumnsError, readContactsExcel } from "@/lib/contacts-excel"
 import { TerritoryNotes } from "@/components/home/TerritoryNotes"
 import { StatsBar } from "@/components/home/StatsBar"
 import { BatchActionBar } from "@/components/home/BatchActionBar"
@@ -48,16 +49,6 @@ import { forebearsSurnameUrl, normalizeSurname } from "@/lib/surname-countries"
 import type { SurnameOriginEntry } from "@/lib/surname-origins"
 
 // Add a useRef for the file input at the top of the component with the other state variables
-
-// Update the fixed column indices to match the new format
-const FIXED_COLUMNS = {
-  FIRST_NAME: 0, // 1st column
-  LAST_NAME: 1, // 2nd column
-  ADDRESS: 2, // 3rd column
-  CITY: 3, // 4th column
-  ZIPCODE: 4, // 5th column
-  PHONE: 5, // 6th column
-}
 
 // EnhancedContact and BaseContact are imported from @/types/contact
 
@@ -779,7 +770,7 @@ export default function SearchHelper({
     window.history.replaceState(window.history.state, "", url)
   }, [])
 
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
       console.log("No file selected")
@@ -790,146 +781,68 @@ export default function SearchHelper({
     setIsLoading(true)
     setError(null)
 
-    const reader = new FileReader()
+    try {
+      const processedContacts = (await readContactsExcel(file)).map((contact) => ({
+        ...contact,
+        id: Math.random().toString(36).substring(2, 11),
+        status: "Not checked" as const,
+        notes: "",
+        isExpanded: false,
+        checkedOnTPS: false,
+        checkedOnOTM: false,
+        checkedOnForebears: false,
+        checkedOnOrigin: false,
+        needAddressUpdate: false,
+        needPhoneUpdate: false,
+        territoryStatus: false, // Initialize territory status
+      }))
 
-    reader.onload = async (e) => {
-      try {
-        const XLSX = await import("xlsx")
-        const data = e.target?.result
-        const workbook = XLSX.read(data, { type: "binary" })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
+      // Mark duplicate addresses before setting state
+      const seen = new Map<string, boolean>()
+      const deduped = processedContacts.map((c) => {
+        const key = `${c.address} ${c.city} ${c.zipcode}`.toLowerCase().replace(/\s+/g, " ").trim()
+        if (!key) return c
+        if (seen.has(key)) return { ...c, status: "Duplicate" as const }
+        seen.set(key, true)
+        return c
+      })
 
-        // Convert to array of arrays for simpler processing
-        const rawData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 })
-
-        if (rawData.length <= 1) {
-          // Check if there's data beyond the header row
-          throw new Error("No data found in the Excel file")
-        }
-
-        // Validate header row columns
-        const REQUIRED_COLUMNS: { name: string; index: number; aliases: string[] }[] = [
-          { name: "First Name", index: FIXED_COLUMNS.FIRST_NAME, aliases: ["first name", "firstname", "first"] },
-          { name: "Last Name",  index: FIXED_COLUMNS.LAST_NAME,  aliases: ["last name", "lastname", "last"] },
-          { name: "Address",    index: FIXED_COLUMNS.ADDRESS,    aliases: ["address", "addr", "street"] },
-          { name: "City",       index: FIXED_COLUMNS.CITY,       aliases: ["city"] },
-          { name: "Zipcode",    index: FIXED_COLUMNS.ZIPCODE,    aliases: ["zipcode", "zip code", "zip", "postal code", "postal"] },
-          { name: "Phone",      index: FIXED_COLUMNS.PHONE,      aliases: ["phone", "phone number", "telephone", "tel"] },
-        ]
-
-        const headerRow: string[] = (rawData[0] as any[]).map((h) =>
-          String(h ?? "").toLowerCase().trim()
-        )
-
-        const missingColumns: string[] = []
-        for (const col of REQUIRED_COLUMNS) {
-          const headerAtIndex = headerRow[col.index] ?? ""
-          const matchesAlias = col.aliases.some((alias) => headerAtIndex.includes(alias))
-          if (!matchesAlias) {
-            // Also check if the header exists anywhere in the row (wrong order)
-            const foundElsewhere = headerRow.some((h) => col.aliases.some((alias) => h.includes(alias)))
-            if (foundElsewhere) {
-              missingColumns.push(`"${col.name}" found but in the wrong column position (expected column ${col.index + 1})`)
-            } else {
-              missingColumns.push(`"${col.name}" (expected in column ${col.index + 1})`)
-            }
-          }
-        }
-
-        if (missingColumns.length > 0) {
-          const errorMsg = `Invalid column format. Missing or misplaced columns:\n• ${missingColumns.join("\n• ")}\n\nRequired order: First Name, Last Name, Address, City, Zipcode, Phone`
-          setError(errorMsg)
-          toast.error("Invalid file format", {
-            description: `${missingColumns.length} column${missingColumns.length > 1 ? "s" : ""} missing or misplaced. Check the error details above.`,
-            duration: 6000,
-          })
-          setIsLoading(false)
-          return
-        }
-
-        // Skip header row (index 0) and process data rows
-        const processedContacts = rawData.slice(1).map((row) => {
-          // Extract values by position based on the new format
-          const firstName = String(row[FIXED_COLUMNS.FIRST_NAME] || "")
-          const lastName = String(row[FIXED_COLUMNS.LAST_NAME] || "")
-          const address = String(row[FIXED_COLUMNS.ADDRESS] || "")
-          const city = String(row[FIXED_COLUMNS.CITY] || "")
-          const zipcode = String(row[FIXED_COLUMNS.ZIPCODE] || "")
-          const phone = String(row[FIXED_COLUMNS.PHONE] || "")
-
-          // Combine first and last name
-          const fullName = `${firstName} ${lastName}`.trim()
-
-          // Create enhanced contact with ID and default values
-          return {
-            firstName,
-            lastName,
-            fullName,
-            address,
-            city,
-            zipcode,
-            phone,
-            id: Math.random().toString(36).substring(2, 11),
-            status: "Not checked" as const,
-            notes: "",
-            isExpanded: false,
-            checkedOnTPS: false,
-            checkedOnOTM: false,
-            checkedOnForebears: false,
-            checkedOnOrigin: false,
-            needAddressUpdate: false,
-            needPhoneUpdate: false,
-            territoryStatus: false, // Initialize territory status
-          }
+      if (workspaceSlug) {
+        setPendingPackageUpload({
+          filename: file.name,
+          contacts: deduped.map(({ firstName, lastName, fullName, address, city, zipcode, phone }) => ({
+            firstName, lastName, fullName, address, city, zipcode, phone,
+          })),
+          ...uploadPresetRef.current,
         })
-
-        // Mark duplicate addresses before setting state
-        const seen = new Map<string, boolean>()
-        const deduped = processedContacts.map((c) => {
-          const key = `${c.address} ${c.city} ${c.zipcode}`.toLowerCase().replace(/\s+/g, " ").trim()
-          if (!key) return c
-          if (seen.has(key)) return { ...c, status: "Duplicate" as const }
-          seen.set(key, true)
-          return c
-        })
-
-        if (workspaceSlug) {
-          setPendingPackageUpload({
-            filename: file.name,
-            contacts: deduped.map(({ firstName, lastName, fullName, address, city, zipcode, phone }) => ({
-              firstName, lastName, fullName, address, city, zipcode, phone,
-            })),
-            ...uploadPresetRef.current,
-          })
-          if (uploadPresetRef.current) clearUploadPreset()
-        } else {
-          setContacts(deduped)
-          setFileUploaded(true)
-        }
-        // Run French name detection automatically after import (non-blocking)
-        if (!workspaceSlug) setTimeout(() => {
-          try {
-            ; (detectFrenchNames as any)?.(false, deduped, true)
-          } catch (e) {
-            console.warn("detectFrenchNames not available yet", e)
-          }
-        }, 50)
-      } catch (error) {
-        console.error("Error parsing Excel file:", error)
-        setError(`Error parsing Excel file: ${error instanceof Error ? error.message : "Unknown error"}`)
-        setContacts([])
-      } finally {
-        setIsLoading(false)
+        if (uploadPresetRef.current) clearUploadPreset()
+      } else {
+        setContacts(deduped)
+        setFileUploaded(true)
       }
-    }
-
-    reader.onerror = () => {
+      // Run French name detection automatically after import (non-blocking)
+      if (!workspaceSlug) setTimeout(() => {
+        try {
+          ; (detectFrenchNames as any)?.(false, deduped, true)
+        } catch (e) {
+          console.warn("detectFrenchNames not available yet", e)
+        }
+      }, 50)
+    } catch (error) {
+      if (error instanceof ExcelColumnsError) {
+        setError(error.message)
+        toast.error("Invalid file format", {
+          description: `${error.problems.length} column${error.problems.length > 1 ? "s" : ""} missing or misplaced. Check the error details above.`,
+          duration: 6000,
+        })
+        return
+      }
+      console.error("Error parsing Excel file:", error)
+      setError(`Error parsing Excel file: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setContacts([])
+    } finally {
       setIsLoading(false)
-      setError("Error reading file. Please try again.")
     }
-
-    reader.readAsBinaryString(file)
   }, [clearUploadPreset, workspaceSlug])
 
   const loadPackageDraft = useCallback((draft: any, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => {
