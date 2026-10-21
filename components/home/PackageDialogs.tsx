@@ -134,11 +134,12 @@ function rowTime(row: PackageRow) {
   return raw ? new Date(raw).getTime() || 0 : 0
 }
 
-function ExcelBrowser({ rows, filters, renderRow, searchLabel }: {
+function ExcelBrowser({ rows, filters, renderRow, searchLabel, placeholder = "Search name, member, or ZIP" }: {
   rows: PackageRow[]
   filters: ExcelFilter[]
   renderRow: (row: PackageRow) => React.ReactNode
   searchLabel: string
+  placeholder?: string
 }) {
   const [search, setSearch] = useState("")
   const [filterId, setFilterId] = useState("all")
@@ -176,7 +177,7 @@ function ExcelBrowser({ rows, filters, renderRow, searchLabel }: {
     <div className="space-y-3">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input value={search} onChange={(event) => { setSearch(event.target.value); setShown(PAGE_SIZE) }} placeholder="Search name, member, or ZIP" className="admin-field h-11 pl-10" aria-label={searchLabel} />
+        <Input value={search} onChange={(event) => { setSearch(event.target.value); setShown(PAGE_SIZE) }} placeholder={placeholder} className="admin-field h-11 pl-10" aria-label={searchLabel} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-1 flex-wrap gap-1.5" role="group" aria-label="Filter Excels">
@@ -576,7 +577,7 @@ export function PackageDialogs({
           <p className="mt-0.5 text-xs font-normal text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · ${updatedLabel}` : ""}</p>
           <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5"><span className={`${PILL} ${PILL_NEUTRAL}`}>{row.visibility === "private" ? "Private" : "Shared"}</span>{isAssignedToViewer ? <span className={`${PILL} ${PILL_ACCENT}`}>Assigned to you</span> : null}<span className={`${PILL} capitalize ${row.state === "available" ? PILL_SUCCESS : row.state === "in_progress" ? PILL_WARNING : row.state === "assigned" ? PILL_ACCENT : PILL_NEUTRAL}`}>{packageStatus}</span></div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">{row.visibility === "private" || !isOwnExcel(row) ? <span className={`${PILL} ${PILL_NEUTRAL}`}>{row.visibility === "private" ? "Private" : "Shared"}</span> : null}{isAssignedToViewer ? <span className={`${PILL} ${PILL_ACCENT}`}>Assigned to you</span> : null}<span className={`${PILL} capitalize ${row.state === "available" ? PILL_SUCCESS : row.state === "in_progress" ? PILL_WARNING : row.state === "assigned" ? PILL_ACCENT : PILL_NEUTRAL}`}>{packageStatus}</span></div>
         <div className="flex shrink-0 items-center justify-end gap-1.5">
           {!assignedToAnotherMember ? <Button className="h-9 rounded-lg px-4" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
           {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
@@ -724,7 +725,7 @@ export function PackageDialogs({
                 </section>
                 <section aria-labelledby="all-excels-title" className="space-y-2">
                   <div className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" /><h3 id="all-excels-title" className="text-sm font-semibold">Congregation Excels</h3></div>
-                  <ExcelBrowser rows={otherExcels} filters={myFilters} renderRow={(row) => renderPackageCard(row)} searchLabel="Search congregation Excels" />
+                  <ExcelBrowser rows={otherExcels} filters={myFilters} renderRow={(row) => renderPackageCard(row)} searchLabel="Search congregation Excels" placeholder="Search city or ZIP" />
                 </section>
               </TabsContent>
               {canManagePackages ? <TabsContent value="library" className="pt-4">
