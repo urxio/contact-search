@@ -1,7 +1,7 @@
 "use client"
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Check, ChevronDown, FileSpreadsheet, MoreHorizontal, PackageOpen, Search, UserRound, UsersRound } from "lucide-react"
+import { Archive, Check, ChevronDown, ChevronRight, FileSpreadsheet, MoreHorizontal, Search, UserRound, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -110,6 +110,120 @@ function isClaimableByViewer(row: PackageRow) {
     row.state === "available"
 }
 
+const PAGE_SIZE = 25
+
+type ExcelFilter = { id: string; label: string; test: (row: PackageRow) => boolean }
+
+const SORT_LABELS = { recent: "Most recent", name: "Name A–Z", zip: "ZIP code" } as const
+type SortKey = keyof typeof SORT_LABELS
+
+function rowSearchText(row: PackageRow) {
+  return [row.name, row.originalFilename, row.original_filename, row.uploader?.displayName, row.uploaderName,
+    row.segment?.owner, row.segment?.zipcode, row.segment?.city, row.zipcode, row.ownerName, row.owner_name]
+    .filter(Boolean).join(" ").toLocaleLowerCase()
+}
+
+function rowTime(row: PackageRow) {
+  const raw = value<string | Date>(row, "updatedAt", "updated_at")
+  return raw ? new Date(raw).getTime() || 0 : 0
+}
+
+function ExcelBrowser({ rows, filters, renderRow, searchLabel }: {
+  rows: PackageRow[]
+  filters: ExcelFilter[]
+  renderRow: (row: PackageRow) => React.ReactNode
+  searchLabel: string
+}) {
+  const [search, setSearch] = useState("")
+  const [filterId, setFilterId] = useState("all")
+  const [sort, setSort] = useState<SortKey>("recent")
+  const [shown, setShown] = useState(PAGE_SIZE)
+  const [grouped, setGrouped] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const counts = useMemo(() => Object.fromEntries(filters.map((filter) => [filter.id, rows.filter(filter.test).length])), [filters, rows])
+  const visibleChips = filters.filter((filter) => filter.id === "all" || counts[filter.id] > 0 || filter.id === filterId)
+  const results = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    const active = filters.find((filter) => filter.id === filterId) ?? filters[0]
+    const matches = rows.filter((row) => active.test(row) && (!query || rowSearchText(row).includes(query)))
+    return [...matches].sort((a, b) => {
+      if (sort === "name") return a.name.localeCompare(b.name, undefined, { numeric: true })
+      if (sort === "zip") return (a.segment?.zipcode ?? a.zipcode).localeCompare(b.segment?.zipcode ?? b.zipcode) || a.name.localeCompare(b.name, undefined, { numeric: true })
+      return rowTime(b) - rowTime(a)
+    })
+  }, [rows, filters, filterId, search, sort])
+
+  const groups = useMemo(() => {
+    const map = new Map<string, PackageRow[]>()
+    for (const row of results) {
+      const zip = row.segment?.zipcode ?? row.zipcode ?? "—"
+      map.set(zip, [...(map.get(zip) ?? []), row])
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [results])
+  const toggleGroup = (zip: string) => setCollapsed((prev) => { const next = new Set(prev); if (next.has(zip)) next.delete(zip); else next.add(zip); return next })
+  const filtered = Boolean(search.trim()) || filterId !== "all"
+  const page = results.slice(0, shown)
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Input value={search} onChange={(event) => { setSearch(event.target.value); setShown(PAGE_SIZE) }} placeholder="Search name, member, or ZIP" className="admin-field h-11 pl-10" aria-label={searchLabel} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-1 flex-wrap gap-1.5" role="group" aria-label="Filter Excels">
+          {visibleChips.map((filter) => (
+            <button key={filter.id} type="button" aria-pressed={filterId === filter.id} onClick={() => { setFilterId(filter.id); setShown(PAGE_SIZE) }}
+              className={`min-h-8 rounded-full border px-3 text-xs font-medium transition-colors ${filterId === filter.id ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
+              {filter.label} <span className="font-normal opacity-80">{counts[filter.id]}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" aria-pressed={grouped} onClick={() => setGrouped((on) => !on)}
+          className={`min-h-8 rounded-lg border px-3 text-xs font-medium transition-colors ${grouped ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
+          Group by ZIP
+        </button>
+        {grouped ? null : <Select value={sort} onValueChange={(next) => setSort(next as SortKey)}>
+          <SelectTrigger className="admin-field h-8 w-auto gap-1.5 text-xs" aria-label="Sort Excels"><SelectValue /></SelectTrigger>
+          <SelectContent>{(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <SelectItem key={key} value={key}>{SORT_LABELS[key]}</SelectItem>)}</SelectContent>
+        </Select>}
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground" aria-live="polite">
+        <span>{results.length === rows.length ? `${rows.length.toLocaleString()} Excels` : `${results.length.toLocaleString()} of ${rows.length.toLocaleString()} Excels`}</span>
+        {filtered ? <button type="button" className="font-medium text-primary hover:underline" onClick={() => { setSearch(""); setFilterId("all"); setShown(PAGE_SIZE) }}>Clear filters</button> : null}
+      </div>
+      {results.length && grouped ? (
+        <div className="space-y-2">
+          <div className="flex justify-end"><button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(groups.map(([zip]) => zip)))}>{collapsed.size ? "Expand all" : "Collapse all"}</button></div>
+          {groups.map(([zip, groupRows]) => {
+            const open = !collapsed.has(zip)
+            const city = groupRows.find((row) => row.segment?.city)?.segment?.city
+            const availableCount = groupRows.filter((row) => row.state === "available").length
+            return (
+              <section key={zip} className="overflow-hidden rounded-xl border">
+                <button type="button" aria-expanded={open} onClick={() => toggleGroup(zip)} className="flex w-full items-center gap-2 bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50">
+                  <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
+                  <span className="text-sm font-semibold">{zip}{city ? ` ${city}` : ""}</span>
+                  <Badge variant="secondary">{groupRows.length}</Badge>
+                  {availableCount ? <span className="text-xs text-muted-foreground">{availableCount} available</span> : null}
+                </button>
+                {open ? <div className="divide-y border-t">{groupRows.map((row) => renderRow(row))}</div> : null}
+              </section>
+            )
+          })}
+        </div>
+      ) : page.length && !grouped ? (
+        <div className="divide-y rounded-xl border">{page.map((row) => renderRow(row))}</div>
+      ) : (
+        <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">{rows.length ? "No Excels match" : "No Excels yet"}</p><p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">{rows.length ? "Try another name, member, or ZIP code, or clear the filters." : "Excels you can access will appear here."}</p></div>
+      )}
+      {!grouped && results.length > shown ? <Button variant="outline" className="h-10 w-full rounded-xl" onClick={() => setShown((count) => count + PAGE_SIZE)}>Show {Math.min(PAGE_SIZE, results.length - shown)} more <span className="ml-1 font-normal text-muted-foreground">({(results.length - shown).toLocaleString()} remaining)</span></Button> : null}
+    </div>
+  )
+}
+
 export function PackageDialogs({
   slug,
   draftSessionId,
@@ -132,9 +246,6 @@ export function PackageDialogs({
   const [zipcodes, setZipcodes] = useState<ZipcodeRow[]>([])
   const [packages, setPackages] = useState<PackageRow[]>([])
   const [libraryPackages, setLibraryPackages] = useState<PackageRow[]>([])
-  const [librarySearch, setLibrarySearch] = useState("")
-  const [libraryStatus, setLibraryStatus] = useState("all")
-  const [libraryVisibility, setLibraryVisibility] = useState("all")
   const [name, setName] = useState("")
   const [zipcode, setZipcode] = useState("")
   const [zipPickerOpen, setZipPickerOpen] = useState(false)
@@ -158,39 +269,22 @@ export function PackageDialogs({
 
   const selectedZip = useMemo(() => zipcodes.find((item) => item.zipcode === zipcode), [zipcode, zipcodes])
   const visibleZipcodes = useMemo(() => zipcodes.filter((item) => showAllZipcodes || item.zipcode.includes(zipcode)), [showAllZipcodes, zipcode, zipcodes])
-  const packageSections = useMemo(() => [
-    {
-      id: "my-excels",
-      title: "Private Excels",
-      description: "Excels assigned to you, plus your unassigned private uploads.",
-      emptyTitle: "No private Excels",
-      emptyDescription: "Private Excels you can access will appear here.",
-      icon: UserRound,
-      rows: packages.filter((row) => value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer") ||
-        (row.visibility === "private" && value<boolean>(row, "isMine", "is_mine") && row.state === "available")),
-    },
-    {
-      id: "congregation-excels",
-      title: "Congregation Excels",
-      description: "Available shared Excels from your congregation.",
-      emptyTitle: "No shared Excels available",
-      emptyDescription: "New shared Excels will appear here when they are ready to claim.",
-      icon: UsersRound,
-      rows: packages.filter((row) => row.visibility === "shared" && !value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer")),
-    },
-  ], [packages])
-  const filteredLibraryPackages = useMemo(() => {
-    const query = librarySearch.trim().toLocaleLowerCase()
-    return libraryPackages.filter((row) => {
-      const state = row.state ?? ""
-      if (libraryStatus !== "all" && state !== libraryStatus) return false
-      if (libraryVisibility !== "all" && row.visibility !== libraryVisibility) return false
-      if (!query) return true
-      const searchable = [row.name, row.originalFilename, row.original_filename, row.uploader?.displayName, row.uploaderName,
-        row.segment?.owner, row.segment?.zipcode, row.segment?.city, row.zipcode].filter(Boolean).join(" ").toLocaleLowerCase()
-      return searchable.includes(query)
-    })
-  }, [libraryPackages, librarySearch, libraryStatus, libraryVisibility])
+  const myExcels = useMemo(() => packages.filter((row) => row.state !== "completed"), [packages])
+  const myFilters = useMemo<ExcelFilter[]>(() => [
+    { id: "all", label: "All", test: () => true },
+    { id: "mine", label: "Mine", test: (row) => Boolean(value<boolean>(row, "isAssignedToViewer", "is_assigned_to_viewer") || (value<boolean>(row, "isMine", "is_mine") && row.state !== "available") || (row.visibility === "private" && value<boolean>(row, "isMine", "is_mine"))) },
+    { id: "available", label: "Available", test: (row) => row.state === "available" },
+    { id: "in_progress", label: "In progress", test: (row) => row.state === "in_progress" },
+    { id: "private", label: "Private", test: (row) => row.visibility === "private" },
+  ], [])
+  const libraryFilters = useMemo<ExcelFilter[]>(() => [
+    { id: "all", label: "All", test: () => true },
+    { id: "available", label: "Available", test: (row) => row.state === "available" },
+    { id: "assigned", label: "Assigned", test: (row) => row.state === "assigned" },
+    { id: "in_progress", label: "In progress", test: (row) => row.state === "in_progress" },
+    { id: "private", label: "Private", test: (row) => row.visibility === "private" },
+    { id: "shared", label: "Shared", test: (row) => row.visibility === "shared" },
+  ], [])
   const packageToOpenIsClaim = Boolean(packageToOpen && isClaimableByViewer(packageToOpen))
 
   useEffect(() => {
@@ -467,17 +561,17 @@ export function PackageDialogs({
     const updatedLabel = updatedAt ? new Date(updatedAt).toLocaleDateString() : null
 
     return (
-      <div key={row.id} className="admin-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-4 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-        <div className="admin-icon-well flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"><PackageOpen className="h-5 w-5" aria-hidden="true" /></div>
+      <div key={row.id} className="flex min-w-0 flex-wrap items-center gap-3 px-3 py-3 sm:flex-nowrap">
+        <FileSpreadsheet className="hidden h-5 w-5 shrink-0 text-primary sm:block" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="max-w-full break-words text-base font-semibold [overflow-wrap:anywhere]">{row.name}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
-          <p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · Updated ${updatedLabel}` : ""}</p>
-          {library ? <div className="mt-1 space-y-0.5 text-xs font-normal text-muted-foreground"><p>Uploaded by {uploader}</p><p>{assignedOwner ? `Assigned to ${assignedOwner}` : "Unassigned"}</p></div> : <p className="mt-1 text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>}
+          <p className="max-w-full truncate text-sm font-semibold" title={row.name}>{row.name}</p>
+          <p className="mt-0.5 text-xs font-normal text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · ${updatedLabel}` : ""}</p>
+          <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>
         </div>
-        <div className="col-span-2 flex w-full items-center justify-end gap-2 sm:col-span-1 sm:w-auto">
-          {!assignedToAnotherMember ? <Button className="min-h-11 rounded-xl" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
-          {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5"><Badge variant="outline">{row.visibility === "private" ? "Private" : "Shared"}</Badge>{isAssignedToViewer ? <Badge>Assigned to you</Badge> : null}<Badge variant="secondary" className="capitalize">{packageStatus}</Badge></div>
+        <div className="flex shrink-0 items-center justify-end gap-1.5">
+          {!assignedToAnotherMember ? <Button className="h-9 rounded-lg px-4" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
+          {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
         </div>
       </div>
     )
@@ -605,7 +699,7 @@ export function PackageDialogs({
       </Dialog>
 
       <Dialog open={browseOpen} onOpenChange={onBrowseOpenChange}>
-        <DialogContent className="admin-material !inset-0 m-auto h-fit max-h-[88vh] w-[calc(100vw-2rem)] !transform-none overflow-x-hidden overflow-y-auto rounded-2xl data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:max-w-2xl">
+        <DialogContent className="admin-material !inset-0 m-auto h-fit max-h-[88vh] w-[calc(100vw-2rem)] !transform-none overflow-x-hidden overflow-y-auto rounded-2xl data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:max-w-3xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-semibold">Browse Excels</DialogTitle>
             <DialogDescription>Your Excels and, for admins, congregation-wide management.</DialogDescription>
@@ -615,18 +709,11 @@ export function PackageDialogs({
           ) : (
             <Tabs defaultValue="mine" className="py-2">
               <TabsList className="w-full sm:w-auto"><TabsTrigger value="mine" className="flex-1 sm:flex-none">My Excels</TabsTrigger>{canManagePackages ? <TabsTrigger value="library" className="flex-1 sm:flex-none">Congregation Library</TabsTrigger> : null}</TabsList>
-              <TabsContent value="mine" className="space-y-8 pt-4">
-                {packageSections.map((section) => (
-                  <section key={section.id} aria-labelledby={`${section.id}-title`} className="space-y-3">
-                    <div className="flex items-start gap-3"><span className="admin-icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-primary"><section.icon className="h-5 w-5" aria-hidden="true" /></span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 id={`${section.id}-title`} className="text-base font-semibold">{section.title}</h3><Badge variant="secondary" aria-label={`${section.rows.length} ${section.title}`}>{section.rows.length}</Badge></div><p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">{section.description}</p></div></div>
-                    {section.rows.length ? <div className="space-y-3">{section.rows.map((row) => renderPackageCard(row))}</div> : <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">{section.emptyTitle}</p><p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">{section.emptyDescription}</p></div>}
-                  </section>
-                ))}
+              <TabsContent value="mine" className="pt-4">
+                <ExcelBrowser rows={myExcels} filters={myFilters} renderRow={(row) => renderPackageCard(row)} searchLabel="Search your Excels" />
               </TabsContent>
-              {canManagePackages ? <TabsContent value="library" className="space-y-4 pt-4">
-                <div><h3 className="text-base font-semibold">Congregation Excel Library</h3><p className="mt-1 text-sm font-normal leading-relaxed text-muted-foreground">All active and available Excels, including private uploads. Completed work is not shown.</p></div>
-                <div className="grid gap-3 sm:grid-cols-3"><Input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Search Excels, people, ZIP…" className="admin-field h-11 sm:col-span-3" aria-label="Search congregation Excel library" /><Select value={libraryStatus} onValueChange={setLibraryStatus}><SelectTrigger className="admin-field h-11"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="available">Available</SelectItem><SelectItem value="assigned">Assigned</SelectItem><SelectItem value="in_progress">In progress</SelectItem></SelectContent></Select><Select value={libraryVisibility} onValueChange={setLibraryVisibility}><SelectTrigger className="admin-field h-11"><SelectValue placeholder="Visibility" /></SelectTrigger><SelectContent><SelectItem value="all">All visibility</SelectItem><SelectItem value="private">Private</SelectItem><SelectItem value="shared">Shared</SelectItem></SelectContent></Select></div>
-                {filteredLibraryPackages.length ? <div className="space-y-3">{filteredLibraryPackages.map((row) => renderPackageCard(row, true))}</div> : <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-8 text-center"><Archive className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" /><p className="mt-3 text-base font-semibold">No Excels match these filters</p><p className="mx-auto mt-1 max-w-md text-sm font-normal leading-relaxed text-muted-foreground">Try another name, member, ZIP code, status, or visibility.</p></div>}
+              {canManagePackages ? <TabsContent value="library" className="pt-4">
+                <ExcelBrowser rows={libraryPackages} filters={libraryFilters} renderRow={(row) => renderPackageCard(row, true)} searchLabel="Search congregation Excel library" />
               </TabsContent> : null}
             </Tabs>
           )}
