@@ -180,20 +180,20 @@ function ExcelBrowser({ rows, filters, renderRow, searchLabel, placeholder = "Se
         <Input value={search} onChange={(event) => { setSearch(event.target.value); setShown(PAGE_SIZE) }} placeholder={placeholder} className="admin-field h-11 pl-10" aria-label={searchLabel} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-1 flex-wrap gap-1.5" role="group" aria-label="Filter Excels">
+        <div className="flex w-full flex-wrap gap-1.5 sm:w-auto sm:flex-1" role="group" aria-label="Filter Excels">
           {visibleChips.map((filter) => (
             <button key={filter.id} type="button" aria-pressed={filterId === filter.id} onClick={() => { setFilterId(filter.id); setShown(PAGE_SIZE) }}
-              className={`min-h-8 rounded-full border px-3 text-xs font-medium transition-colors ${filterId === filter.id ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
+              className={`min-h-9 rounded-full border px-3.5 text-xs sm:min-h-8 sm:px-3 font-medium transition-colors ${filterId === filter.id ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
               {filter.label} <span className="font-normal opacity-80">{counts[filter.id]}</span>
             </button>
           ))}
         </div>
         <button type="button" aria-pressed={grouped} onClick={() => setGrouped((on) => !on)}
-          className={`min-h-8 rounded-lg border px-3 text-xs font-medium transition-colors ${grouped ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
+          className={`min-h-9 rounded-lg border px-3 text-xs sm:min-h-8 font-medium transition-colors ${grouped ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50"}`}>
           Group by ZIP
         </button>
         {grouped ? null : <Select value={sort} onValueChange={(next) => setSort(next as SortKey)}>
-          <SelectTrigger className="admin-field h-8 w-auto gap-1.5 text-xs" aria-label="Sort Excels"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="admin-field h-9 w-auto gap-1.5 text-xs sm:h-8" aria-label="Sort Excels"><SelectValue /></SelectTrigger>
           <SelectContent>{(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <SelectItem key={key} value={key}>{SORT_LABELS[key]}</SelectItem>)}</SelectContent>
         </Select>}
       </div>
@@ -570,16 +570,16 @@ export function PackageDialogs({
     const updatedLabel = updatedAt ? new Date(updatedAt).toLocaleDateString() : null
 
     return (
-      <div key={row.id} className="flex min-w-0 flex-wrap items-center gap-3 px-3 py-3 sm:flex-nowrap">
+      <div key={row.id} className="flex min-w-0 flex-col gap-2.5 px-3 py-3 sm:flex-row sm:items-center sm:gap-3">
         <FileSpreadsheet className="hidden h-5 w-5 shrink-0 text-primary sm:block" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="max-w-full truncate text-sm font-semibold" title={row.name}>{row.name}</p>
+          <p className="max-w-full break-words text-sm font-semibold [overflow-wrap:anywhere] sm:truncate" title={row.name}>{row.name}</p>
           <p className="mt-0.5 text-xs font-normal text-muted-foreground">ZIP {row.segment?.zipcode ?? row.zipcode} · pages {pageStartValue}–{pageEndValue} · {contactCount.toLocaleString()} contacts{updatedLabel ? ` · ${updatedLabel}` : ""}</p>
           <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">{assignedOwner ? `Assigned to ${assignedOwner}` : `Uploaded by ${uploader}`}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">{row.visibility === "private" || !isOwnExcel(row) ? <span className={`${PILL} ${PILL_NEUTRAL}`}>{row.visibility === "private" ? "Private" : "Shared"}</span> : null}{isAssignedToViewer ? <span className={`${PILL} ${PILL_ACCENT}`}>Assigned to you</span> : null}<span className={`${PILL} capitalize ${row.state === "available" ? PILL_SUCCESS : row.state === "in_progress" ? PILL_WARNING : row.state === "assigned" ? PILL_ACCENT : PILL_NEUTRAL}`}>{packageStatus}</span></div>
-        <div className="flex shrink-0 items-center justify-end gap-1.5">
-          {!assignedToAnotherMember ? <Button className="h-9 rounded-lg px-4" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
+        <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">{row.visibility === "private" || !isOwnExcel(row) ? <span className={`${PILL} ${PILL_NEUTRAL}`}>{row.visibility === "private" ? "Private" : "Shared"}</span> : null}{isAssignedToViewer ? <span className={`${PILL} ${PILL_ACCENT}`}>Assigned to you</span> : null}<span className={`${PILL} capitalize ${row.state === "available" ? PILL_SUCCESS : row.state === "in_progress" ? PILL_WARNING : row.state === "assigned" ? PILL_ACCENT : PILL_NEUTRAL}`}>{packageStatus}</span></div>
+        <div className="flex items-center gap-2 sm:shrink-0 sm:justify-end">
+          {!assignedToAnotherMember ? <Button className="h-10 flex-1 rounded-lg px-4 sm:h-9 sm:flex-none" disabled={!canOpen || busy} onClick={() => { onBrowseOpenChange(false); setPackageToOpen(row) }}>{openLabel}</Button> : null}
           {canManage ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" aria-label={`Manage ${row.name}`}><MoreHorizontal aria-hidden="true" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl p-2"><DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => { onBrowseOpenChange(false); setEditingPackage(row); setEditName(row.name); setEditVisibility(row.visibility) }}>Edit details</DropdownMenuItem>{row.canAssign ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => beginAssign(row)}>Assign or reassign member</DropdownMenuItem> : null}{row.state !== "available" ? <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => packageAction(row, "release")}>Unassign & make available</DropdownMenuItem> : null}<DropdownMenuSeparator /><DropdownMenuItem className="min-h-11 rounded-lg text-destructive focus:text-destructive" onSelect={() => { onBrowseOpenChange(false); setPackageToDelete(row) }}>Delete Excel</DropdownMenuItem></DropdownMenuContent></DropdownMenu> : null}
         </div>
       </div>
