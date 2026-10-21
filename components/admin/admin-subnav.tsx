@@ -22,8 +22,8 @@ export function AdminSubnav({ slug }: { slug: string }) {
     : pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <nav aria-label="Admin sections" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <div className="flex min-w-max gap-1 border-b">
+    <nav aria-label="Admin sections">
+      <div className="grid grid-cols-2 gap-1 rounded-xl border bg-muted/60 p-1 sm:grid-cols-4">
         {tabs.map(({ href, label, icon: Icon }) => {
           const active = isActive(href)
           return (
@@ -32,11 +32,13 @@ export function AdminSubnav({ slug }: { slug: string }) {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-blue-500 text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-center text-sm leading-tight sm:px-4 font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
               )}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
+              <Icon className={cn("h-4 w-4 shrink-0", active && "text-blue-600 dark:text-blue-400")} aria-hidden="true" />
               {label}
             </Link>
           )
