@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { auditEvent, requireCongregationAdmin, validateMutationOrigin } from "@/lib/auth"
+import { syncSegmentOwnerNames } from "@/lib/team-segments"
 import { apiError, assertMultiTenantEnabled, integer, RouteContext } from "../../_shared"
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
@@ -97,6 +98,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       [auth.congregation.id, userId, displayName, role, status, body.congregationDisplayName !== undefined],
     )
     if (!result.rows[0]) return NextResponse.json({ error: "Member not found." }, { status: 404 })
+    if (body.displayName !== undefined || body.congregationDisplayName !== undefined) {
+      await syncSegmentOwnerNames(pool, userId, auth.congregation.id)
+    }
     await auditEvent({ actorUserId: auth.user.id, congregationId: auth.congregation.id,
       action: "membership.updated", targetType: "user", targetId: String(userId),
       metadata: { role, status } })

@@ -63,3 +63,21 @@ export async function assertNoSegmentConflict(client: PoolClient, input: {
     pageStart: Number(row.page_start), pageEnd: Number(row.page_end), status: row.status, packageName: row.package_name || null,
   })
 }
+
+/**
+ * Re-copies a member's current name (congregation name, else account name) onto
+ * the segments they own, so Team Progress reflects renames.
+ */
+export async function syncSegmentOwnerNames(db: Pick<PoolClient, "query">, userId: number, congregationId?: number) {
+  await db.query(
+    `UPDATE zt_segments s
+        SET owner = COALESCE(
+              (SELECT NULLIF(TRIM(m.display_name), '') FROM congregation_memberships m
+                WHERE m.user_id = s.owner_user_id AND m.congregation_id = s.congregation_id),
+              u.display_name)
+       FROM users u
+      WHERE u.id = $1 AND s.owner_user_id = u.id
+        AND ($2::bigint IS NULL OR s.congregation_id = $2)`,
+    [userId, congregationId ?? null],
+  )
+}

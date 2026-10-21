@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { auditEvent, requireMembership, validateMutationOrigin } from "@/lib/auth"
 import { pool } from "@/lib/db"
+import { syncSegmentOwnerNames } from "@/lib/team-segments"
 import { apiError, assertMultiTenantEnabled, RouteContext } from "../../_shared"
 
 const validTheme = new Set(["light", "dark"])
@@ -111,6 +112,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
             WHERE user_id=$1 AND congregation_id=$2 AND status='active'`,
           [auth.user.id, auth.congregation.id, congregationDisplayName],
         )
+      }
+      if (displayName !== undefined || congregationDisplayName !== undefined) {
+        await syncSegmentOwnerNames(client, auth.user.id)
       }
       await client.query("COMMIT")
     } catch (error) {
