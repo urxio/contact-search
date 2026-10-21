@@ -155,6 +155,10 @@ export default function SearchHelper({
   const [error, setError] = useState<string | null>(null)
   const [fileUploaded, setFileUploaded] = useState(false)
   const [pendingPackageUpload, setPendingPackageUpload] = useState<PendingPackageUpload | null>(null)
+  // Set by Admin > ZIP coverage links (?uploadZip=…&uploadPages=…) and applied to the next upload.
+  const [uploadPreset, setUploadPreset] = useState<{ zipcode: string; pageStart: number; pageEnd: number } | null>(null)
+  const uploadPresetRef = useRef(uploadPreset)
+  uploadPresetRef.current = uploadPreset
   const [packageBrowserOpen, setPackageBrowserOpen] = useState(false)
   const [preferredPackageId, setPreferredPackageId] = useState<number | null>(null)
   const [activePackages, setActivePackages] = useState<Array<{ id: number; name: string; state: "assigned" | "in_progress"; isMine: boolean }>>([])
@@ -756,6 +760,25 @@ export default function SearchHelper({
   }, [])
 
   // Updated file upload function for the new format
+  useEffect(() => {
+    if (!workspaceSlug) return
+    const params = new URLSearchParams(window.location.search)
+    const zipcode = params.get("uploadZip")?.trim() ?? ""
+    const range = params.get("uploadPages")?.match(/^(\d+)-(\d+)$/)
+    if (!/^\d{5}$/.test(zipcode) || !range) return
+    const pageStart = Number(range[1])
+    const pageEnd = Number(range[2])
+    if (pageStart >= 1 && pageEnd >= pageStart) setUploadPreset({ zipcode, pageStart, pageEnd })
+  }, [workspaceSlug])
+
+  const clearUploadPreset = useCallback(() => {
+    setUploadPreset(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete("uploadZip")
+    url.searchParams.delete("uploadPages")
+    window.history.replaceState(window.history.state, "", url)
+  }, [])
+
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
@@ -877,7 +900,9 @@ export default function SearchHelper({
             contacts: deduped.map(({ firstName, lastName, fullName, address, city, zipcode, phone }) => ({
               firstName, lastName, fullName, address, city, zipcode, phone,
             })),
+            ...uploadPresetRef.current,
           })
+          if (uploadPresetRef.current) clearUploadPreset()
         } else {
           setContacts(deduped)
           setFileUploaded(true)
@@ -905,7 +930,7 @@ export default function SearchHelper({
     }
 
     reader.readAsBinaryString(file)
-  }, [workspaceSlug])
+  }, [clearUploadPreset, workspaceSlug])
 
   const loadPackageDraft = useCallback((draft: any, packageRow?: { id: number; name: string; isMine?: boolean; state?: string }) => {
     activePackageRevisionRef.current = draft.packageAssignmentRevision ?? null
@@ -2606,6 +2631,16 @@ export default function SearchHelper({
             </div>
           </DialogContent>
         </Dialog>
+
+        {uploadPreset ? (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <span className="flex-1">
+              Uploading for ZIP <strong>{uploadPreset.zipcode}</strong>, pages <strong>{uploadPreset.pageStart}–{uploadPreset.pageEnd}</strong>. Choose the Excel and the range will be filled in.
+            </span>
+            <Button size="sm" onClick={() => fileInputRef.current?.click()}>Choose Excel</Button>
+            <Button size="sm" variant="ghost" onClick={clearUploadPreset}>Dismiss</Button>
+          </div>
+        ) : null}
 
         {/* ── Upload & session row ── */}
         <ImportBar

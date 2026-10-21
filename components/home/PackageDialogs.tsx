@@ -19,6 +19,10 @@ import { packageNameForSegment } from "@/lib/package-name"
 export type PendingPackageUpload = {
   filename: string
   contacts: BaseContact[]
+  /** Pre-selected range, e.g. from Admin > ZIP coverage. */
+  zipcode?: string
+  pageStart?: number
+  pageEnd?: number
 }
 
 type PackageRow = {
@@ -299,11 +303,11 @@ export function PackageDialogs({
   useEffect(() => {
     if (!pendingUpload) return
     setName(pendingUpload.filename.replace(/\.(xlsx?|xls)$/i, ""))
-    setZipcode("")
+    setZipcode(pendingUpload.zipcode ?? "")
     setZipPickerOpen(false)
     setShowAllZipcodes(false)
-    setPageStart("")
-    setPageEnd("")
+    setPageStart(pendingUpload.pageStart ? String(pendingUpload.pageStart) : "")
+    setPageEnd(pendingUpload.pageEnd ? String(pendingUpload.pageEnd) : "")
   }, [pendingUpload])
 
   useEffect(() => {

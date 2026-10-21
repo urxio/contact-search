@@ -338,7 +338,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="admin-shell flex min-h-screen items-center justify-center">
+      <div className={`admin-shell flex items-center justify-center ${workspace ? "py-16" : "min-h-screen"}`}>
         <p className="animate-pulse text-sm text-muted-foreground">Loading admin…</p>
       </div>
     )
@@ -346,7 +346,7 @@ export default function AdminDashboard() {
 
   if (fetchError) {
     return (
-      <div className="admin-shell flex min-h-screen items-center justify-center px-4">
+      <div className={`admin-shell flex items-center justify-center px-4 ${workspace ? "py-16" : "min-h-screen"}`}>
         <div className="admin-material w-full max-w-sm rounded-2xl p-6 text-center">
           <p className="mb-2 text-base font-semibold text-destructive">Could not load admin</p>
           <p className="mb-4 text-sm text-muted-foreground">{fetchError}</p>
@@ -363,10 +363,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-shell min-h-screen">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${workspace ? "pb-8 pt-6" : "py-8"}`}>
 
-        {/* ── Header ── */}
-        <div className="mb-8 flex items-start justify-between gap-4">
+        {/* ── Header ── (the congregation admin layout renders its own) */}
+        {!workspace ? <div className="mb-8 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="admin-icon-well flex h-11 w-11 items-center justify-center rounded-2xl text-primary">
               <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
@@ -378,22 +378,20 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-          {!workspace ? (
-            <div className="flex items-center gap-2">
-              <ThemeSwitcher className="admin-material" />
-              <button
-                onClick={async () => {
-                  await fetch("/api/admin/logout", { method: "POST" })
-                  window.location.href = "/"
-                }}
-                className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher className="admin-material" />
+            <button
+              onClick={async () => {
+                await fetch("/api/admin/logout", { method: "POST" })
+                window.location.href = "/"
+              }}
+              className="admin-material inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-muted-foreground transition-all duration-150 ease-out hover:-translate-y-px hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
+        </div> : null}
 
         {/* ── Primary navigation ── */}
         <div className="admin-material mb-6 inline-flex items-center gap-1 rounded-full p-1">

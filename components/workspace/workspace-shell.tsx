@@ -231,24 +231,16 @@ export function WorkspaceShell({
                       What&apos;s new
                     </Link>
                   </DropdownMenuItem>
-                  {canAdmin ? (
+                  {account.isPlatformAdmin ? (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
-                        <Link href={`/c/${activeWorkspace.slug}/congregation-settings`}>
-                          <Building2 aria-hidden="true" />
-                          Congregation settings
+                        <Link href="/platform">
+                          <ShieldCheck aria-hidden="true" />
+                          Platform portal
                         </Link>
                       </DropdownMenuItem>
                     </>
-                  ) : null}
-                  {account.isPlatformAdmin ? (
-                    <DropdownMenuItem asChild className="min-h-11 rounded-lg px-3">
-                      <Link href="/platform">
-                        <ShieldCheck aria-hidden="true" />
-                        Platform portal
-                      </Link>
-                    </DropdownMenuItem>
                   ) : null}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={signOut} className="min-h-11 rounded-lg px-3 text-destructive focus:text-destructive">
@@ -305,16 +297,6 @@ export function WorkspaceShell({
                           What&apos;s new
                         </Link>
                       </SheetClose>
-                      {canAdmin ? (
-                        <div className="mt-2 border-t pt-2">
-                          <SheetClose asChild>
-                            <Link href={`/c/${activeWorkspace.slug}/congregation-settings`} className="flex min-h-11 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                              <Building2 className="h-4 w-4" aria-hidden="true" />
-                              Congregation settings
-                            </Link>
-                          </SheetClose>
-                        </div>
-                      ) : null}
                       <button type="button" onClick={signOut} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 text-sm font-medium text-destructive transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <LogOut className="h-4 w-4" aria-hidden="true" />
                         Sign out
