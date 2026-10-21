@@ -153,9 +153,15 @@ const ContactGridCard = React.memo(function ContactGridCard({
     <Card
       key={contact.id}
       id={`contact-row-${contact.id}`}
-      className={`overflow-hidden cursor-pointer ${areaClass ?? ""} ${isLastVerified ? "border-l-4 border-l-green-500" : ""} ${contact.bookmarked ? "border-t-2 border-t-amber-500" : ""} ${isActiveOrigin ? "ring-2 ring-indigo-500" : ""}`}
+      className={`overflow-hidden cursor-pointer ${areaClass ?? ""} ${isLastVerified ? "border-l-4 border-l-green-500" : ""} ${isActiveOrigin ? "ring-2 ring-indigo-500" : ""}`}
       onClick={() => onToggleExpanded(contact.id)}
     >
+      {contact.bookmarked && (
+        <div className="flex items-center gap-1.5 border-b border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+          <Bookmark className="h-3 w-3 fill-current" />
+          You stopped here
+        </div>
+      )}
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -166,11 +172,6 @@ const ContactGridCard = React.memo(function ContactGridCard({
                 onClick={(e) => e.stopPropagation()}
               />
               <CardTitle className="text-base">{contact.fullName}</CardTitle>
-              {contact.bookmarked && (
-                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                  You stopped here
-                </span>
-              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

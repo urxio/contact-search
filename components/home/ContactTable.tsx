@@ -169,14 +169,22 @@ const ContactTableRow = React.memo(function ContactTableRow({
 
   return (
     <>
+      {contact.bookmarked && (
+        <TableRow className="border-b-0 hover:bg-transparent">
+          <TableCell colSpan={8} className="p-0">
+            <div className="flex items-center gap-1.5 border-y border-amber-300 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+              <Bookmark className="h-3 w-3 fill-current" />
+              You stopped here
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
       <TableRow
         id={`contact-row-${contact.id}`}
         className={`cursor-pointer transition-colors hover:bg-muted/50 ${rowColorClass} ${
           isActiveOrigin ? "ring-2 ring-inset ring-indigo-500" : ""
         } ${
           isLastVerified ? "border-l-4 border-l-green-500 dark:border-l-green-400" : ""
-        } ${
-          contact.bookmarked ? "border-t-2 border-t-amber-500" : ""
         }`}
         onClick={() => onToggleExpanded(contact.id)}
       >
@@ -190,11 +198,6 @@ const ContactTableRow = React.memo(function ContactTableRow({
         <TableCell className="font-medium">
           <div className="flex items-center gap-2">
             {contact.fullName}
-            {contact.bookmarked && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                You stopped here
-              </span>
-            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

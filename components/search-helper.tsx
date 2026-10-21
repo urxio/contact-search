@@ -1397,18 +1397,25 @@ export default function SearchHelper({
     })
   }, [])
 
-  // Remember the first visible row when the user leaves, as a fallback when nothing is bookmarked.
+  // Remember the furthest row the user has scrolled to as a fallback when nothing is bookmarked.
+  // Scrolling back up never moves it, so returning to the top of the list doesn't lose their place.
   const saveScrollAnchor = useCallback(() => {
-    const rows = document.querySelectorAll<HTMLElement>('[id^="contact-row-"]')
-    for (const row of rows) {
-      const rect = row.getBoundingClientRect()
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('[id^="contact-row-"]'))
+    const idOf = (row: HTMLElement) => row.id.replace("contact-row-", "")
+    let firstVisible = -1
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect()
       if (rect.bottom > 80) {
-        if (rect.top < window.innerHeight) {
-          try { localStorage.setItem(storageKey("scrollAnchorId"), row.id.replace("contact-row-", "")) } catch {}
-        }
-        return
+        if (rect.top < window.innerHeight) firstVisible = i
+        break
       }
     }
+    if (firstVisible < 0) return
+    try {
+      const savedId = localStorage.getItem(storageKey("scrollAnchorId"))
+      const savedIndex = savedId ? rows.findIndex((row) => idOf(row) === savedId) : -1
+      if (firstVisible > savedIndex) localStorage.setItem(storageKey("scrollAnchorId"), idOf(rows[firstVisible]))
+    } catch {}
   }, [storageKey])
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === "hidden") saveScrollAnchor() }
