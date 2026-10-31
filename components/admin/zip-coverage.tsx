@@ -465,7 +465,7 @@ function UploadDialog({ slug, upload, onClose, onUploaded }: {
 
   return (
     <Dialog open={Boolean(upload)} onOpenChange={(open) => { if (!open && !saving) onClose() }}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
+      <DialogContent className="grid-cols-[minmax(0,1fr)] rounded-2xl sm:max-w-lg">
         <DialogHeader className="text-left">
           <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
@@ -481,11 +481,11 @@ function UploadDialog({ slug, upload, onClose, onUploaded }: {
           <div className="space-y-2"><Label htmlFor="coverage-page-end">End page</Label>
             <Input id="coverage-page-end" type="number" min={1} max={upload?.totalPages} value={pageEnd} onChange={(event) => setPageEnd(event.target.value)} className="h-11 rounded-xl" /></div>
         </div>
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" className="rounded-xl" disabled={Boolean(saving)} onClick={() => save("private")}>
+        <DialogFooter className="flex-row flex-wrap gap-2 sm:space-x-0">
+          <Button variant="outline" className="flex-auto rounded-xl" disabled={Boolean(saving)} onClick={() => save("private")}>
             <UserRound aria-hidden="true" />{saving === "private" ? "Saving…" : "Save in Your Excels"}
           </Button>
-          <Button className="rounded-xl" disabled={Boolean(saving)} onClick={() => save("shared")}>
+          <Button className="flex-auto rounded-xl" disabled={Boolean(saving)} onClick={() => save("shared")}>
             <Share2 aria-hidden="true" />{saving === "shared" ? "Sharing…" : "Share with congregation"}
           </Button>
         </DialogFooter>
