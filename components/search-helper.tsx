@@ -1817,6 +1817,9 @@ export default function SearchHelper({
 
       if (res.ok) {
         toast.success(`Work submitted for review! (${contacts.length} contacts sent as "${userId}")`)
+        const submittedPackageId = activePackageIdRef.current
+        if (submittedPackageId != null) setActivePackages((current) => current.filter((item) => item.id !== submittedPackageId))
+        void refreshActivePackages()
         // Ask if they'd like to start a new session
         setTimeout(() => setIsPostExportDialogOpen(true), 1000)
       } else {
@@ -1839,7 +1842,7 @@ export default function SearchHelper({
     } finally {
       setIsSendingReview(false)
     }
-  }, [blockDraftEditing, contacts, globalNotes, lastVerifiedId, saveDraftSnapshot, territoryPageRange, territoryZipcode, userId, workspaceSlug])
+  }, [blockDraftEditing, contacts, globalNotes, lastVerifiedId, refreshActivePackages, saveDraftSnapshot, territoryPageRange, territoryZipcode, userId, workspaceSlug])
 
   // Modify the startNewSession function to reset the file input element
   const startNewSession = useCallback(() => {

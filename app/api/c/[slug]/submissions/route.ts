@@ -110,6 +110,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         )
         completedSegmentIds = completed.rows.map(row => Number(row.id))
       }
+      // A linked Excel completes its own segment even if the draft's ZIP/page text was edited.
+      if (linkedPackage?.segment_id != null && !completedSegmentIds.includes(Number(linkedPackage.segment_id))) {
+        const completed = await client.query(
+          `UPDATE zt_segments SET status = 'Completed', updated_at = NOW()
+           WHERE id = $1 AND congregation_id = $2 AND owner_user_id = $3 AND status <> 'Completed'
+           RETURNING id`,
+          [linkedPackage.segment_id, auth.congregation.id, auth.user.id],
+        )
+        completedSegmentIds.push(...completed.rows.map(row => Number(row.id)))
+      }
       await client.query("COMMIT")
       await auditEvent({
         actorUserId: auth.user.id,
