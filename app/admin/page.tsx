@@ -155,6 +155,14 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchSubmissions() }, [fetchSubmissions])
 
+  // Bumped when the Database Duplicates Check deletes contacts, so the
+  // Potentially French tab (which stays mounted) reloads its list.
+  const [contactsReloadKey, setContactsReloadKey] = useState(0)
+  const handleDuplicateContactsRemoved = useCallback(() => {
+    setContactsReloadKey(k => k + 1)
+    void fetchSubmissions()
+  }, [fetchSubmissions])
+
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   const setStatus = useCallback(async (id: number, review_status: ReviewStatus) => {
@@ -467,7 +475,7 @@ export default function AdminDashboard() {
 
         {/* Keep tools mounted after their first visit so switching does not refetch. */}
         {visitedTabs.has("otm") && (
-          <div className={activeTab === "otm" ? "" : "hidden"}><MemoOtmPanel /></div>
+          <div className={activeTab === "otm" ? "" : "hidden"}><MemoOtmPanel onContactsRemoved={handleDuplicateContactsRemoved} /></div>
         )}
 
         {visitedTabs.has("names") && (
@@ -475,7 +483,7 @@ export default function AdminDashboard() {
         )}
 
         {visitedTabs.has("potentiallyFrench") && (
-          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><MemoPotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} /></div>
+          <div className={activeTab === "potentiallyFrench" ? "" : "hidden"}><MemoPotentiallyFrenchPanel onSubmissionsChanged={fetchSubmissions} reloadKey={contactsReloadKey} /></div>
         )}
 
         {visitedTabs.has("dictionaryScan") && (
@@ -921,7 +929,7 @@ const OTM_LS_NAME = "otm_last_filename"
 
 type SavedFileInfo = { exists: boolean; filename?: string; uploadedAt?: string }
 
-function OtmPanel() {
+function OtmPanel({ onContactsRemoved }: { onContactsRemoved?: () => void }) {
   const workspace = useWorkspaceRuntime()
   const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
   const adminPeopleBase = workspace ? `/c/${workspace.slug}/admin/people` : "/admin/user"
@@ -1045,7 +1053,10 @@ function OtmPanel() {
   }
 
   // ── Remove a single OTM dup contact from the DB ───────────────────────────
-  const removeMatch = async (m: OtmMatch) => {
+  // Returns whether the contact was deleted. `notify` tells the dashboard so
+  // the Potentially French list and submission counts drop the contact;
+  // Remove all passes false and notifies once at the end instead.
+  const removeMatch = async (m: OtmMatch, notify = true): Promise<boolean> => {
     const key = `${m.submissionId}:${m.contactId}`
     setRemoving(prev => new Set(prev).add(key))
     try {
@@ -1055,15 +1066,17 @@ function OtmPanel() {
       )
       if (res.ok) {
         setDismissed(prev => new Set(prev).add(key))
-      } else {
-        const data = await res.json()
-        alert("Failed to remove contact: " + (data.error ?? "Unknown error"))
+        if (notify) onContactsRemoved?.()
+        return true
       }
+      const data = await res.json()
+      alert("Failed to remove contact: " + (data.error ?? "Unknown error"))
     } catch {
       alert("Network error — could not remove contact.")
     } finally {
       setRemoving(prev => { const s = new Set(prev); s.delete(key); return s })
     }
+    return false
   }
 
   // ── Remove ALL visible OTM dup contacts at once ───────────────────────────
@@ -1071,7 +1084,8 @@ function OtmPanel() {
     if (!result) return
     const visible = result.matches.filter(m => !dismissed.has(`${m.submissionId}:${m.contactId}`))
     if (!window.confirm(`Remove all ${visible.length} duplicate contact${visible.length !== 1 ? "s" : ""} from their submissions? This cannot be undone.`)) return
-    await Promise.all(visible.map(removeMatch))
+    const removed = await Promise.all(visible.map(m => removeMatch(m, false)))
+    if (removed.some(Boolean)) onContactsRemoved?.()
   }
 
   // ── Clear a single OTM dup: dismiss from UI and remove from saved result ──
@@ -2101,7 +2115,7 @@ function FrenchExportBatchList({ batches, archived, busy, expanded, onToggle, on
   )
 }
 
-function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
+function PotentiallyFrenchPanel({ onSubmissionsChanged, reloadKey = 0 }: { onSubmissionsChanged?: () => void; reloadKey?: number }) {
   const workspace = useWorkspaceRuntime()
   const adminApiBase = workspace ? `/api/c/${encodeURIComponent(workspace.slug)}/admin` : "/api/admin"
   const [contacts, setContacts] = useState<PotentiallyFrenchContact[]>([])
@@ -2143,7 +2157,9 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
     }
   }, [adminApiBase])
 
-  useEffect(() => { void loadContacts() }, [loadContacts])
+  // reloadKey bumps when another tab (the Database Duplicates Check) deletes
+  // contacts, so this stays-mounted list drops them without a page reload.
+  useEffect(() => { void loadContacts() }, [loadContacts, reloadKey])
 
   const exportedBatches = exports.filter((batch) => !batch.archivedAt)
   const archivedBatches = exports.filter((batch) => !!batch.archivedAt)
