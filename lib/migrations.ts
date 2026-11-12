@@ -318,6 +318,29 @@ const migrations: Migration[] = [{
       FROM users u
       WHERE s.owner_user_id=u.id`)
   }
+},{
+  version:24,name:"potentially French export batches",async run(client){
+    // Each CSV export of Potentially French contacts becomes a batch. Items keep a
+    // snapshot of the exported row so a batch can be re-downloaded unchanged, and
+    // the (submission_id, contact_id) key keeps a contact in at most one batch.
+    await client.query(`CREATE TABLE french_contact_exports (
+      id BIGSERIAL PRIMARY KEY,
+      congregation_id BIGINT REFERENCES congregations(id) ON DELETE CASCADE,
+      created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      state_value TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      archived_at TIMESTAMPTZ
+    )`)
+    await client.query(`CREATE INDEX french_contact_exports_congregation_idx ON french_contact_exports(congregation_id, created_at DESC)`)
+    await client.query(`CREATE TABLE french_contact_export_items (
+      export_id BIGINT NOT NULL REFERENCES french_contact_exports(id) ON DELETE CASCADE,
+      submission_id INT NOT NULL,
+      contact_id TEXT NOT NULL,
+      contact JSONB NOT NULL,
+      PRIMARY KEY(submission_id, contact_id)
+    )`)
+    await client.query(`CREATE INDEX french_contact_export_items_export_idx ON french_contact_export_items(export_id)`)
+  }
 }]
 
 const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version

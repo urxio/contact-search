@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { pool } from "@/lib/db"
+import { ensureSchema, pool } from "@/lib/db"
+import { createFrenchExport, isFrenchExportAction, listFrenchContacts, parseStateValue, updateFrenchExport } from "@/lib/french-exports"
+import { parseContactRefs } from "@/lib/submission-contacts"
 
 function requireAdmin(): NextResponse | null {
   const cookieStore = cookies()
@@ -11,86 +13,44 @@ function requireAdmin(): NextResponse | null {
   return null
 }
 
-function normalize(s: string) {
-  return (s || "").toLowerCase().replace(/\s+/g, " ").trim()
-}
-
-type ContactRow = {
-  submission_id: number
-  user_id: string
-  submitted_at: string
-  contact_id: string | null
-  full_name: string | null
-  address: string | null
-  city: string | null
-  zipcode: string | null
-  phone: string | null
-  notes: string | null
-}
-
-// GET — every contact currently marked "Potentially French" across all
-// non-archived submissions, with duplicate detection (by address and by
-// name) across users — something no single user's local "Duplicate"
-// status check can catch, since that only looks within one session.
+// GET — Potentially French contacts not yet exported (with duplicate detection
+// across users) plus every CSV export batch, newest first.
 export async function GET() {
   const unauthorized = requireAdmin()
   if (unauthorized) return unauthorized
 
   try {
-    const result = await pool.query(`
-      SELECT
-        s.id AS submission_id,
-        s.user_id,
-        s.submitted_at,
-        c->>'id'        AS contact_id,
-        c->>'fullName'  AS full_name,
-        c->>'address'   AS address,
-        c->>'city'      AS city,
-        c->>'zipcode'   AS zipcode,
-        c->>'phone'     AS phone,
-        c->>'notes'     AS notes
-      FROM submissions s, jsonb_array_elements(s.contacts) c
-      WHERE c->>'status' = 'Potentially French' AND s.archived = FALSE
-    `)
-
-    const addressCounts = new Map<string, number>()
-    const nameCounts = new Map<string, number>()
-
-    const rows = (result.rows as ContactRow[]).map((row) => {
-      const addressKey = normalize(`${row.address} ${row.city} ${row.zipcode}`)
-      const nameKey = normalize(row.full_name || "")
-      if (addressKey) addressCounts.set(addressKey, (addressCounts.get(addressKey) ?? 0) + 1)
-      if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
-      return { row, addressKey, nameKey }
-    })
-
-    const contacts = rows.map(({ row, addressKey, nameKey }: { row: ContactRow; addressKey: string; nameKey: string }) => ({
-      submissionId: row.submission_id,
-      contactId: row.contact_id,
-      userId: row.user_id,
-      submittedAt: row.submitted_at,
-      fullName: row.full_name || "",
-      address: row.address || "",
-      city: row.city || "",
-      zipcode: row.zipcode || "",
-      phone: row.phone || "",
-      notes: row.notes || "",
-      duplicateAddressCount: addressKey ? addressCounts.get(addressKey) ?? 1 : 1,
-      duplicateNameCount: nameKey ? nameCounts.get(nameKey) ?? 1 : 1,
-    }))
-
-    contacts.sort((a, b) => {
-      const aMax = Math.max(a.duplicateAddressCount, a.duplicateNameCount)
-      const bMax = Math.max(b.duplicateAddressCount, b.duplicateNameCount)
-      if (aMax !== bMax) return bMax - aMax
-      return a.fullName.localeCompare(b.fullName)
-    })
-
-    const duplicateCount = contacts.filter((c) => c.duplicateAddressCount > 1 || c.duplicateNameCount > 1).length
-
-    return NextResponse.json({ contacts, totalCount: contacts.length, duplicateCount })
+    await ensureSchema()
+    return NextResponse.json(await listFrenchContacts(pool, null))
   } catch (err: any) {
     console.error("Potentially French list fetch error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// POST — records an export batch for the chosen contacts and returns the rows
+// to write into the CSV. Body: { contacts: ContactRef[], stateValue?: string }
+export async function POST(req: NextRequest) {
+  const unauthorized = requireAdmin()
+  if (unauthorized) return unauthorized
+
+  try {
+    const body = await req.json()
+    const contacts = parseContactRefs(body?.contacts)
+    if (!contacts.length) return NextResponse.json({ error: "Choose at least one contact to export" }, { status: 400 })
+    const stateValue = parseStateValue(body?.stateValue)
+    if (stateValue === null) return NextResponse.json({ error: "State must be 20 characters or fewer" }, { status: 400 })
+    await ensureSchema()
+    const client = await pool.connect()
+    try {
+      const batch = await createFrenchExport(client, { scope: null, userId: null, contacts, stateValue })
+      if (!batch) return NextResponse.json({ error: "Those contacts were already exported or are no longer Potentially French" }, { status: 409 })
+      return NextResponse.json({ export: batch })
+    } finally {
+      client.release()
+    }
+  } catch (err: any) {
+    console.error("Potentially French export error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -248,6 +208,18 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json()
+
+    if (isFrenchExportAction(body?.action)) {
+      const exportId = Number(body?.exportId)
+      if (!Number.isSafeInteger(exportId) || exportId <= 0) {
+        return NextResponse.json({ error: "Missing exportId" }, { status: 400 })
+      }
+      await ensureSchema()
+      if (!await updateFrenchExport(pool, null, exportId, body.action)) {
+        return NextResponse.json({ error: "Export batch not found" }, { status: 404 })
+      }
+      return NextResponse.json({ success: true })
+    }
 
     if (body?.action === "removeDuplicates") {
       const contacts = Array.isArray(body?.contacts)

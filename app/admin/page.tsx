@@ -1865,6 +1865,19 @@ type PotentiallyFrenchContact = {
   notes: string
   duplicateAddressCount: number
   duplicateNameCount: number
+  /** Matches a contact already in an export batch, by address or by name. */
+  exportedMatch?: "address" | "name" | null
+}
+
+type ExportedFrenchContact = Omit<PotentiallyFrenchContact, "duplicateAddressCount" | "duplicateNameCount" | "exportedMatch">
+
+type FrenchExportBatch = {
+  id: number
+  createdAt: string
+  archivedAt: string | null
+  stateValue: string
+  createdBy: string | null
+  contacts: ExportedFrenchContact[]
 }
 
 function potentiallyFrenchAddressKey(contact: PotentiallyFrenchContact) {
@@ -1951,7 +1964,7 @@ function escapeCSV(field: string) {
 // Same column set, escaping, and filename pattern as the main app's
 // exportPotentiallyFrenchToCSV — this is the admin-wide equivalent (every
 // user's Potentially French contacts, not just the current session's).
-function exportPotentiallyFrenchToCSV(contacts: PotentiallyFrenchContact[], stateValue: string) {
+function exportPotentiallyFrenchToCSV(contacts: ExportedFrenchContact[], stateValue: string, batch: { id: number; createdAt: string }) {
   const headers = [
     "Contact Name", "House Number", "Direction", "Street Name",
     "Apt Num", "City", "ZIP Code", "Phone Number", "State",
@@ -1969,11 +1982,123 @@ function exportPotentiallyFrenchToCSV(contacts: PotentiallyFrenchContact[], stat
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `french-contacts-${new Date().toLocaleDateString().replace(/\//g, "-")}.csv`
+  a.download = `french-contacts-${new Date(batch.createdAt).toISOString().slice(0, 10)}-batch-${batch.id}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+function FrenchExportBatchList({ batches, archived, busy, expanded, onToggle, onAction }: {
+  batches: FrenchExportBatch[]
+  archived: boolean
+  busy: Record<number, boolean>
+  expanded: Record<number, boolean>
+  onToggle: (id: number) => void
+  onAction: (batch: FrenchExportBatch, action: "undoExport" | "archiveExport" | "unarchiveExport") => void
+}) {
+  if (batches.length === 0) {
+    return (
+      <p className="px-6 py-12 text-center text-gray-400 text-sm">
+        {archived ? "No archived batches yet." : "No exported batches waiting. Export contacts from \"To export\" to start one."}
+      </p>
+    )
+  }
+  return (
+    <ul className="flex flex-col gap-3 p-6">
+      {batches.map((batch) => {
+        const isOpen = !!expanded[batch.id]
+        const isBusy = !!busy[batch.id]
+        return (
+          <li key={batch.id} className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/40">
+              <button
+                onClick={() => onToggle(batch.id)}
+                aria-expanded={isOpen}
+                className="flex min-w-0 items-center gap-2 text-left"
+              >
+                <svg className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="font-semibold text-gray-900 dark:text-white">Batch #{batch.id}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {batch.contacts.length} contact{batch.contacts.length !== 1 ? "s" : ""}
+                  {" · exported "}{new Date(batch.createdAt).toLocaleString()}
+                  {batch.createdBy ? ` by ${batch.createdBy}` : ""}
+                  {batch.stateValue ? ` · state ${batch.stateValue}` : ""}
+                  {batch.archivedAt ? ` · archived ${new Date(batch.archivedAt).toLocaleDateString()}` : ""}
+                </span>
+              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => exportPotentiallyFrenchToCSV(batch.contacts, batch.stateValue, batch)}
+                  disabled={batch.contacts.length === 0}
+                  title="Download this batch's CSV again, exactly as it was exported"
+                  className="h-8 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
+                >
+                  Re-download
+                </button>
+                {archived ? (
+                  <button
+                    onClick={() => onAction(batch, "unarchiveExport")}
+                    disabled={isBusy}
+                    title="Move this batch back to Exported"
+                    className="h-8 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 text-gray-700 dark:text-gray-300 text-xs font-medium transition-colors"
+                  >
+                    {isBusy ? "…" : "Unarchive"}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onAction(batch, "undoExport")}
+                      disabled={isBusy}
+                      title="The export didn't go out — put these contacts back in To export"
+                      className="h-8 px-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 disabled:opacity-50 text-red-600 dark:text-red-400 text-xs font-medium transition-colors"
+                    >
+                      Undo export
+                    </button>
+                    <button
+                      onClick={() => onAction(batch, "archiveExport")}
+                      disabled={isBusy}
+                      title="The CSV was received — file this batch away under Archived"
+                      className="h-8 px-3 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+                    >
+                      {isBusy ? "…" : "Archive"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {isOpen && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-gray-800">
+                      {["Name", "Address", "City", "Zip", "Phone", "User"].map((heading) => (
+                        <th key={heading} className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">{heading}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batch.contacts.map((c) => (
+                      <tr key={`${c.submissionId}:${c.contactId}`} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
+                        <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{c.fullName || "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{c.address || "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{c.city || "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{c.zipcode || "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{c.phone || "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{c.userId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged?: () => void }) {
@@ -1991,35 +2116,107 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
   const [reviewAllDuplicates, setReviewAllDuplicates] = useState(false)
   const [duplicateKeepers, setDuplicateKeepers] = useState<Record<string, string>>({})
   const [removingDuplicates, setRemovingDuplicates] = useState(false)
+  const [view, setView] = useState<"toExport" | "exported" | "archived">("toExport")
+  const [exports, setExports] = useState<FrenchExportBatch[]>([])
+  const [exporting, setExporting] = useState(false)
+  const [batchBusy, setBatchBusy] = useState<Record<number, boolean>>({})
+  const [expandedBatches, setExpandedBatches] = useState<Record<number, boolean>>({})
+  const [justExportedId, setJustExportedId] = useState<number | null>(null)
 
-  useEffect(() => {
-    fetch(`${adminApiBase}/potentially-french`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.error) {
-          setError(data.error)
-        } else {
-          setContacts(withPotentiallyFrenchDuplicateCounts(data.contacts ?? []))
-          setTotalCount(data.totalCount ?? 0)
-          setDuplicateCount(data.duplicateCount ?? 0)
-        }
-        setLoading(false)
-      })
-      .catch(() => {
-        setError("Network error — could not reach the server.")
-        setLoading(false)
-      })
+  const loadContacts = useCallback(async () => {
+    try {
+      const res = await fetch(`${adminApiBase}/potentially-french`)
+      const data = await res.json()
+      if (data?.error) {
+        setError(data.error)
+      } else {
+        setError(null)
+        setContacts(withPotentiallyFrenchDuplicateCounts(data.contacts ?? []))
+        setTotalCount(data.totalCount ?? 0)
+        setDuplicateCount(data.duplicateCount ?? 0)
+        setExports(data.exports ?? [])
+      }
+    } catch {
+      setError("Network error — could not reach the server.")
+    } finally {
+      setLoading(false)
+    }
   }, [adminApiBase])
 
-  const handleExport = () => {
-    if (contacts.length === 0) {
+  useEffect(() => { void loadContacts() }, [loadContacts])
+
+  const exportedBatches = exports.filter((batch) => !batch.archivedAt)
+  const archivedBatches = exports.filter((batch) => !!batch.archivedAt)
+  const exportedContactCount = exportedBatches.reduce((sum, batch) => sum + batch.contacts.length, 0)
+  const archivedContactCount = archivedBatches.reduce((sum, batch) => sum + batch.contacts.length, 0)
+  const justExported = exportedBatches.find((batch) => batch.id === justExportedId) ?? null
+
+  // Records the shown contacts as a new export batch on the server, then
+  // downloads exactly the rows the server recorded. They leave "To export"
+  // and wait under "Exported" until the batch is archived.
+  const handleExport = async (toExport: PotentiallyFrenchContact[]) => {
+    if (toExport.length === 0) {
       alert("No Potentially French contacts to export.")
       return
     }
     const stateValue = window.prompt("State abbreviation to stamp on every exported row (optional):", "")
     if (stateValue === null) return // cancelled
-    exportPotentiallyFrenchToCSV(contacts, stateValue)
+    setExporting(true)
+    try {
+      const res = await fetch(`${adminApiBase}/potentially-french`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stateValue,
+          contacts: toExport.map((c) => ({ submissionId: c.submissionId, contactId: c.contactId })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.export) {
+        alert(`Export failed: ${data?.error ?? "Unknown error"}`)
+        await loadContacts()
+        return
+      }
+      const batch = data.export as FrenchExportBatch
+      exportPotentiallyFrenchToCSV(batch.contacts, batch.stateValue, batch)
+      setJustExportedId(batch.id)
+      await loadContacts()
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setExporting(false)
+    }
   }
+
+  const updateBatch = useCallback(async (batch: FrenchExportBatch, action: "undoExport" | "archiveExport" | "unarchiveExport") => {
+    if (action === "undoExport" && !window.confirm(
+      `Undo batch #${batch.id}? Its ${batch.contacts.length} contact${batch.contacts.length !== 1 ? "s" : ""} go back to "To export". Contacts are not deleted.`,
+    )) return
+    setBatchBusy((b) => ({ ...b, [batch.id]: true }))
+    try {
+      const res = await fetch(`${adminApiBase}/potentially-french`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, exportId: batch.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Could not update batch #${batch.id}: ${data?.error ?? "Unknown error"}`)
+        return
+      }
+      if (justExportedId === batch.id) setJustExportedId(null)
+      if (action === "undoExport") {
+        await loadContacts()
+      } else {
+        const archivedAt = action === "archiveExport" ? new Date().toISOString() : null
+        setExports((prev) => prev.map((item) => item.id === batch.id ? { ...item, archivedAt } : item))
+      }
+    } catch {
+      alert("Network error — could not reach the server.")
+    } finally {
+      setBatchBusy((b) => { const next = { ...b }; delete next[batch.id]; return next })
+    }
+  }, [adminApiBase, justExportedId, loadContacts])
 
   // Removes a contact from this list by flipping its status to "Not French".
   const markNotFrench = useCallback(async (c: PotentiallyFrenchContact) => {
@@ -2172,13 +2369,13 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Potential Frenchs</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {totalCount} contact{totalCount !== 1 ? "s" : ""} across all users
+            {totalCount} contact{totalCount !== 1 ? "s" : ""} to export across all users
             {duplicateCount > 0 && (
               <span className="text-amber-600 dark:text-amber-400 font-medium"> · {duplicateCount} possible duplicate{duplicateCount !== 1 ? "s" : ""}</span>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        {view === "toExport" && <div className="flex flex-wrap items-center gap-3">
           <input
             type="text"
             placeholder="Search name, address, user…"
@@ -2199,26 +2396,83 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
             Auto-remove duplicates
           </button>
           <button
-            onClick={handleExport}
-            disabled={contacts.length === 0}
-            title="Export all Potentially French contacts to CSV — same format as the main app's Export CSV"
+            onClick={() => handleExport(filtered)}
+            disabled={filtered.length === 0 || exporting}
+            title="Download the contacts shown below as a CSV (same format as the main app's Export CSV) and move them to Exported"
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors whitespace-nowrap"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2-8H8a2 2 0 00-2 2v14a2 2 0 002 2h8a2 2 0 002-2V8l-6-6z" />
             </svg>
-            Export CSV
+            {exporting ? "Exporting…" : `Export ${filtered.length} to CSV`}
           </button>
+        </div>}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 px-6 pt-4">
+        <div role="tablist" aria-label="Potentially French export stages" className="inline-flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+          {([
+            ["toExport", "To export", totalCount],
+            ["exported", "Exported", exportedContactCount],
+            ["archived", "Archived", archivedContactCount],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={view === key}
+              onClick={() => setView(key)}
+              className={`inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                view === key
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              {label}
+              <span className="text-xs tabular-nums text-gray-400">{count}</span>
+            </button>
+          ))}
         </div>
       </div>
+
+      {justExported && (
+        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-4 py-3 text-sm">
+          <p className="text-green-800 dark:text-green-300">
+            Exported {justExported.contacts.length} contact{justExported.contacts.length !== 1 ? "s" : ""} as batch #{justExported.id}. Once you&apos;ve checked the CSV, archive the batch.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => updateBatch(justExported, "archiveExport")}
+              disabled={!!batchBusy[justExported.id]}
+              className="h-8 px-3 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+            >
+              Archive now
+            </button>
+            <button
+              onClick={() => setJustExportedId(null)}
+              className="h-8 px-3 rounded-lg text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40 text-xs font-medium transition-colors"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="px-6 py-12 text-center text-gray-400 text-sm">Loading…</p>
       ) : error ? (
         <p className="px-6 py-12 text-center text-red-500 text-sm">{error}</p>
+      ) : view !== "toExport" ? (
+        <FrenchExportBatchList
+          batches={view === "exported" ? exportedBatches : archivedBatches}
+          archived={view === "archived"}
+          busy={batchBusy}
+          expanded={expandedBatches}
+          onToggle={(id) => setExpandedBatches((e) => ({ ...e, [id]: !e[id] }))}
+          onAction={updateBatch}
+        />
       ) : filtered.length === 0 ? (
         <p className="px-6 py-12 text-center text-gray-400 text-sm">
-          {duplicatesOnly ? "No duplicates found." : "No contacts marked Potentially French yet."}
+          {duplicatesOnly ? "No duplicates found." : search ? "No contacts match your search." : "Nothing left to export."}
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -2239,6 +2493,14 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
             <tbody>
               {filtered.map((c) => {
                 const isDup = c.duplicateAddressCount > 1 || c.duplicateNameCount > 1
+                const exportedBadge = c.exportedMatch ? (
+                  <span
+                    title={`Same ${c.exportedMatch} as a contact in an earlier export batch`}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 whitespace-nowrap"
+                  >
+                    Exported {c.exportedMatch}
+                  </span>
+                ) : null
                 return (
                   <tr
                     key={`${c.submissionId}:${c.contactId}`}
@@ -2273,8 +2535,9 @@ function PotentiallyFrenchPanel({ onSubmissionsChanged }: { onSubmissionsChanged
                               {c.duplicateNameCount}× name
                             </span>
                           )}
+                          {exportedBadge}
                         </div>
-                      ) : (
+                      ) : exportedBadge ?? (
                         <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
                       )}
                     </td>
