@@ -1996,7 +1996,15 @@ function exportPotentiallyFrenchToCSV(contacts: ExportedFrenchContact[], stateVa
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `french-contacts-${new Date(batch.createdAt).toISOString().slice(0, 10)}-batch-${batch.id}.csv`
+  // Local calendar date (not toISOString, which is UTC and rolls over to the
+  // next day in the evening in US time zones).
+  const exportedAt = new Date(batch.createdAt)
+  const localDate = [
+    exportedAt.getFullYear(),
+    String(exportedAt.getMonth() + 1).padStart(2, "0"),
+    String(exportedAt.getDate()).padStart(2, "0"),
+  ].join("-")
+  a.download = `french-contacts-${localDate}-batch-${batch.id}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
